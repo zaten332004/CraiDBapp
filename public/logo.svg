@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <title>CRAI DB</title>
+  <defs>
+    <linearGradient id="cloud" x1="64" y1="48" x2="192" y2="144" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7BE0FF" />
+      <stop offset="1" stop-color="#4DBAF5" />
+    </linearGradient>
+    <linearGradient id="container" x1="48" y1="112" x2="208" y2="184" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2F5AA8" />
+      <stop offset="1" stop-color="#274D92" />
+    </linearGradient>
+  </defs>
+
+  <!-- Cloud -->
+  <path
+    d="M88 120c-17.7 0-32-14.3-32-32 0-15.2 10.7-28 25-31.3C86 43.5 100 32 116.7 32c12.6 0 24 6.6 30.4 16.9 2.9-0.6 5.9-0.9 8.9-0.9 22.1 0 40 17.9 40 40 0 17.7-14.3 32-32 32H88Z"
+    fill="url(#cloud)"
+  />
+
+  <!-- Container body -->
+  <path
+    d="M72 120h136c8.8 0 16 7.2 16 16v24c0 13.3-10.7 24-24 24H88c-13.3 0-24-10.7-24-24v-40c0-4.4 3.6-8 8-8Z"
+    fill="url(#container)"
+  />
+
+  <!-- Speed lines -->
+  <path d="M40 136h44" stroke="#2F5AA8" stroke-width="10" stroke-linecap="round" opacity="0.9" />
+  <path d="M24 156h56" stroke="#2F5AA8" stroke-width="10" stroke-linecap="round" opacity="0.75" />
+
+  <!-- Text -->
+  <path
+    d="M66 222h124"
+    stroke="#6CCDF2"
+    stroke-width="2"
+    stroke-linecap="round"
+    opacity="0.35"
+  />
+  <text
+    x="128"
+    y="212"
+    text-anchor="middle"
+    font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'"
+    font-size="30"
+    font-weight="700"
+    letter-spacing="4"
+    fill="#6CCDF2"
+  >
+    CRAI_DB
+  </text>
+</svg>
+
