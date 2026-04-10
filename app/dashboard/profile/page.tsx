@@ -15,6 +15,7 @@ import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { formatUserFacingApiError, formatUserFacingFetchError } from '@/lib/api/format-api-error';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { CRAIDB_PROFILE_CHANGED_EVENT } from '@/lib/profile-sync-event';
 import { getAccessToken, setSession } from '@/lib/auth/token';
 
 type ProfileMe = {
@@ -97,6 +98,7 @@ export default function ProfilePage() {
         full_name: updated.full_name ?? '',
         phone: updated.phone ?? '',
       });
+      window.dispatchEvent(new Event(CRAIDB_PROFILE_CHANGED_EVENT));
       notifySuccess(isVi ? 'Đã lưu hồ sơ.' : 'Profile saved.');
     } catch (err) {
       const msg = formatUserFacingApiError(err);
@@ -206,6 +208,7 @@ export default function ProfilePage() {
       }
       const updated = (await response.json()) as ProfileMe;
       setProfile(updated);
+      window.dispatchEvent(new Event(CRAIDB_PROFILE_CHANGED_EVENT));
       notifySuccess(isVi ? 'Đã cập nhật ảnh đại diện.' : 'Avatar updated.');
     } catch (err) {
       const msg = formatUserFacingApiError(err);

@@ -36,6 +36,7 @@ import { getUserRole, type UserRole } from '@/lib/auth/token';
 import { LanguageToggle } from '@/components/language-toggle';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
+import { CRAIDB_PROFILE_CHANGED_EVENT } from '@/lib/profile-sync-event';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 import {
@@ -154,21 +155,35 @@ export function AppSidebar() {
   const [role, setRole] = React.useState<UserRole | null>(null);
   const [currentUser, setCurrentUser] = React.useState<{ name: string; avatarUrl?: string | null } | null>(null);
 
+  const loadSidebarUser = React.useCallback(async () => {
+    try {
+      const me = await browserApiFetchAuth<Record<string, unknown>>('/profile/me', { method: 'GET' });
+      const name = String(me?.full_name ?? me?.username ?? me?.email ?? '').trim();
+      const raw = me?.avatar_url ?? me?.avatarUrl;
+      const avatarUrl =
+        typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+      setCurrentUser({
+        name: name || 'User',
+        avatarUrl,
+      });
+    } catch {
+      setCurrentUser(null);
+    }
+  }, []);
+
   React.useEffect(() => {
     setRole(getUserRole());
-    void (async () => {
-      try {
-        const me = await browserApiFetchAuth<any>('/profile/me', { method: 'GET' });
-        const name = String(me?.full_name ?? me?.username ?? me?.email ?? '').trim();
-        setCurrentUser({
-          name: name || 'User',
-          avatarUrl: me?.avatar_url ?? null,
-        });
-      } catch {
-        setCurrentUser(null);
-      }
-    })();
   }, []);
+
+  React.useEffect(() => {
+    void loadSidebarUser();
+  }, [pathname, loadSidebarUser]);
+
+  React.useEffect(() => {
+    const handler = () => void loadSidebarUser();
+    window.addEventListener(CRAIDB_PROFILE_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(CRAIDB_PROFILE_CHANGED_EVENT, handler);
+  }, [loadSidebarUser]);
 
   const handleLogout = () => {
     clearAccessToken();
@@ -367,7 +382,11 @@ export function AppSidebar() {
             className="mb-3 flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-2.5 py-2 transition-colors hover:bg-sidebar-accent"
           >
             <Avatar className="h-7 w-7">
-              <AvatarImage src={currentUser.avatarUrl || undefined} alt={currentUser.name} />
+              <AvatarImage
+                key={currentUser.avatarUrl ?? 'no-avatar'}
+                src={currentUser.avatarUrl || undefined}
+                alt={currentUser.name}
+              />
               <AvatarFallback>
                 {currentUser.name
                   .split(' ')
