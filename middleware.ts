@@ -26,17 +26,23 @@ export function middleware(request: NextRequest) {
     if (role === "viewer") {
       if (
         pathname.startsWith("/dashboard/upload") ||
-        pathname.startsWith("/dashboard/customers/new") ||
-        pathname.startsWith("/dashboard/risk/batch")
+        pathname.startsWith("/dashboard/customers/new")
       ) {
         return NextResponse.redirect(new URL("/dashboard/forbidden", request.url));
+      }
+    }
+
+    if (role === "analyst") {
+      if (pathname === "/dashboard" || pathname === "/dashboard/") {
+        return NextResponse.redirect(new URL("/dashboard/customers", request.url));
       }
     }
   }
 
   if (pathname.startsWith("/auth")) {
     if (token) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      const home = role === "analyst" ? "/dashboard/customers" : "/dashboard";
+      return NextResponse.redirect(new URL(home, request.url));
     }
   }
 

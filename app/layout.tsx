@@ -7,6 +7,8 @@ import { cookies } from 'next/headers'
 import { normalizeLocale } from '@/lib/i18n/cookies'
 import { PageTransition } from '@/components/page-transition'
 import { RouteTransitionListener } from '@/components/route-transition-listener'
+import { AppToaster } from '@/components/app-toaster'
+import { SessionActivityTracker } from '@/components/session-activity-tracker'
 
 export const metadata: Metadata = {
   title: 'CRAI DB - Intelligent Credit Risk Analytics Platform',
@@ -41,11 +43,13 @@ export default async function RootLayout({
 
   return (
     <html lang={initialLocale} suppressHydrationWarning>
-      <body className={`font-sans antialiased`}>
+      <body className={`font-sans antialiased`} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <I18nProvider initialLocale={initialLocale}>
             <RouteTransitionListener />
+            <SessionActivityTracker />
             <PageTransition>{children}</PageTransition>
+            <AppToaster />
           </I18nProvider>
         </ThemeProvider>
         <Analytics />

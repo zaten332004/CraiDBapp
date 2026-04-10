@@ -88,3 +88,44 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* AI Chat: first send — message list fades in, composer slides down to the bottom */
+@keyframes ai-chat-messages-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 1.5rem, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.ai-chat-messages-reveal {
+  animation: ai-chat-messages-reveal 0.75s cubic-bezier(0.18, 0.88, 0.22, 1) both;
+}
+
+@keyframes ai-chat-composer-snap-to-bottom {
+  from {
+    transform: translate3d(0, clamp(-22rem, -48vh, -8rem), 0) scale(0.94);
+    opacity: 0.45;
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+}
+
+.ai-chat-composer-snap-to-bottom {
+  animation: ai-chat-composer-snap-to-bottom 0.82s cubic-bezier(0.15, 0.9, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-chat-messages-reveal,
+  .ai-chat-composer-snap-to-bottom {
+    animation: none;
+  }
+}

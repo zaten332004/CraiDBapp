@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
-import { AlertCircle, Chrome, Github, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Chrome, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { setSession } from '@/lib/auth/token';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/components/i18n-provider';
@@ -26,20 +26,36 @@ function toMode(value: string | null | undefined): Mode | null {
   return null;
 }
 
+function defaultDashboardAfterLogin(role: string | null | undefined) {
+  return String(role || '').trim().toLowerCase() === 'analyst' ? '/dashboard/customers' : '/dashboard';
+}
+
 export function AuthSplitCard() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+
+  const googleClientId = (process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID || '').trim();
+  const googleBtnDivRef = useRef<HTMLDivElement | null>(null);
+  const googleLoginRef = useRef<(credential: string) => void>(() => {});
 
   const nextParam = searchParams.get('next');
   const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null;
+  const sessionReason = searchParams.get('reason');
+  const sessionExpiredRedirect =
+    sessionReason === 'session_expired' ||
+    sessionReason === 'session_idle' ||
+    sessionReason === 'session_invalid';
 
   const queryMode = useMemo(() => toMode(searchParams.get('mode')) ?? 'login', [searchParams]);
   // Start in `login` so opening `/auth?mode=register` can animate into place after hydration.
   const [mode, setMode] = useState<Mode>('login');
+  const isLogin = mode === 'login';
+  const overlayCta = isLogin ? t('auth.sign_up') : t('auth.sign_in');
 
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -52,11 +68,78 @@ export function AuthSplitCard() {
   });
   const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
 
   useEffect(() => {
     setMode((prev) => (prev === queryMode ? prev : queryMode));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryMode]);
+
+  /** Google Identity Services: gửi id_token JWT tới POST /auth/login/google (backend không có GET /auth/oauth). */
+  useEffect(() => {
+    if (!isLogin || !googleClientId) return;
+    const el = googleBtnDivRef.current;
+    if (!el) return;
+
+    let cancelled = false;
+
+    const mountButton = () => {
+      if (cancelled || !el) return;
+      const g = window.google?.accounts?.id;
+      if (!g) return;
+      el.innerHTML = '';
+      g.initialize({
+        client_id: googleClientId,
+        callback: (resp: { credential: string }) => {
+          void googleLoginRef.current(resp.credential);
+        },
+        ux_mode: 'popup',
+        auto_select: false,
+      });
+      const w = Math.max(220, Math.floor(el.getBoundingClientRect().width) || 280);
+      g.renderButton(el, {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large',
+        width: w,
+        text: 'signin_with',
+        locale: locale === 'vi' ? 'vi' : 'en',
+      });
+    };
+
+    const run = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!cancelled) mountButton();
+        });
+      });
+    };
+
+    if (window.google?.accounts?.id) {
+      run();
+    } else {
+      const existing = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+      if (existing) {
+        if (window.google?.accounts?.id) {
+          run();
+        } else {
+          existing.addEventListener('load', run);
+        }
+      } else {
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.async = true;
+        s.onload = () => run();
+        document.head.appendChild(s);
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      el.innerHTML = '';
+    };
+  }, [isLogin, googleClientId, locale]);
 
   const replaceMode = (nextMode: Mode) => {
     // Update immediately so the animation is always visible,
@@ -69,16 +152,57 @@ export function AuthSplitCard() {
     router.replace(`/auth?${params.toString()}`, { scroll: false });
   };
 
-  const isLogin = mode === 'login';
-  const overlayCta = isLogin ? t('auth.sign_up') : t('auth.sign_in');
-  const oauthBasePath = '/api/v1/auth/oauth';
+  const postGoogleCredential = useCallback(
+    async (credential: string) => {
+      setLoginError('');
+      setLoginLoading(true);
+      try {
+        const response = await fetch('/api/v1/auth/login/google', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            accept: 'application/json',
+          },
+          body: JSON.stringify({ token: credential }),
+        });
 
-  const startOAuth = (provider: 'google' | 'github') => {
-    const params = new URLSearchParams();
-    if (safeNext) params.set('next', safeNext);
-    const qs = params.toString();
-    window.location.href = `${oauthBasePath}/${provider}${qs ? `?${qs}` : ''}`;
-  };
+        if (!response.ok) {
+          let message = 'Login failed';
+          try {
+            const contentType = response.headers.get('content-type') ?? '';
+            if (contentType.includes('application/json')) {
+              const data = await response.json();
+              message =
+                data?.message ||
+                data?.detail ||
+                data?.error ||
+                data?.errors?.[0]?.message ||
+                message;
+            } else {
+              const text = await response.text();
+              if (text) message = text;
+            }
+          } catch {
+            // ignore parse errors
+          }
+          throw new Error(message);
+        }
+
+        const data = (await response.json()) as { access_token: string; role?: string };
+        setSession({ accessToken: data.access_token, role: data.role });
+        router.push(safeNext ?? defaultDashboardAfterLogin(data.role));
+      } catch (err) {
+        setLoginError(err instanceof Error ? err.message : t('common.error'));
+      } finally {
+        setLoginLoading(false);
+      }
+    },
+    [router, safeNext, t],
+  );
+
+  useEffect(() => {
+    googleLoginRef.current = postGoogleCredential;
+  }, [postGoogleCredential]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,7 +242,7 @@ export function AuthSplitCard() {
 
       const data = (await response.json()) as { access_token: string; role?: string };
       setSession({ accessToken: data.access_token, role: data.role });
-      router.push(safeNext ?? '/dashboard');
+      router.push(safeNext ?? defaultDashboardAfterLogin(data.role));
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : t('common.error'));
     } finally {
@@ -137,14 +261,21 @@ export function AuthSplitCard() {
 
     setRegLoading(true);
     try {
+      const normalizedName = regData.name.trim();
+      const usernameCandidate =
+        normalizedName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '.')
+          .replace(/^\.+|\.+$/g, '') || regData.email.split('@')[0].toLowerCase();
       const response = await fetch('/api/v1/auth/register/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          username: usernameCandidate,
           email: regData.email,
           password: regData.password,
-          name: regData.name,
-          reg_type: regData.registrationType,
+          full_name: regData.name,
+          registration_type: regData.registrationType,
         }),
       });
 
@@ -153,7 +284,7 @@ export function AuthSplitCard() {
         throw new Error(data?.message || t('auth.register_failed'));
       }
 
-      router.push('/auth/verify-email');
+      router.push(`/auth/verify-email?email=${encodeURIComponent(regData.email)}`);
     } catch (err) {
       setRegError(err instanceof Error ? err.message : t('common.error'));
     } finally {
@@ -184,7 +315,7 @@ export function AuthSplitCard() {
             {/* Register */}
             <div
               className={cn(
-                'p-5 md:p-6 flex flex-col',
+                'p-5 md:p-6 flex flex-col justify-center',
                 isLogin ? 'hidden md:flex md:pointer-events-none' : 'flex',
               )}
             >
@@ -246,27 +377,47 @@ export function AuthSplitCard() {
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="reg-password" className="text-sm">{t('auth.password')}</Label>
-                      <Input
-                        id="reg-password"
-                        type="password"
-                        className="h-9"
-                        value={regData.password}
-                        onChange={(e) => setRegData((p) => ({ ...p, password: e.target.value }))}
-                        disabled={regLoading}
-                        required
-                      />
+                      <div className="relative">
+                        <Input
+                          id="reg-password"
+                          type={showRegisterPassword ? 'text' : 'password'}
+                          className="h-9 pr-10"
+                          value={regData.password}
+                          onChange={(e) => setRegData((p) => ({ ...p, password: e.target.value }))}
+                          disabled={regLoading}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegisterPassword((prev) => !prev)}
+                          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+                          aria-label={showRegisterPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="reg-confirm" className="text-sm">{t('auth.confirm_password')}</Label>
-                      <Input
-                        id="reg-confirm"
-                        type="password"
-                        className="h-9"
-                        value={regData.confirmPassword}
-                        onChange={(e) => setRegData((p) => ({ ...p, confirmPassword: e.target.value }))}
-                        disabled={regLoading}
-                        required
-                      />
+                      <div className="relative">
+                        <Input
+                          id="reg-confirm"
+                          type={showRegisterConfirmPassword ? 'text' : 'password'}
+                          className="h-9 pr-10"
+                          value={regData.confirmPassword}
+                          onChange={(e) => setRegData((p) => ({ ...p, confirmPassword: e.target.value }))}
+                          disabled={regLoading}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegisterConfirmPassword((prev) => !prev)}
+                          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+                          aria-label={showRegisterConfirmPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showRegisterConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                     <Button type="submit" size="sm" className="w-full h-9" disabled={regLoading}>
                       {regLoading ? (
@@ -296,7 +447,7 @@ export function AuthSplitCard() {
             {/* Login */}
             <div
               className={cn(
-                'p-5 md:p-6 flex flex-col',
+                'p-5 md:p-6 flex flex-col justify-center',
                 isLogin ? 'flex' : 'hidden md:flex md:pointer-events-none',
               )}
             >
@@ -311,6 +462,17 @@ export function AuthSplitCard() {
                 <h2 className="text-xl font-semibold tracking-tight">{t('auth.welcome_back')}</h2>
                 <p className="text-sm text-muted-foreground mt-1.5">{t('auth.sign_in_desc')}</p>
 
+                {sessionExpiredRedirect && (
+                  <Alert className="mt-4 border-emerald-200 bg-emerald-50/90 text-emerald-900">
+                    <CheckCircle className="h-4 w-4 text-emerald-600" />
+                    <AlertDescription>
+                      {sessionReason === 'session_invalid'
+                        ? t('session.expired_token')
+                        : t('session.expired_idle')}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 {loginError && (
                   <Alert variant="destructive" className="mt-6">
                     <AlertCircle className="h-4 w-4" />
@@ -318,7 +480,7 @@ export function AuthSplitCard() {
                   </Alert>
                 )}
 
-                <form onSubmit={handleLogin} className="space-y-3">
+                <form onSubmit={handleLogin} className="mt-3 space-y-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="login-id" className="text-sm">{t('auth.username_or_email')}</Label>
                     <Input
@@ -334,15 +496,30 @@ export function AuthSplitCard() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="login-password" className="text-sm">{t('auth.password')}</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      className="h-9"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={loginLoading}
-                      required
-                    />
+                    <div className="relative">
+                      <Input
+                        id="login-password"
+                        type={showLoginPassword ? 'text' : 'password'}
+                        className="h-9 pr-10"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={loginLoading}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword((prev) => !prev)}
+                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+                        aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <div className="pt-1 text-right">
+                      <Link href="/auth/forgot-password" className="text-xs font-medium text-accent hover:underline">
+                        Quên mật khẩu?
+                      </Link>
+                    </div>
                   </div>
                   <Button type="submit" size="sm" className="w-full h-9" disabled={loginLoading}>
                     {loginLoading ? (
@@ -362,26 +539,22 @@ export function AuthSplitCard() {
                   </div>
 
                   <div className="grid grid-cols-1 gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-9 justify-start gap-2"
-                      onClick={() => startOAuth('google')}
-                    >
-                      <Chrome className="h-4 w-4" />
-                      Đăng nhập với Google
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-9 justify-start gap-2"
-                      onClick={() => startOAuth('github')}
-                    >
-                      <Github className="h-4 w-4" />
-                      Đăng nhập với GitHub
-                    </Button>
+                    {googleClientId ? (
+                      <div
+                        ref={googleBtnDivRef}
+                        className="flex min-h-[40px] w-full flex-col items-stretch justify-center [&_iframe]:!max-w-none"
+                      />
+                    ) : (
+                      <>
+                        <Button type="button" size="sm" variant="outline" className="h-9 justify-start gap-2" disabled>
+                          <Chrome className="h-4 w-4" />
+                          {t('auth.google_sign_in')}
+                        </Button>
+                        <p className="text-[11px] text-muted-foreground px-0.5 leading-snug">
+                          {t('auth.google_not_configured')}
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   <div className="text-xs text-muted-foreground text-center pt-1.5">

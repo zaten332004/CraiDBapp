@@ -4,9 +4,9 @@ import { ApiFetchOptions, fetchJson, joinUrl } from "@/lib/api/shared";
 import { cookies } from "next/headers";
 
 function getServerBaseUrl() {
-  const baseUrl = process.env.API_BASE_URL;
+  const baseUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!baseUrl) {
-    throw new Error("Missing API_BASE_URL. Add it to .env.local (see .env.example).");
+    return "http://127.0.0.1:8000/api/v1";
   }
   return baseUrl;
 }

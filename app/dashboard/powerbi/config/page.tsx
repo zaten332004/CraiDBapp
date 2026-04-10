@@ -5,14 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, AlertCircle, Loader2, RefreshCw, Unplug, PlugZap } from 'lucide-react';
+import { Loader2, RefreshCw, Unplug, PlugZap } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
+import { formatDateTimeVietnam } from '@/lib/datetime';
+import { notifyError, notifyInfo, notifySuccess } from '@/lib/notify';
 
 type PowerBIWorkspace = { id: string; name: string; raw: unknown };
 type PowerBIDataset = { id: string; name: string; raw: unknown };
@@ -33,17 +34,33 @@ function toDataset(item: any): PowerBIDataset | null {
   return { id, name, raw: item };
 }
 
+type PowerBiStatus = {
+  connected?: boolean;
+  tenant_id?: string | null;
+  workspace_id?: string | null;
+  workspace_name?: string | null;
+  dataset_id?: string | null;
+  dataset_name?: string | null;
+  last_sync?: string | null;
+};
+
+/** Lỗi probe global từ server (thiếu .env) — không hiển thị toast/banner cho người dùng cuối. */
+function isGlobalPowerBiEnvMissingMessage(text: string): boolean {
+  return /missing\s+power_bi_/i.test(text);
+}
+
 export default function PowerBIConfigPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
-  const [customerId, setCustomerId] = useState('');
+  const [accountStatus, setAccountStatus] = useState<{ connected: boolean; lastSync: string | null }>({
+    connected: false,
+    lastSync: null,
+  });
   const [config, setConfig] = useState({
     workspaceId: '',
-    clientId: '',
-    clientSecret: '',
+    datasetId: '',
     tenantId: '',
   });
   const [workspaces, setWorkspaces] = useState<PowerBIWorkspace[]>([]);
@@ -51,7 +68,6 @@ export default function PowerBIConfigPage() {
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('');
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>('');
   const [refreshResult, setRefreshResult] = useState<any>(null);
-  const [dataChecks, setDataChecks] = useState<any>(null);
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((w) => w.id === selectedWorkspaceId) ?? null,
@@ -83,33 +99,152 @@ export default function PowerBIConfigPage() {
     setDatasets(parsed);
   };
 
-  const checkConnection = async () => {
+  /** Đồng bộ trạng thái tài khoản + điền lại ô cấu hình từ bản lưu server (trước khi ngắt kết nối). */
+  const applySavedPowerBiFromStatus = (s: PowerBiStatus) => {
+    const sync = typeof s?.last_sync === 'string' ? s.last_sync.trim() : '';
+    setAccountStatus({
+      connected: Boolean(s?.connected),
+      lastSync: sync || null,
+    });
+
+    if (!s?.connected) {
+      setConfig({ workspaceId: '', datasetId: '', tenantId: '' });
+      setSelectedWorkspaceId('');
+      setSelectedDatasetId('');
+      return;
+    }
+
+    const wsId = String(s.workspace_id ?? '').trim();
+    const dsId = String(s.dataset_id ?? '').trim();
+    const tenant = String(s.tenant_id ?? '').trim();
+
+    setConfig((prev) => ({
+      ...prev,
+      ...(tenant ? { tenantId: tenant } : {}),
+      ...(wsId ? { workspaceId: wsId } : {}),
+      ...(dsId ? { datasetId: dsId } : {}),
+    }));
+    if (wsId) setSelectedWorkspaceId(wsId);
+    if (dsId) setSelectedDatasetId(dsId);
+
+    const wsName = String(s.workspace_name ?? '').trim();
+    if (wsId) {
+      setWorkspaces((prev) => {
+        if (prev.some((w) => w.id === wsId)) return prev;
+        return [{ id: wsId, name: wsName || wsId, raw: {} }, ...prev];
+      });
+    }
+    const dsName = String(s.dataset_name ?? '').trim();
+    if (dsId) {
+      setDatasets((prev) => {
+        if (prev.some((d) => d.id === dsId)) return prev;
+        return [{ id: dsId, name: dsName || dsId, raw: {} }, ...prev];
+      });
+    }
+  };
+
+  const loadAccountPowerBiStatus = async () => {
     try {
-      setError(null);
+      const s = await browserApiFetchAuth<PowerBiStatus>('/powerbi/status', { method: 'GET' });
+      applySavedPowerBiFromStatus(s);
+    } catch {
+      setAccountStatus({ connected: false, lastSync: null });
+      setConfig({ workspaceId: '', datasetId: '', tenantId: '' });
+      setSelectedWorkspaceId('');
+      setSelectedDatasetId('');
+    }
+  };
+
+  /** Kiểm tra kết nối Power BI (global .env phía server). Lỗi chỉ qua toast khi gọi từ nút Kiểm tra kết nối. */
+  const runConnectionTest = async (): Promise<{
+    ok: boolean;
+    detail?: string;
+    suppressUserNotification?: boolean;
+  }> => {
+    try {
       const res = await browserApiFetchAuth<any>('/powerbi/test-connection', { method: 'GET' });
-      setIsConnected(Boolean(res?.connected ?? true));
+      const connected = Boolean(res?.connected);
+      setIsConnected(connected);
       setLastCheckedAt(new Date());
+      const msg = typeof res?.message === 'string' ? res.message.trim() : '';
+      if (!connected) {
+        const text = msg || t('powerbi.toast.test_fail_fallback');
+        const suppress = isGlobalPowerBiEnvMissingMessage(text);
+        return { ok: false, detail: suppress ? undefined : text, suppressUserNotification: suppress };
+      }
+      return { ok: true, detail: msg || undefined };
     } catch (err) {
+      const text = formatApiError(err);
       setIsConnected(false);
       setLastCheckedAt(new Date());
-      setError(formatApiError(err));
+      const suppress = isGlobalPowerBiEnvMissingMessage(text);
+      return { ok: false, detail: suppress ? undefined : text, suppressUserNotification: suppress };
     }
   };
 
   const handleConnect = async () => {
+    const workspace_id = config.workspaceId.trim() || selectedWorkspaceId.trim();
+    const dataset_id = selectedDatasetId.trim() || config.datasetId.trim();
+    const tenant_id = config.tenantId.trim();
+
+    if (!workspace_id) {
+      const msg = t('powerbi.workspace_id_required');
+      notifyError(t('powerbi.toast.connect_fail_title'), { description: msg, duration: 5000 });
+      return;
+    }
+    if (!dataset_id) {
+      const msg = t('powerbi.dataset_id_required');
+      notifyError(t('powerbi.toast.connect_fail_title'), { description: msg, duration: 5000 });
+      return;
+    }
+    if (!tenant_id) {
+      const msg = t('powerbi.tenant_id_required');
+      notifyError(t('powerbi.toast.connect_fail_title'), { description: msg, duration: 5000 });
+      return;
+    }
+
     setIsLoading(true);
-    setError(null);
     try {
+      const workspace_name =
+        workspaces.find((w) => w.id === workspace_id)?.name?.trim() || '';
+      const dataset_name =
+        datasets.find((d) => d.id === dataset_id)?.name?.trim() || '';
       const res = await browserApiFetchAuth<any>('/powerbi/configure', {
         method: 'POST',
-        body: config,
+        body: {
+          workspace_id,
+          dataset_id,
+          tenant_id,
+          ...(workspace_name ? { workspace_name } : {}),
+          ...(dataset_name ? { dataset_name } : {}),
+        },
       });
-      setIsConnected(Boolean(res?.connected ?? true));
+      setIsConnected(Boolean(res?.success ?? res?.connected ?? true));
       setLastCheckedAt(new Date());
-      if (config.workspaceId) setSelectedWorkspaceId(config.workspaceId);
+      if (workspace_id) setSelectedWorkspaceId(workspace_id);
+      if (dataset_id) setSelectedDatasetId(dataset_id);
+      setConfig((prev) => ({
+        ...prev,
+        tenantId: tenant_id,
+        workspaceId: workspace_id,
+        datasetId: dataset_id,
+      }));
+      const apiMsg = typeof res?.message === 'string' ? res.message.trim() : '';
+      const lines = [
+        `${t('powerbi.workspace_id')}: ${workspace_id}`,
+        `${t('powerbi.dataset_id')}: ${dataset_id}`,
+        `${t('powerbi.tenant_id')}: ${tenant_id}`,
+        ...(apiMsg ? [apiMsg] : []),
+      ];
+      notifySuccess(t('powerbi.toast.connect_ok_title'), {
+        description: lines.join('\n'),
+        duration: 5200,
+      });
+      await loadAccountPowerBiStatus();
     } catch (err) {
       setIsConnected(false);
-      setError(formatApiError(err));
+      const detail = formatApiError(err);
+      notifyError(t('powerbi.toast.connect_fail_title'), { description: detail, duration: 6500 });
     } finally {
       setIsLoading(false);
     }
@@ -117,9 +252,52 @@ export default function PowerBIConfigPage() {
 
   const handleTestConnection = async () => {
     setIsLoading(true);
-    setError(null);
     try {
-      await checkConnection();
+      const result = await runConnectionTest();
+
+      let accountLine = t('powerbi.toast.test_account_status_unknown');
+      let accountConnected: boolean | null = null;
+      try {
+        const st = await browserApiFetchAuth<{ connected?: boolean }>('/powerbi/status', { method: 'GET' });
+        accountConnected = Boolean(st?.connected);
+        accountLine = accountConnected
+          ? t('powerbi.toast.test_account_configured')
+          : t('powerbi.toast.test_account_not_configured');
+      } catch {
+        accountConnected = null;
+        accountLine = t('powerbi.toast.test_account_status_unknown');
+      }
+
+      if (result.ok) {
+        const parts = [
+          t('powerbi.toast.test_stable_summary'),
+          result.detail ? `${t('powerbi.toast.test_server_detail')}: ${result.detail}` : '',
+          accountLine,
+        ].filter((x) => String(x).trim().length > 0);
+        notifySuccess(t('powerbi.toast.test_stable_title'), {
+          description: parts.join('\n'),
+          duration: 6200,
+        });
+      } else if (result.suppressUserNotification) {
+        const desc =
+          accountConnected === true
+            ? t('powerbi.toast.test_not_assessed_desc_with_account')
+            : [t('powerbi.toast.test_not_assessed_desc'), accountLine].join('\n\n');
+        notifyInfo(t('powerbi.toast.test_not_assessed_title'), {
+          description: desc,
+          duration: accountConnected === true ? 7200 : 6000,
+        });
+      } else {
+        const parts = [
+          t('powerbi.toast.test_unstable_summary'),
+          result.detail ? `${t('powerbi.toast.test_server_detail')}: ${result.detail}` : t('powerbi.toast.test_fail_fallback'),
+          accountLine,
+        ];
+        notifyError(t('powerbi.toast.test_unstable_title'), {
+          description: parts.join('\n'),
+          duration: 7800,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -127,13 +305,21 @@ export default function PowerBIConfigPage() {
 
   const handleDisconnect = async () => {
     setIsLoading(true);
-    setError(null);
     try {
-      await browserApiFetchAuth('/powerbi/disconnect', { method: 'DELETE' });
+      const res = await browserApiFetchAuth<{ success?: boolean; message?: string }>('/powerbi/disconnect', {
+        method: 'DELETE',
+      });
       setIsConnected(false);
       setLastCheckedAt(new Date());
+      const serverMsg = typeof res?.message === 'string' ? res.message.trim() : '';
+      notifySuccess(t('powerbi.toast.disconnect_ok_title'), {
+        description: serverMsg || t('powerbi.toast.disconnect_ok_desc'),
+        duration: 5200,
+      });
+      await loadAccountPowerBiStatus();
     } catch (err) {
-      setError(formatApiError(err));
+      const detail = formatApiError(err);
+      notifyError(t('powerbi.toast.disconnect_fail_title'), { description: detail, duration: 6500 });
     } finally {
       setIsLoading(false);
     }
@@ -142,7 +328,6 @@ export default function PowerBIConfigPage() {
   const handleRefreshDataset = async () => {
     if (!selectedDatasetId) return;
     setIsLoading(true);
-    setError(null);
     setRefreshResult(null);
     try {
       const res = await browserApiFetchAuth<any>('/powerbi/refresh-dataset', {
@@ -150,38 +335,9 @@ export default function PowerBIConfigPage() {
         body: { dataset_id: selectedDatasetId, datasetId: selectedDatasetId },
       });
       setRefreshResult(res);
+      await loadAccountPowerBiStatus();
     } catch (err) {
-      setError(formatApiError(err));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const runDataCheck = async (kind: 'risk-data' | 'portfolio-metrics' | 'customer-risk-profile') => {
-    setIsLoading(true);
-    setError(null);
-    setDataChecks(null);
-
-    try {
-      if (kind === 'risk-data') {
-        const res = await browserApiFetchAuth<any>('/powerbi/risk-data', { method: 'GET' });
-        setDataChecks({ kind, res });
-        return;
-      }
-      if (kind === 'portfolio-metrics') {
-        const res = await browserApiFetchAuth<any>('/powerbi/portfolio-metrics', { method: 'GET' });
-        setDataChecks({ kind, res });
-        return;
-      }
-      const id = customerId.trim();
-      if (!id) {
-        setError(t('powerbi.customer_id_required'));
-        return;
-      }
-      const res = await browserApiFetchAuth<any>(`/powerbi/customer/${encodeURIComponent(id)}/risk-profile`, { method: 'GET' });
-      setDataChecks({ kind, customerId: id, res });
-    } catch (err) {
-      setError(formatApiError(err));
+      notifyError(t('powerbi.refresh_dataset'), { description: formatApiError(err), duration: 6500 });
     } finally {
       setIsLoading(false);
     }
@@ -190,9 +346,11 @@ export default function PowerBIConfigPage() {
   useEffect(() => {
     (async () => {
       setIsLoading(true);
-      setError(null);
       try {
-        await Promise.allSettled([checkConnection(), loadWorkspaces(), loadDatasets()]);
+        // Tải danh sách trước, rồi mới hydrate từ /status — tránh setWorkspaces/setDatasets ghi đè workspace/dataset đã lưu.
+        await Promise.allSettled([loadWorkspaces(), loadDatasets()]);
+        await loadAccountPowerBiStatus();
+        await runConnectionTest();
       } finally {
         setIsLoading(false);
       }
@@ -208,22 +366,6 @@ export default function PowerBIConfigPage() {
           {t('powerbi.desc')}
         </p>
       </div>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="whitespace-pre-wrap">{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {isConnected && (
-        <Alert>
-          <CheckCircle className="h-4 w-4 text-green-500" />
-          <AlertDescription className="text-green-700">
-            {t('powerbi.connected')}
-          </AlertDescription>
-        </Alert>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
@@ -247,29 +389,6 @@ export default function PowerBIConfigPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="clientId">{t('powerbi.client_id')}</Label>
-                <Input
-                  id="clientId"
-                  placeholder={t('powerbi.client_id_ph')}
-                  value={config.clientId}
-                  onChange={(e) => setConfig({ ...config, clientId: e.target.value })}
-                  disabled={isConnected === true}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="clientSecret">{t('powerbi.client_secret')}</Label>
-                <Input
-                  id="clientSecret"
-                  type="password"
-                  placeholder={t('powerbi.client_secret_ph')}
-                  value={config.clientSecret}
-                  onChange={(e) => setConfig({ ...config, clientSecret: e.target.value })}
-                  disabled={isConnected === true}
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="workspaceId">{t('powerbi.workspace_id')}</Label>
                 <Input
                   id="workspaceId"
@@ -278,6 +397,18 @@ export default function PowerBIConfigPage() {
                   onChange={(e) => setConfig({ ...config, workspaceId: e.target.value })}
                   disabled={isConnected === true}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="datasetId">{t('powerbi.dataset_id')}</Label>
+                <Input
+                  id="datasetId"
+                  placeholder={t('powerbi.dataset_id_ph')}
+                  value={config.datasetId}
+                  onChange={(e) => setConfig({ ...config, datasetId: e.target.value })}
+                  disabled={isConnected === true}
+                />
+                <p className="text-xs text-muted-foreground">{t('powerbi.dataset_id_hint')}</p>
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -323,7 +454,13 @@ export default function PowerBIConfigPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{t('powerbi.workspace')}</Label>
-                  <Select value={selectedWorkspaceId} onValueChange={(v) => setSelectedWorkspaceId(v)}>
+                  <Select
+                    value={selectedWorkspaceId}
+                    onValueChange={(v) => {
+                      setSelectedWorkspaceId(v);
+                      setConfig((prev) => ({ ...prev, workspaceId: v }));
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder={t('powerbi.workspace_id_ph')} />
                     </SelectTrigger>
@@ -340,11 +477,10 @@ export default function PowerBIConfigPage() {
                       variant="outline"
                       onClick={async () => {
                         setIsLoading(true);
-                        setError(null);
                         try {
                           await loadWorkspaces();
                         } catch (err) {
-                          setError(formatApiError(err));
+                          notifyError(t('powerbi.view_workspaces'), { description: formatApiError(err), duration: 6500 });
                         } finally {
                           setIsLoading(false);
                         }
@@ -368,7 +504,13 @@ export default function PowerBIConfigPage() {
 
                 <div className="space-y-2">
                   <Label>{t('powerbi.view_datasets')}</Label>
-                  <Select value={selectedDatasetId} onValueChange={(v) => setSelectedDatasetId(v)}>
+                  <Select
+                    value={selectedDatasetId}
+                    onValueChange={(v) => {
+                      setSelectedDatasetId(v);
+                      setConfig((prev) => ({ ...prev, datasetId: v }));
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder={t('common.select')} />
                     </SelectTrigger>
@@ -385,11 +527,10 @@ export default function PowerBIConfigPage() {
                       variant="outline"
                       onClick={async () => {
                         setIsLoading(true);
-                        setError(null);
                         try {
                           await loadDatasets();
                         } catch (err) {
-                          setError(formatApiError(err));
+                          notifyError(t('powerbi.view_datasets'), { description: formatApiError(err), duration: 6500 });
                         } finally {
                           setIsLoading(false);
                         }
@@ -461,49 +602,6 @@ export default function PowerBIConfigPage() {
               )}
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('powerbi.data_checks_title')}</CardTitle>
-              <CardDescription>{t('powerbi.data_checks_desc')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={() => void runDataCheck('risk-data')} disabled={isLoading}>
-                  {t('powerbi.fetch_risk_data')}
-                </Button>
-                <Button variant="outline" onClick={() => void runDataCheck('portfolio-metrics')} disabled={isLoading}>
-                  {t('powerbi.fetch_portfolio_metrics')}
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                <div className="md:col-span-2">
-                  <Label htmlFor="powerbi-customer-id">{t('powerbi.customer_id')}</Label>
-                  <Input
-                    id="powerbi-customer-id"
-                    value={customerId}
-                    onChange={(e) => setCustomerId(e.target.value)}
-                    placeholder={t('powerbi.customer_id_ph')}
-                    className="mt-2"
-                  />
-                </div>
-                <Button onClick={() => void runDataCheck('customer-risk-profile')} disabled={isLoading}>
-                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {t('powerbi.fetch_customer_risk_profile')}
-                </Button>
-              </div>
-
-              {dataChecks && (
-                <div className="rounded-md border bg-secondary p-3">
-                  <p className="text-sm font-medium">{t('common.result')}</p>
-                  <pre className="mt-2 max-h-72 overflow-auto text-xs text-muted-foreground">
-                    {JSON.stringify(dataChecks, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
 
         <div className="space-y-4">
@@ -522,11 +620,11 @@ export default function PowerBIConfigPage() {
               {lastCheckedAt && (
                 <div>
                   <p className="text-sm text-muted-foreground">{t('common.last_checked')}</p>
-                  <p className="font-medium mt-2">{lastCheckedAt.toLocaleString()}</p>
+                  <p className="font-medium mt-2">{formatDateTimeVietnam(lastCheckedAt, locale)}</p>
                 </div>
               )}
 
-              {isConnected && (
+              {accountStatus.connected && (
                 <>
                   <div>
                     <p className="text-sm text-muted-foreground">{t('powerbi.workspace')}</p>
@@ -534,44 +632,14 @@ export default function PowerBIConfigPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">{t('powerbi.last_synced')}</p>
-                    <p className="font-medium mt-2">{t('powerbi.last_synced_value')}</p>
+                    <p className="font-medium mt-2">
+                      {accountStatus.lastSync
+                        ? formatDateTimeVietnam(accountStatus.lastSync, locale)
+                        : t('common.na')}
+                    </p>
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t('common.quick_links')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => setSelectedWorkspaceId(config.workspaceId)}
-              >
-                {t('powerbi.workspace')}: {config.workspaceId ? config.workspaceId.slice(0, 12) + '…' : t('common.na')}
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={async () => {
-                  setIsLoading(true);
-                  setError(null);
-                  try {
-                    await Promise.all([loadWorkspaces(), loadDatasets()]);
-                  } catch (err) {
-                    setError(formatApiError(err));
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                disabled={isLoading}
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                {t('common.refresh')}
-              </Button>
             </CardContent>
           </Card>
         </div>

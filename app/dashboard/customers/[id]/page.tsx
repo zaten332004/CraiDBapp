@@ -1,49 +1,222 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Input } from '@/components/ui/input';
 import { ArrowLeft, Edit } from 'lucide-react';
 import { useI18n } from '@/components/i18n-provider';
-
-const scoreHistory = [
-  { date: 'Jan 1', score: 72 },
-  { date: 'Jan 8', score: 75 },
-  { date: 'Jan 15', score: 73 },
-  { date: 'Jan 22', score: 78 },
-  { date: 'Jan 29', score: 82 },
-  { date: 'Feb 5', score: 80 },
-];
+import { browserApiFetchAuth } from '@/lib/api/browser';
+import { notifyError, notifySuccess } from '@/lib/notify';
+import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { formatDateTimeVietnam } from '@/lib/datetime';
+import { formatVnd } from '@/lib/money';
 
 export default function CustomerDetailPage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const params = useParams();
-  const customerId = params.id;
+  const customerId = Number(params.id);
+  const [customer, setCustomer] = useState<any | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    phone_number: '',
+    email: '',
+    occupation: '',
+    employment_status: '',
+    monthly_income: '',
+    permanent_address: '',
+    current_address: '',
+    loan_type: '',
+    loan_purpose: '',
+    requested_loan_amount: '',
+    requested_term_months: '',
+    annual_interest_rate: '',
+    collateral_id: '',
+    collateral_value: '',
+  });
 
-  const customer = {
-    id: customerId,
-    name: 'John Smith',
-    email: 'john@example.com',
-    phone: '+1 (555) 123-4567',
-    company: 'Tech Innovations Inc.',
-    riskLevel: 'low',
-    score: 85,
-    status: 'active',
-    createdAt: '2024-01-15',
-    lastScored: '2024-02-05',
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const customerData = await browserApiFetchAuth<any>(`/customers/${customerId}`, { method: 'GET' });
+        if (cancelled) return;
+        setCustomer(customerData);
+        setEditForm({
+          phone_number: String(customerData.phone_number ?? customerData.phone ?? ''),
+          email: String(customerData.email ?? ''),
+          occupation: String(customerData.occupation ?? ''),
+          employment_status: String(customerData.employment_status ?? ''),
+          monthly_income: customerData.monthly_income != null ? String(customerData.monthly_income) : '',
+          permanent_address: String(customerData.permanent_address ?? ''),
+          current_address: String(customerData.current_address ?? ''),
+          loan_type: String(customerData.loan_type ?? ''),
+          loan_purpose: String(customerData.loan_purpose ?? ''),
+          requested_loan_amount: customerData.requested_loan_amount != null ? String(customerData.requested_loan_amount) : '',
+          requested_term_months: customerData.requested_term_months != null ? String(customerData.requested_term_months) : '',
+          annual_interest_rate: customerData.annual_interest_rate != null ? String(customerData.annual_interest_rate) : '',
+          collateral_id: String(customerData.collateral_id ?? ''),
+          collateral_value: customerData.collateral_value != null ? String(customerData.collateral_value) : '',
+        });
+      } catch (err) {
+        if (!cancelled) notifyError(formatUserFacingApiError(err));
+      }
+    };
+    if (Number.isFinite(customerId) && customerId > 0) void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId, locale]);
+
+  const riskBadgeClass = useMemo(() => {
+    const level = String(customer?.risk_level || '').toLowerCase();
+    if (level === 'high') return 'border-rose-200 bg-rose-50 text-rose-700';
+    if (level === 'medium') return 'border-blue-200 bg-blue-50 text-blue-700';
+    if (level === 'low') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    return 'border-slate-200 bg-slate-50 text-slate-700';
+  }, [customer?.risk_level]);
+
+  const riskBadgeLabel = useMemo(() => {
+    const level = String(customer?.risk_level || '').toLowerCase();
+    if (level === 'high') return t('risk.level.high');
+    if (level === 'medium') return t('risk.level.medium');
+    if (level === 'low') return t('risk.level.low');
+    return String(customer?.risk_level || '-');
+  }, [customer?.risk_level, t]);
+
+  const statusBadgeClass = useMemo(() => {
+    const status = String(customer?.application_status || '').toLowerCase();
+    if (status === 'approved') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    if (status === 'rejected') return 'border-rose-200 bg-rose-50 text-rose-700';
+    if (status === 'pending') return 'border-slate-200 bg-slate-50 text-slate-700';
+    return 'border-slate-200 bg-slate-50 text-slate-700';
+  }, [customer?.application_status]);
+
+  const statusBadgeLabel = useMemo(() => {
+    const status = String(customer?.application_status || '').toLowerCase();
+    if (status === 'approved') return t('status.approved');
+    if (status === 'rejected') return t('status.rejected');
+    if (status === 'pending') return t('status.pending');
+    if (status === 'active') return t('status.active');
+    if (status === 'inactive') return t('status.inactive');
+    return String(customer?.application_status || '-');
+  }, [customer?.application_status, t]);
+
+  const isPending = String(customer?.application_status || '').toLowerCase() === 'pending';
+
+  const sanitizePhoneInput = (value: string) => value.replace(/[^\d+]/g, '').slice(0, 15);
+
+  const formatPhoneViDisplay = (value: unknown) => {
+    const raw = String(value ?? '').replace(/\D/g, '');
+    if (!raw) return '-';
+    const normalized = raw.startsWith('84') && raw.length >= 11 ? `0${raw.slice(2)}` : raw;
+    if (normalized.length === 10) {
+      return `${normalized.slice(0, 4)} ${normalized.slice(4, 7)} ${normalized.slice(7)}`;
+    }
+    return normalized;
   };
 
-  const activityItems = [
-    { actionKey: 'customers.detail.activity.score_updated', detailsKey: 'customers.detail.activity.score_updated_desc', date: '2024-02-05' },
-    { actionKey: 'customers.detail.activity.profile_reviewed', detailsKey: 'customers.detail.activity.profile_reviewed_desc', date: '2024-02-01' },
-    { actionKey: 'customers.detail.activity.data_imported', detailsKey: 'customers.detail.activity.data_imported_desc', date: '2024-01-28' },
-    { actionKey: 'customers.detail.activity.account_created', detailsKey: 'customers.detail.activity.account_created_desc', date: '2024-01-15' },
-  ];
+  const toVietnameseValue = (value: unknown, fieldLabel?: string) => {
+    if (value == null) return '-';
+    const raw = String(value).trim();
+    if (!raw) return '-';
+    const normalized = raw.toLowerCase();
+
+    const commonMap: Record<string, string> = {
+      male: 'Nam',
+      female: 'Nữ',
+      other: 'Khác',
+      secured: 'Có tài sản bảo đảm',
+      unsecured: 'Tín chấp',
+      mortgage: 'Thế chấp',
+      business: 'Kinh doanh',
+      personal: 'Cá nhân',
+      employed: 'Đang làm việc',
+      unemployed: 'Thất nghiệp',
+      self_employed: 'Tự kinh doanh',
+      single: 'Độc thân',
+      married: 'Đã kết hôn',
+      divorced: 'Ly hôn',
+      widowed: 'Góa',
+      approved: 'Đã duyệt',
+      rejected: 'Từ chối',
+      pending: 'Đang chờ',
+      active: 'Hoạt động',
+      inactive: 'Ngừng hoạt động',
+      true: 'Có',
+      false: 'Không',
+    };
+    if (commonMap[normalized]) return commonMap[normalized];
+
+    if (fieldLabel === 'Giới tính') {
+      if (normalized.startsWith('m')) return 'Nam';
+      if (normalized.startsWith('f')) return 'Nữ';
+    }
+
+    if (fieldLabel === 'Số điện thoại') return formatPhoneViDisplay(raw);
+    if (/[0-9@._-]/.test(raw)) return raw;
+    return raw;
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!customer) return;
+    setIsSaving(true);
+    try {
+      const payload: Record<string, any> = {
+        phone_number: sanitizePhoneInput(editForm.phone_number || ''),
+        email: editForm.email || null,
+        occupation: editForm.occupation || null,
+        employment_status: editForm.employment_status || null,
+        monthly_income: editForm.monthly_income ? Number(editForm.monthly_income) : null,
+        permanent_address: editForm.permanent_address || null,
+        current_address: editForm.current_address || null,
+        loan_type: editForm.loan_type || null,
+        loan_purpose: editForm.loan_purpose || null,
+        requested_loan_amount: editForm.requested_loan_amount ? Number(editForm.requested_loan_amount) : null,
+        requested_term_months: editForm.requested_term_months ? Number(editForm.requested_term_months) : null,
+        annual_interest_rate: editForm.annual_interest_rate ? Number(editForm.annual_interest_rate) : null,
+        collateral_id: editForm.collateral_id || null,
+        collateral_value: editForm.collateral_value ? Number(editForm.collateral_value) : null,
+      };
+      const updated = await browserApiFetchAuth<any>(`/customers/${customerId}`, {
+        method: 'PUT',
+        body: payload,
+      });
+      setCustomer(updated);
+      setIsEditing(false);
+      notifySuccess(locale === 'vi' ? 'Đã cập nhật hồ sơ.' : 'Profile updated.');
+    } catch (err) {
+      notifyError(formatUserFacingApiError(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReview = async (nextStatus: 'approved' | 'rejected') => {
+    if (!customer) return;
+    setIsSaving(true);
+    try {
+      const updated = await browserApiFetchAuth<any>(`/customers/${customerId}`, {
+        method: 'PUT',
+        body: { application_status: nextStatus },
+      });
+      setCustomer(updated);
+      setIsEditing(false);
+      notifySuccess(nextStatus === 'approved' ? (locale === 'vi' ? 'Đã duyệt hồ sơ.' : 'Application approved.') : (locale === 'vi' ? 'Đã từ chối hồ sơ.' : 'Application rejected.'));
+    } catch (err) {
+      notifyError(formatUserFacingApiError(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!customer) {
+    return <div className="p-8 text-sm text-muted-foreground">{locale === 'vi' ? 'Đang tải dữ liệu khách hàng...' : 'Loading customer data...'}</div>;
+  }
 
   return (
     <div className="flex flex-col gap-8 p-8">
@@ -57,147 +230,160 @@ export default function CustomerDetailPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">{customer.name}</h1>
-            <p className="text-muted-foreground mt-1">{customer.company}</p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">{customer.full_name || '-'}</h1>
+            <p className="text-muted-foreground mt-1">{customer.occupation || '-'}</p>
           </div>
         </div>
-        <Button>
-          <Edit className="mr-2 h-4 w-4" />
-          {t('customers.detail.edit')}
-        </Button>
+        <div className="flex items-center gap-2">
+          {isPending ? (
+            <>
+              <Button variant="outline" onClick={() => void handleReview('rejected')} disabled={isSaving}>
+                {locale === 'vi' ? 'Từ chối' : 'Reject'}
+              </Button>
+              <Button onClick={() => void handleReview('approved')} disabled={isSaving}>
+                {locale === 'vi' ? 'Duyệt' : 'Approve'}
+              </Button>
+            </>
+          ) : null}
+          <Button variant="secondary" onClick={() => setIsEditing((prev) => !prev)} disabled={!isPending || isSaving}>
+            <Edit className="mr-2 h-4 w-4" />
+            {isEditing ? (locale === 'vi' ? 'Hủy sửa' : 'Cancel') : t('customers.detail.edit')}
+          </Button>
+          {isEditing && isPending ? (
+            <Button onClick={() => void handleUpdateProfile()} disabled={isSaving}>
+              {locale === 'vi' ? 'Cập nhật hồ sơ' : 'Update profile'}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('customers.detail.risk_score')}</CardTitle>
+          <CardHeader>
+            <CardTitle>Thông tin khách hàng</CardTitle>
+            <CardDescription>Thông tin định danh, liên hệ và hồ sơ cơ bản của khách hàng.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{customer.score}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t('common.as_of')} {customer.lastScored}
-            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                ['Họ và tên', customer.full_name],
+                ['Mã tham chiếu ngoài', customer.external_customer_ref],
+                ['Ngày sinh', customer.date_of_birth],
+                ['Tuổi', customer.age],
+                ['Giới tính', customer.gender],
+                ['Quốc tịch', customer.nationality],
+                ['Số giấy tờ', customer.national_id],
+                ['Ngày cấp', customer.id_issue_date],
+                ['Nơi cấp', customer.id_issue_place],
+                ['Tình trạng hôn nhân', customer.marital_status],
+                ['Số điện thoại', customer.phone_number || customer.phone],
+                ['Email', customer.email],
+                ['Nghề nghiệp', customer.occupation],
+                ['Tình trạng nghề nghiệp', customer.employment_status],
+                ['Thu nhập hàng tháng', customer.monthly_income != null ? formatVnd(Number(customer.monthly_income), locale === 'vi' ? 'vi' : 'en') : '-'],
+                ['Điểm tín dụng', customer.credit_score],
+                ['Địa chỉ thường trú', customer.permanent_address],
+                ['Địa chỉ hiện tại', customer.current_address],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  {isEditing && isPending && ['Số điện thoại', 'Email', 'Nghề nghiệp', 'Tình trạng nghề nghiệp', 'Thu nhập hàng tháng', 'Địa chỉ thường trú', 'Địa chỉ hiện tại'].includes(String(label)) ? (
+                    <Input
+                      className="mt-1 h-9"
+                      value={
+                        String(label) === 'Số điện thoại' ? editForm.phone_number
+                          : String(label) === 'Email' ? editForm.email
+                          : String(label) === 'Nghề nghiệp' ? editForm.occupation
+                          : String(label) === 'Tình trạng nghề nghiệp' ? editForm.employment_status
+                          : String(label) === 'Thu nhập hàng tháng' ? editForm.monthly_income
+                          : String(label) === 'Địa chỉ thường trú' ? editForm.permanent_address
+                          : editForm.current_address
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (String(label) === 'Số điện thoại') setEditForm((p) => ({ ...p, phone_number: sanitizePhoneInput(v) }));
+                        else if (String(label) === 'Email') setEditForm((p) => ({ ...p, email: v }));
+                        else if (String(label) === 'Nghề nghiệp') setEditForm((p) => ({ ...p, occupation: v }));
+                        else if (String(label) === 'Tình trạng nghề nghiệp') setEditForm((p) => ({ ...p, employment_status: v }));
+                        else if (String(label) === 'Thu nhập hàng tháng') setEditForm((p) => ({ ...p, monthly_income: v.replace(/[^\d.]/g, '') }));
+                        else if (String(label) === 'Địa chỉ thường trú') setEditForm((p) => ({ ...p, permanent_address: v }));
+                        else setEditForm((p) => ({ ...p, current_address: v }));
+                      }}
+                    />
+                  ) : (
+                    <p className="mt-1 text-sm font-medium break-words">{toVietnameseValue(value, String(label))}</p>
+                  )}
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('customers.detail.risk_level')}</CardTitle>
+          <CardHeader>
+            <CardTitle>Thông tin hồ sơ vay</CardTitle>
+            <CardDescription>Thông tin khoản vay, nguồn tiếp nhận và tài sản bảo đảm.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Badge variant="secondary" className="text-lg px-3 py-1">
-              {t(`risk.level.${customer.riskLevel}`)}
-            </Badge>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('common.status')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Badge variant="outline">
-              {t(`status.${customer.status}`)}
-            </Badge>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('customers.detail.member_since')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold">{customer.createdAt}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs */}
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList>
-          <TabsTrigger value="overview">{t('common.overview')}</TabsTrigger>
-          <TabsTrigger value="history">{t('common.history')}</TabsTrigger>
-          <TabsTrigger value="scores">{t('customers.detail.score_analysis')}</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('customers.detail.info_title')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <p className="text-sm text-muted-foreground">{t('common.email')}</p>
-                  <p className="font-medium">{customer.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{t('common.phone')}</p>
-                  <p className="font-medium">{customer.phone}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{t('common.company')}</p>
-                  <p className="font-medium">{customer.company}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{t('common.status')}</p>
-                  <p className="font-medium">{t(`status.${customer.status}`)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('customers.detail.activity_title')}</CardTitle>
-              <CardDescription>{t('customers.detail.activity_desc')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {activityItems.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between pb-4 border-b last:border-0 last:pb-0">
-                    <div>
-                      <p className="font-medium text-foreground">{t(item.actionKey)}</p>
-                      <p className="text-sm text-muted-foreground">{t(item.detailsKey)}</p>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{item.date}</p>
+            <div className="grid grid-cols-1 gap-4">
+              {[
+                ['Mã hồ sơ', customer.application_ref_no],
+                ['Ngày nộp hồ sơ', customer.application_date],
+                ['Người tạo hồ sơ', customer.created_by || '-'],
+                [
+                  'Người duyệt',
+                  customer.approved_by
+                    ? `${customer.approved_by}${customer.approved_at ? ` (${formatDateTimeVietnam(customer.approved_at, locale)})` : ''}`
+                    : '-',
+                ],
+                ['Loại vay', customer.loan_type],
+                ['Mục đích vay', customer.loan_purpose],
+                ['Khoản vay', customer.requested_loan_amount != null ? formatVnd(Number(customer.requested_loan_amount), locale === 'vi' ? 'vi' : 'en') : '-'],
+                ['Thời hạn vay', customer.requested_term_months != null ? `${customer.requested_term_months} tháng` : '-'],
+                ['Lãi suất', customer.annual_interest_rate != null ? `${customer.annual_interest_rate}%/năm` : '-'],
+                ['Mức rủi ro', <Badge key="risk-badge" variant="outline" className={riskBadgeClass}>{riskBadgeLabel}</Badge>],
+                ['Trạng thái hồ sơ', <Badge key="status-badge" variant="outline" className={statusBadgeClass}>{statusBadgeLabel}</Badge>],
+                ['Mã tài sản bảo đảm', customer.collateral_id],
+                ['Giá trị tài sản bảo đảm', customer.collateral_value != null ? formatVnd(Number(customer.collateral_value), locale === 'vi' ? 'vi' : 'en') : '-'],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <div className="mt-1 text-sm font-medium break-words">
+                    {isEditing && isPending && ['Loại vay', 'Mục đích vay', 'Khoản vay', 'Thời hạn vay', 'Lãi suất', 'Mã tài sản bảo đảm', 'Giá trị tài sản bảo đảm'].includes(String(label)) ? (
+                      <Input
+                        className="h-9"
+                        value={
+                          String(label) === 'Loại vay' ? editForm.loan_type
+                            : String(label) === 'Mục đích vay' ? editForm.loan_purpose
+                            : String(label) === 'Khoản vay' ? editForm.requested_loan_amount
+                            : String(label) === 'Thời hạn vay' ? editForm.requested_term_months
+                            : String(label) === 'Lãi suất' ? editForm.annual_interest_rate
+                            : String(label) === 'Mã tài sản bảo đảm' ? editForm.collateral_id
+                            : editForm.collateral_value
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (String(label) === 'Loại vay') setEditForm((p) => ({ ...p, loan_type: v }));
+                          else if (String(label) === 'Mục đích vay') setEditForm((p) => ({ ...p, loan_purpose: v }));
+                          else if (String(label) === 'Khoản vay') setEditForm((p) => ({ ...p, requested_loan_amount: v.replace(/[^\d.]/g, '') }));
+                          else if (String(label) === 'Thời hạn vay') setEditForm((p) => ({ ...p, requested_term_months: v.replace(/[^\d]/g, '') }));
+                          else if (String(label) === 'Lãi suất') setEditForm((p) => ({ ...p, annual_interest_rate: v.replace(/[^\d.]/g, '') }));
+                          else if (String(label) === 'Mã tài sản bảo đảm') setEditForm((p) => ({ ...p, collateral_id: v }));
+                          else setEditForm((p) => ({ ...p, collateral_value: v.replace(/[^\d.]/g, '') }));
+                        }}
+                      />
+                    ) : typeof value === 'string' || typeof value === 'number' ? (
+                      toVietnameseValue(value, String(label))
+                    ) : (
+                      (value as any ?? '-')
+                    )}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="scores" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('customers.detail.score_trend')}</CardTitle>
-              <CardDescription>{t('customers.detail.score_trend_desc')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={scoreHistory}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="score"
-                    stroke="#06b6d4"
-                    strokeWidth={2}
-                    name={t('customers.detail.risk_score')}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

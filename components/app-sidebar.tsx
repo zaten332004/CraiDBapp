@@ -35,6 +35,8 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { getUserRole, type UserRole } from '@/lib/auth/token';
 import { LanguageToggle } from '@/components/language-toggle';
 import { useI18n } from '@/components/i18n-provider';
+import { browserApiFetchAuth } from '@/lib/api/browser';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 import {
   LayoutDashboard,
@@ -43,13 +45,11 @@ import {
   PieChart,
   Zap,
   AlertCircle,
-  Upload,
   Settings,
   LogOut,
   ChevronDown,
   BarChart3,
   ScrollText,
-  Download,
 } from 'lucide-react';
 
 const navigationItems = [
@@ -76,16 +76,12 @@ const navigationItems = [
         href: '/dashboard/risk/analyze',
       },
       {
-        titleKey: 'sidebar.risk.batch',
-        href: '/dashboard/risk/batch',
-      },
-      {
         titleKey: 'sidebar.risk.simulation',
         href: '/dashboard/risk/simulation',
       },
       {
         titleKey: 'sidebar.risk.explain',
-        href: '/dashboard/risk/explain',
+        hidden: true,
       },
     ],
   },
@@ -103,15 +99,15 @@ const navigationItems = [
       },
       {
         titleKey: 'sidebar.portfolio.concentration',
-        href: '/dashboard/portfolio/concentration',
+        hidden: true,
       },
       {
         titleKey: 'sidebar.portfolio.trends',
-        href: '/dashboard/portfolio/trends',
+        hidden: true,
       },
       {
         titleKey: 'sidebar.portfolio.compare',
-        href: '/dashboard/portfolio/compare',
+        hidden: true,
       },
     ],
   },
@@ -129,11 +125,6 @@ const navigationItems = [
     titleKey: 'sidebar.alerts',
     href: '/dashboard/alerts',
     icon: AlertCircle,
-  },
-  {
-    titleKey: 'sidebar.upload',
-    href: '/dashboard/upload',
-    icon: Upload,
   },
 ];
 
@@ -153,11 +144,6 @@ const adminItems = [
     href: '/dashboard/admin/audit-logs',
     icon: ScrollText,
   },
-  {
-    titleKey: 'sidebar.admin.export',
-    href: '/dashboard/admin/export',
-    icon: Download,
-  },
 ];
 
 export function AppSidebar() {
@@ -166,9 +152,22 @@ export function AppSidebar() {
   const { t } = useI18n();
   const [openItems, setOpenItems] = React.useState<string[]>([]);
   const [role, setRole] = React.useState<UserRole | null>(null);
+  const [currentUser, setCurrentUser] = React.useState<{ name: string; avatarUrl?: string | null } | null>(null);
 
   React.useEffect(() => {
     setRole(getUserRole());
+    void (async () => {
+      try {
+        const me = await browserApiFetchAuth<any>('/profile/me', { method: 'GET' });
+        const name = String(me?.full_name ?? me?.username ?? me?.email ?? '').trim();
+        setCurrentUser({
+          name: name || 'User',
+          avatarUrl: me?.avatar_url ?? null,
+        });
+      } catch {
+        setCurrentUser(null);
+      }
+    })();
   }, []);
 
   const handleLogout = () => {
@@ -185,18 +184,18 @@ export function AppSidebar() {
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
   const isAdmin = role === 'admin';
   const isViewer = role === 'viewer';
+  const isAnalyst = role === 'analyst';
+  const homeHref = isAnalyst ? '/dashboard/customers' : '/dashboard';
 
   const visibleNavHrefs = React.useMemo(() => {
     const hrefs: string[] = [];
     for (const item of navigationItems) {
       if (isViewer) {
-        if (item.href === '/dashboard/upload') continue;
+        
       }
       if (item.items) {
-        const filteredSubItems = isViewer
-          ? item.items.filter((subItem) => !subItem.href.includes('/batch'))
-          : item.items;
-        for (const subItem of filteredSubItems) hrefs.push(subItem.href);
+        const baseSubItems = item.items.filter((subItem) => !subItem.hidden && Boolean(subItem.href));
+        for (const subItem of baseSubItems) hrefs.push(subItem.href);
         continue;
       }
       if (item.href) hrefs.push(item.href);
@@ -207,9 +206,12 @@ export function AppSidebar() {
     }
 
     // Ensure deterministic indices and a fallback.
-    if (!hrefs.includes('/dashboard')) hrefs.unshift('/dashboard');
+    if (!isAnalyst && !hrefs.includes('/dashboard')) hrefs.unshift('/dashboard');
+    if (isAnalyst && !hrefs.includes('/dashboard/customers')) {
+      hrefs.unshift('/dashboard/customers');
+    }
     return hrefs;
-  }, [isAdmin, isViewer]);
+  }, [isAdmin, isAnalyst, isViewer]);
 
   const navIndexFor = React.useCallback(
     (path: string) => {
@@ -245,8 +247,8 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <Link
-          href="/dashboard"
-          data-nav-dir={navDirForHref('/dashboard')}
+          href={homeHref}
+          data-nav-dir={navDirForHref(homeHref)}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
           <Image
@@ -263,8 +265,9 @@ export function AppSidebar() {
         <SidebarMenu>
           {navigationItems
             .filter((item) => {
+              if (isAnalyst && item.href === '/dashboard') return false;
               if (isViewer) {
-                if (item.href === '/dashboard/upload') return false;
+                
                 if (item.href === '/dashboard/customers') return true;
                 if (item.titleKey === 'sidebar.risk') return true;
               }
@@ -272,9 +275,7 @@ export function AppSidebar() {
             })
             .map((item) => {
             if (item.items) {
-              const filteredSubItems = isViewer
-                ? item.items.filter((subItem) => !subItem.href.includes('/batch'))
-                : item.items;
+              const baseSubItems = item.items.filter((subItem) => !subItem.hidden && Boolean(subItem.href));
               return (
                 <Collapsible
                   key={item.titleKey}
@@ -295,7 +296,7 @@ export function AppSidebar() {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <SidebarMenuSub>
-                        {filteredSubItems.map((subItem) => (
+                        {baseSubItems.map((subItem) => (
                           <SidebarMenuSubItem key={subItem.href}>
                             <SidebarMenuSubButton
                               asChild
@@ -360,6 +361,25 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
+        {currentUser ? (
+          <Link
+            href="/dashboard/profile"
+            className="mb-3 flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-2.5 py-2 transition-colors hover:bg-sidebar-accent"
+          >
+            <Avatar className="h-7 w-7">
+              <AvatarImage src={currentUser.avatarUrl || undefined} alt={currentUser.name} />
+              <AvatarFallback>
+                {currentUser.name
+                  .split(' ')
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((part) => part[0]?.toUpperCase() ?? '')
+                  .join('') || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <p className="truncate text-sm font-medium text-sidebar-foreground">{currentUser.name}</p>
+          </Link>
+        ) : null}
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>

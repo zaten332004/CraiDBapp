@@ -1,3 +1,5 @@
+import { clearSessionActivity, touchSessionActivity } from "@/lib/auth/session-activity";
+
 const ACCESS_TOKEN_STORAGE_KEY = "accessToken";
 const ACCESS_TOKEN_COOKIE_KEY = "access_token";
 const USER_ROLE_STORAGE_KEY = "userRole";
@@ -31,6 +33,7 @@ export function getUserRole(): UserRole | null {
 export function setAccessToken(token: string) {
   if (!isBrowser()) return;
   window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
+  touchSessionActivity();
 
   const secure = window.location.protocol === "https:";
   const attrs = [
@@ -66,6 +69,7 @@ export function clearAccessToken() {
   if (!isBrowser()) return;
   window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
   window.localStorage.removeItem(USER_ROLE_STORAGE_KEY);
+  clearSessionActivity();
   document.cookie = `${ACCESS_TOKEN_COOKIE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
   document.cookie = `${USER_ROLE_COOKIE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
 }

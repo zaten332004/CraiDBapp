@@ -6,13 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CheckCircle, XCircle, AlertCircle, Eye, Loader2, RefreshCw } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { CheckCircle, XCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
+import { ListPagination } from '@/components/list-pagination';
+import { formatDateTimeVietnam } from '@/lib/datetime';
 
 type RegistrationType = 'manager' | 'analyst';
 
@@ -21,7 +23,6 @@ type RegistrationRow = {
   name: string;
   email: string;
   type: string;
-  company?: string | null;
   requestedAt?: string | null;
   raw: unknown;
 };
@@ -33,9 +34,8 @@ function normalizeRegistration(item: any, fallbackType: RegistrationType): Regis
   const name = String(item.name ?? item.full_name ?? item.fullName ?? item.username ?? '').trim() || id;
   const email = String(item.email ?? '').trim() || '—';
   const type = String(item.reg_type ?? item.type ?? item.role ?? fallbackType).trim().toLowerCase() || fallbackType;
-  const company = (item.company ?? item.org ?? item.organization ?? null) as string | null;
   const requestedAt = String(item.requested_at ?? item.requestedAt ?? item.created_at ?? item.createdAt ?? '') || null;
-  return { id, name, email, type, company, requestedAt, raw: item };
+  return { id, name, email, type, requestedAt, raw: item };
 }
 
 function formatApiError(err: unknown) {
@@ -45,24 +45,43 @@ function formatApiError(err: unknown) {
   return err instanceof Error ? err.message : String(err);
 }
 
+function formatDateTime(value: unknown, locale: string) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return locale === 'vi' ? 'Không có' : 'N/A';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  return formatDateTimeVietnam(date, locale);
+}
+
+function formatStatusLabel(value: unknown, locale: string) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized === 'pending') return locale === 'vi' ? 'Chờ duyệt' : 'Pending';
+  if (normalized === 'approved') return locale === 'vi' ? 'Đã duyệt' : 'Approved';
+  if (normalized === 'rejected') return locale === 'vi' ? 'Từ chối' : 'Rejected';
+  return String(value ?? (locale === 'vi' ? 'Không có' : 'N/A'));
+}
+
 export default function AdminRegistrationsPage() {
-  const { t } = useI18n();
-  const [regType, setRegType] = useState<RegistrationType>('manager');
+  const PAGE_SIZE = 15;
+  const { t, locale } = useI18n();
   const [registrations, setRegistrations] = useState<RegistrationRow[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [action, setAction] = useState<'approve' | 'reject' | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [page, setPage] = useState(1);
 
-  const loadPending = async (type: RegistrationType) => {
+  const loadPending = async (status: 'pending' | 'approved' | 'rejected' = statusFilter) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await browserApiFetchAuth<any>(`/auth/register/pending?reg_type=${encodeURIComponent(type)}`, {
+      const data = await browserApiFetchAuth<any>(`/auth/register/list?reg_type=manager&status_filter=${status}`, {
         method: 'GET',
       });
       const rawList = Array.isArray(data)
@@ -72,7 +91,7 @@ export default function AdminRegistrationsPage() {
           : Array.isArray(data?.value)
             ? data.value
             : [];
-      const rows = rawList.map((x: any) => normalizeRegistration(x, type)).filter(Boolean) as RegistrationRow[];
+      const rows = rawList.map((x: any) => normalizeRegistration(x, 'manager')).filter(Boolean) as RegistrationRow[];
       setRegistrations(rows);
     } catch (err) {
       setError(formatApiError(err));
@@ -82,9 +101,28 @@ export default function AdminRegistrationsPage() {
     }
   };
 
+  const openRegistrationDetails = async (regId: string) => {
+    setIsLoading(true);
+    setError(null);
+    setDetails(null);
+    try {
+      const data = await browserApiFetchAuth<any>(
+        `/auth/register/registration/${encodeURIComponent(regId)}`,
+        { method: 'GET' },
+      );
+      setDetails(data);
+      setIsDetailsOpen(true);
+    } catch (err) {
+      setError(formatApiError(err));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleAction = (regId: string, actionType: 'approve' | 'reject') => {
     setSelectedId(regId);
     setAction(actionType);
+    setRejectionReason('');
     setIsDialogOpen(true);
   };
 
@@ -95,42 +133,28 @@ export default function AdminRegistrationsPage() {
     setError(null);
     try {
       const approved = action === 'approve';
-
-      if (approved) {
-        try {
-          await browserApiFetchAuth('/auth/register/approve', {
-            method: 'POST',
-            body: { user_id: selectedId, userId: selectedId },
-          });
-        } catch (err) {
-          if (err instanceof ApiError && (err.status === 404 || err.status === 405)) {
-            await browserApiFetchAuth('/admin/manager-registrations/decision', {
-              method: 'POST',
-              body: { registration_id: selectedId, approved: true },
-            });
-          } else {
-            throw err;
-          }
-        }
-      } else {
-        try {
-          await browserApiFetchAuth('/auth/register/reject', {
-            method: 'POST',
-            body: { user_id: selectedId, userId: selectedId },
-          });
-        } catch (err) {
-          if (err instanceof ApiError && (err.status === 404 || err.status === 405)) {
-            await browserApiFetchAuth('/admin/manager-registrations/decision', {
-              method: 'POST',
-              body: { registration_id: selectedId, approved: false },
-            });
-          } else {
-            throw err;
-          }
-        }
+      if (!approved && !rejectionReason.trim()) {
+        setError(locale === 'vi' ? 'Vui lòng nhập lý do từ chối.' : 'Please provide a rejection reason.');
+        setIsLoading(false);
+        return;
       }
+      await browserApiFetchAuth('/auth/register/approve', {
+        method: 'POST',
+        body: {
+          registration_id: Number(selectedId),
+          action: approved ? 'approve' : 'reject',
+          rejection_reason: approved ? undefined : rejectionReason.trim(),
+        },
+      });
 
-      setRegistrations((prev) => prev.filter((reg) => reg.id !== selectedId));
+      setRegistrations((prev) =>
+        prev.map((reg) =>
+          reg.id === selectedId
+            ? { ...reg, raw: { ...(reg.raw as any), status: approved ? 'approved' : 'rejected', rejection_reason: rejectionReason.trim() || null } }
+            : reg,
+        ),
+      );
+      await loadPending(statusFilter);
       setIsDialogOpen(false);
       setSelectedId(null);
       setAction(null);
@@ -142,9 +166,9 @@ export default function AdminRegistrationsPage() {
   };
 
   useEffect(() => {
-    void loadPending(regType);
+    void loadPending(statusFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regType]);
+  }, [statusFilter]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return registrations;
@@ -153,16 +177,20 @@ export default function AdminRegistrationsPage() {
       return (
         r.id.toLowerCase().includes(q) ||
         r.name.toLowerCase().includes(q) ||
-        r.email.toLowerCase().includes(q) ||
-        String(r.company ?? '').toLowerCase().includes(q)
+        r.email.toLowerCase().includes(q)
       );
     });
   }, [registrations, search]);
+  useEffect(() => {
+    setPage(1);
+  }, [search, registrations.length]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const selected = registrations.find((r) => r.id === selectedId) ?? null;
 
   return (
-    <div className="flex flex-col gap-8 p-8">
+    <div className="flex flex-col gap-4 p-6 bg-[#f4f7fc]">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('admin.reg.title')}</h1>
         <p className="text-muted-foreground mt-2">{t('admin.reg.desc')}</p>
@@ -184,30 +212,49 @@ export default function AdminRegistrationsPage() {
         </Alert>
       )}
 
-      <Card>
-        <CardHeader className="space-y-4">
+      <Card className="border-border/80 bg-card shadow-sm">
+        <CardHeader className="space-y-2 pb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
               <CardTitle>{t('admin.reg.list_title')}</CardTitle>
               <CardDescription>
-                {filtered.length} {t('admin.reg.waiting')}
+                {paged.length} / {filtered.length} {t('admin.reg.waiting')}
               </CardDescription>
             </div>
-            <Button variant="outline" onClick={() => void loadPending(regType)} disabled={isLoading}>
+            <Button variant="outline" onClick={() => void loadPending()} disabled={isLoading}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
               {t('common.refresh')}
             </Button>
           </div>
 
           <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-            <Tabs value={regType} onValueChange={(v) => setRegType(v as RegistrationType)}>
-              <TabsList>
-                <TabsTrigger value="manager">{t('role.manager')}</TabsTrigger>
-                <TabsTrigger value="analyst">{t('role.analyst')}</TabsTrigger>
-              </TabsList>
-              <TabsContent value="manager" />
-              <TabsContent value="analyst" />
-            </Tabs>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="w-fit">{t('role.manager')}</Badge>
+              <Button
+                size="sm"
+                variant={statusFilter === 'pending' ? 'default' : 'outline'}
+                className="h-7"
+                onClick={() => setStatusFilter('pending')}
+              >
+                {locale === 'vi' ? 'Chưa duyệt' : 'Pending'}
+              </Button>
+              <Button
+                size="sm"
+                variant={statusFilter === 'approved' ? 'default' : 'outline'}
+                className="h-7"
+                onClick={() => setStatusFilter('approved')}
+              >
+                {locale === 'vi' ? 'Đã duyệt' : 'Approved'}
+              </Button>
+              <Button
+                size="sm"
+                variant={statusFilter === 'rejected' ? 'default' : 'outline'}
+                className="h-7"
+                onClick={() => setStatusFilter('rejected')}
+              >
+                {locale === 'vi' ? 'Từ chối' : 'Rejected'}
+              </Button>
+            </div>
 
             <div className="w-full md:w-80">
               <Input placeholder={t('common.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -215,7 +262,7 @@ export default function AdminRegistrationsPage() {
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="pt-0">
           {isLoading && registrations.length === 0 ? (
             <div className="text-center py-12">
               <Loader2 className="h-10 w-10 mx-auto mb-4 animate-spin text-muted-foreground" />
@@ -228,74 +275,69 @@ export default function AdminRegistrationsPage() {
               <p className="text-muted-foreground mt-1">{t('admin.reg.none_desc')}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <div className="overflow-x-auto rounded-xl border border-black/70 bg-white">
+              <Table className="min-w-[760px] w-full">
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('common.name')}</TableHead>
-                    <TableHead>{t('common.email')}</TableHead>
-                    <TableHead>{t('admin.reg.type')}</TableHead>
-                    <TableHead>{t('common.company')}</TableHead>
-                    <TableHead>{t('admin.reg.requested')}</TableHead>
-                    <TableHead className="text-right">{t('common.actions')}</TableHead>
+                  <TableRow className="bg-muted/35 hover:bg-muted/35">
+                    <TableHead className="py-1.5">{t('common.name')}</TableHead>
+                    <TableHead className="py-1.5">{t('common.email')}</TableHead>
+                    <TableHead className="py-1.5">{t('admin.reg.type')}</TableHead>
+                    <TableHead className="py-1.5">{t('admin.reg.requested')}</TableHead>
+                    <TableHead className="py-1.5 text-right">{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((reg) => (
-                    <TableRow key={reg.id}>
-                      <TableCell className="font-medium">{reg.name}</TableCell>
-                      <TableCell>{reg.email}</TableCell>
-                      <TableCell>
+                  {paged.map((reg) => (
+                    <TableRow
+                      key={reg.id}
+                      className="cursor-pointer border-b border-black/15 hover:bg-muted/30"
+                      onClick={() => void openRegistrationDetails(reg.id)}
+                    >
+                      <TableCell className="py-1.5 text-[12px] font-medium">{reg.name}</TableCell>
+                      <TableCell className="py-1.5 text-[12px]">{reg.email}</TableCell>
+                      <TableCell className="py-1.5">
                         <Badge variant="outline">{t(`role.${reg.type}`)}</Badge>
                       </TableCell>
-                      <TableCell>{reg.company || '—'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{reg.requestedAt || '—'}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            setIsLoading(true);
-                            setError(null);
-                            setDetails(null);
-                            try {
-                              const data = await browserApiFetchAuth<any>(
-                                `/auth/register/registration/${encodeURIComponent(reg.id)}`,
-                                { method: 'GET' },
-                              );
-                              setDetails(data);
-                              setIsDetailsOpen(true);
-                            } catch (err) {
-                              setError(formatApiError(err));
-                            } finally {
-                              setIsLoading(false);
-                            }
-                          }}
-                          disabled={isLoading}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          {t('common.view')}
-                        </Button>
-                        <Button size="sm" variant="default" onClick={() => handleAction(reg.id, 'approve')} disabled={isLoading}>
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          {t('common.approve')}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() => handleAction(reg.id, 'reject')}
-                          disabled={isLoading}
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          {t('common.reject')}
-                        </Button>
+                      <TableCell className="py-1.5 text-[12px] text-muted-foreground whitespace-nowrap">{reg.requestedAt || '—'}</TableCell>
+                      <TableCell className="py-1.5 text-right space-x-2">
+                        {statusFilter === 'pending' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAction(reg.id, 'approve');
+                              }}
+                              disabled={isLoading}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              {t('common.approve')}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAction(reg.id, 'reject');
+                              }}
+                              disabled={isLoading}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              {t('common.reject')}
+                            </Button>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
+          )}
+          {filtered.length > 0 && (
+            <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
           )}
         </CardContent>
       </Card>
@@ -323,6 +365,17 @@ export default function AdminRegistrationsPage() {
               )}
             </DialogDescription>
           </DialogHeader>
+          {action === 'reject' && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">{locale === 'vi' ? 'Lý do từ chối' : 'Rejection reason'}</p>
+              <Textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder={locale === 'vi' ? 'Nhập lý do từ chối hồ sơ' : 'Enter rejection reason'}
+                rows={3}
+              />
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isLoading}>
               {t('common.cancel')}
@@ -349,10 +402,28 @@ export default function AdminRegistrationsPage() {
             <DialogTitle>{t('admin.reg.details_title')}</DialogTitle>
             <DialogDescription>{t('admin.reg.details_desc')}</DialogDescription>
           </DialogHeader>
-          <div className="rounded-md border bg-secondary p-3">
-            <pre className="max-h-[60vh] overflow-auto text-xs text-muted-foreground whitespace-pre-wrap">
-              {JSON.stringify(details, null, 2)}
-            </pre>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+            {[
+              { label: locale === 'vi' ? 'Mã người dùng' : 'User ID', value: details?.user_id ?? details?.userId },
+              { label: locale === 'vi' ? 'Tên đăng nhập' : 'Username', value: details?.username },
+              { label: locale === 'vi' ? 'Họ và tên' : 'Full name', value: details?.full_name ?? details?.fullName },
+              { label: 'Email', value: details?.email },
+              { label: locale === 'vi' ? 'Số điện thoại' : 'Phone', value: details?.phone },
+              { label: locale === 'vi' ? 'Loại người dùng' : 'User type', value: details?.user_type ?? details?.userType },
+              { label: locale === 'vi' ? 'Trạng thái' : 'Status', value: formatStatusLabel(details?.status, locale) },
+              { label: locale === 'vi' ? 'Đã xác thực email' : 'Email verified', value: details?.is_email_verified ? (locale === 'vi' ? 'Có' : 'Yes') : (locale === 'vi' ? 'Không' : 'No') },
+              { label: locale === 'vi' ? 'Thời gian tạo' : 'Created at', value: formatDateTime(details?.created_at ?? details?.createdAt, locale) },
+              { label: locale === 'vi' ? 'Người duyệt' : 'Approved by', value: details?.approved_by_name ?? details?.approved_by ?? details?.approvedBy },
+              { label: locale === 'vi' ? 'Thời gian duyệt' : 'Approved at', value: formatDateTime(details?.approved_at ?? details?.approvedAt, locale) },
+              { label: locale === 'vi' ? 'Lý do từ chối' : 'Rejection reason', value: details?.rejection_reason ?? details?.rejectionReason },
+            ].map((item) => (
+              <div key={item.label} className="rounded-lg border bg-secondary/40 p-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">{item.label}</p>
+                <p className="mt-1 text-sm font-medium break-words">
+                  {String(item.value ?? (locale === 'vi' ? 'Không có' : 'N/A'))}
+                </p>
+              </div>
+            ))}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>

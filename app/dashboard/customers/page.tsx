@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,61 +23,105 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Download } from 'lucide-react';
 import { getUserRole } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
+import { browserApiFetchAuth } from '@/lib/api/browser';
+import { notifyError, notifySuccess } from '@/lib/notify';
+import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { ListPagination } from '@/components/list-pagination';
+import { getAccessToken } from '@/lib/auth/token';
+import { formatVnd } from '@/lib/money';
 
-const getRiskBadge = (level: string) => {
-  const variants: Record<string, 'default' | 'destructive' | 'outline' | 'secondary'> = {
-    high: 'destructive',
-    medium: 'default',
-    low: 'secondary',
-  };
-  return variants[level] || 'default';
-};
+function getRiskBadgeClass(level: string) {
+  const normalized = String(level || '').toLowerCase();
+  if (normalized === 'low') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (normalized === 'medium') return 'border-blue-200 bg-blue-50 text-blue-700';
+  if (normalized === 'high') return 'border-rose-200 bg-rose-50 text-rose-700';
+  return 'border-slate-200 bg-slate-50 text-slate-700';
+}
+
+function normalizeStatusKey(status: string) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'approved') return 'status.approved';
+  if (normalized === 'rejected') return 'status.rejected';
+  if (normalized === 'pending') return 'status.pending';
+  if (normalized === 'active') return 'status.active';
+  if (normalized === 'inactive') return 'status.inactive';
+  return null;
+}
+
+function getStatusBadgeClass(status: string) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'approved') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (normalized === 'rejected') return 'border-rose-200 bg-rose-50 text-rose-700';
+  if (normalized === 'pending') return 'border-slate-200 bg-slate-50 text-slate-700';
+  if (normalized === 'active') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (normalized === 'inactive') return 'border-slate-200 bg-slate-50 text-slate-700';
+  return 'border-slate-200 bg-slate-50 text-slate-700';
+}
 
 export default function CustomersPage() {
-  const { t } = useI18n();
+  const PAGE_SIZE = 15;
+  const { t, locale } = useI18n();
+  const router = useRouter();
   const role = getUserRole();
   const isViewer = role === 'viewer';
-  const [customers, setCustomers] = useState([
-    {
-      id: '1',
-      name: 'John Smith',
-      email: 'john@example.com',
-      riskLevel: 'low',
-      score: 85,
-      status: 'active',
-    },
-    {
-      id: '2',
-      name: 'Jane Doe',
-      email: 'jane@example.com',
-      riskLevel: 'medium',
-      score: 65,
-      status: 'active',
-    },
-    {
-      id: '3',
-      name: 'Bob Johnson',
-      email: 'bob@example.com',
-      riskLevel: 'high',
-      score: 35,
-      status: 'active',
-    },
-    {
-      id: '4',
-      name: 'Alice Brown',
-      email: 'alice@example.com',
-      riskLevel: 'low',
-      score: 88,
-      status: 'active',
-    },
-  ]);
+  const isAdmin = role === 'admin';
+  const [customers, setCustomers] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+    loanType: string;
+    loanAmount: number | null;
+    termMonths: number | null;
+    annualRate: number | null;
+    riskLevel: string;
+    status: string;
+  }>>([]);
 
   const [search, setSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState<string>('all');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setIsLoading(true);
+      setPage(1);
+      try {
+        const query = new URLSearchParams();
+        query.set('page', '1');
+        if (search.trim()) query.set('search_name', search.trim());
+        if (riskFilter !== 'all') query.set('risk_level', riskFilter);
+        const data = await browserApiFetchAuth<{ items: any[] }>(`/customers?${query.toString()}`, { method: 'GET' });
+        if (cancelled) return;
+        setCustomers(
+          (data.items || []).map((item) => ({
+            id: String(item.customer_id),
+            name: String(item.full_name || '-'),
+            email: String(item.email || '-'),
+            loanType: String(item.loan_type || item.product_type || '-'),
+            loanAmount: item.requested_loan_amount != null ? Number(item.requested_loan_amount) : null,
+            termMonths: item.requested_term_months != null ? Number(item.requested_term_months) : null,
+            annualRate: item.annual_interest_rate != null ? Number(item.annual_interest_rate) : null,
+            riskLevel: String(item.risk_level || 'medium').toLowerCase(),
+            status: String(item.application_status || 'active').toLowerCase(),
+          })),
+        );
+      } catch (err) {
+        if (!cancelled) notifyError(formatUserFacingApiError(err));
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [search, riskFilter]);
 
   const riskLabel = (level: string) => {
     switch (level) {
@@ -91,15 +136,77 @@ export default function CustomersPage() {
     }
   };
 
-  const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch = customer.name.toLowerCase().includes(search.toLowerCase()) ||
-      customer.email.toLowerCase().includes(search.toLowerCase());
-    const matchesRisk = riskFilter === 'all' || customer.riskLevel === riskFilter;
-    return matchesSearch && matchesRisk;
-  });
+  const loanTypeLabel = (value: string) => {
+    const normalized = String(value || '').toLowerCase();
+    if (normalized === 'secured') return locale === 'vi' ? 'Có tài sản bảo đảm' : 'Secured';
+    if (normalized === 'unsecured') return locale === 'vi' ? 'Tín chấp' : 'Unsecured';
+    if (normalized === 'mortgage') return locale === 'vi' ? 'Thế chấp' : 'Mortgage';
+    if (normalized === 'business') return locale === 'vi' ? 'Kinh doanh' : 'Business';
+    return value || '-';
+  };
+
+  const filteredCustomers = customers;
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / PAGE_SIZE));
+  const pagedCustomers = filteredCustomers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const exportRes = await browserApiFetchAuth<{ file_url?: string; url?: string; download_url?: string }>(
+        '/admin/export',
+        {
+          method: 'POST',
+          body: {
+            type: 'customers',
+            filters: {},
+          },
+        },
+      );
+
+      const fileUrl = String(exportRes.file_url || exportRes.url || exportRes.download_url || '').trim();
+      if (!fileUrl) {
+        throw new Error(locale === 'vi' ? 'Không nhận được đường dẫn file export.' : 'No export file URL returned.');
+      }
+
+      const token = getAccessToken();
+      const normalizedPath = (() => {
+        if (fileUrl.startsWith('/api/')) return fileUrl;
+        if (fileUrl.startsWith('/')) return `/api/v1${fileUrl}`;
+        return `/api/v1/${fileUrl}`;
+      })();
+      const response = await fetch(normalizedPath, {
+        method: 'GET',
+        headers: token ? { authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!response.ok) {
+        throw new Error(locale === 'vi' ? 'Tải file export thất bại.' : 'Failed to download export file.');
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get('content-disposition') || '';
+      const matched = disposition.match(/filename="?([^"]+)"?/i);
+      const fallbackName = `customers-export-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+      const fileName = matched?.[1] || fallbackName;
+
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+
+      notifySuccess(locale === 'vi' ? 'Đang tải file export.' : 'Downloading export file.');
+    } catch (err) {
+      notifyError(formatUserFacingApiError(err));
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
-    <div className="flex flex-col gap-8 p-8">
+    <div className="flex flex-col gap-6 p-6 bg-[#f4f7fc]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -109,17 +216,30 @@ export default function CustomersPage() {
           </p>
         </div>
         {!isViewer && (
-          <Button asChild>
-            <Link href="/dashboard/customers/new">
-              <Plus className="mr-2 h-4 w-4" />
-              {t('customers.add')}
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link href="/dashboard/upload">
+                {t('sidebar.upload')}
+              </Link>
+            </Button>
+            {isAdmin && (
+              <Button variant="outline" onClick={() => void handleExport()} disabled={isExporting}>
+                <Download className="mr-2 h-4 w-4" />
+                {isExporting ? (locale === 'vi' ? 'Đang xuất...' : 'Exporting...') : t('sidebar.admin.export')}
+              </Button>
+            )}
+            <Button asChild>
+              <Link href="/dashboard/customers/new">
+                <Plus className="mr-2 h-4 w-4" />
+                {t('customers.add')}
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className="border-border/80 bg-card shadow-sm">
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
@@ -147,53 +267,63 @@ export default function CustomersPage() {
       </Card>
 
       {/* Table */}
-      <Card>
+      <Card className="border-border/80 bg-card shadow-sm">
         <CardHeader>
           <CardTitle>{t('customers.list_title')}</CardTitle>
-          <CardDescription>
-            {t('common.showing')} {filteredCustomers.length} {t('customers.items')}
-          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto rounded-xl border border-black/70 bg-white">
+            <Table className="min-w-[980px] w-full">
               <TableHeader>
-                <TableRow>
-                  <TableHead>{t('common.name')}</TableHead>
-                  <TableHead>{t('common.email')}</TableHead>
-                  <TableHead>{t('customers.risk_level')}</TableHead>
-                  <TableHead>{t('customers.risk_score')}</TableHead>
-                  <TableHead>{t('common.status')}</TableHead>
-                  <TableHead className="text-right">{t('common.actions')}</TableHead>
+                <TableRow className="bg-muted/35 hover:bg-muted/35">
+                  <TableHead className="py-1.5">{t('common.name')}</TableHead>
+                  <TableHead className="py-1.5">{t('customers.loan_type')}</TableHead>
+                  <TableHead className="py-1.5">{t('customers.loan_amount')}</TableHead>
+                  <TableHead className="py-1.5">{t('customers.loan_term')}</TableHead>
+                  <TableHead className="py-1.5">{t('customers.interest_rate')}</TableHead>
+                  <TableHead className="py-1.5">{t('customers.risk_level')}</TableHead>
+                  <TableHead className="py-1.5">{t('common.status')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell>{customer.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={getRiskBadge(customer.riskLevel)}>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell>
+                  </TableRow>
+                ) : pagedCustomers.map((customer) => (
+                  <TableRow
+                    key={customer.id}
+                    className="cursor-pointer border-b border-black/15 hover:bg-muted/30"
+                    onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                  >
+                    <TableCell className="py-1.5 font-medium">
+                      <div className="leading-tight">
+                        <p>{customer.name}</p>
+                        <p className="text-xs text-muted-foreground">{customer.email}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-1.5 text-[13px]">{loanTypeLabel(customer.loanType)}</TableCell>
+                    <TableCell className="py-1.5 text-[13px]">{formatVnd(customer.loanAmount, locale === 'vi' ? 'vi' : 'en')}</TableCell>
+                    <TableCell className="py-1.5 text-[13px]">
+                      {customer.termMonths != null ? `${customer.termMonths} ${locale === 'vi' ? 'tháng' : 'months'}` : '-'}
+                    </TableCell>
+                    <TableCell className="py-1.5 text-[13px]">{customer.annualRate != null ? `${customer.annualRate}%` : '-'}</TableCell>
+                    <TableCell className="py-1.5">
+                      <Badge variant="outline" className={getRiskBadgeClass(customer.riskLevel)}>
                         {riskLabel(customer.riskLevel)}
                       </Badge>
                     </TableCell>
-                    <TableCell>{customer.score}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{t(`status.${customer.status}`)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link
-                        href={`/dashboard/customers/${customer.id}`}
-                        className="text-accent hover:underline text-sm font-medium"
-                      >
-                        {t('common.view')}
-                      </Link>
+                    <TableCell className="py-1.5">
+                      <Badge variant="outline" className={getStatusBadgeClass(customer.status)}>
+                        {normalizeStatusKey(customer.status) ? t(normalizeStatusKey(customer.status) as string) : customer.status}
+                      </Badge>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
+          <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
         </CardContent>
       </Card>
     </div>

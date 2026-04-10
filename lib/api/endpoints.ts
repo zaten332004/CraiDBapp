@@ -65,7 +65,6 @@ export const API_GROUPS: ApiGroup[] = [
       { method: "POST", path: "/risk/score", auth: "auth" },
       { method: "GET", path: "/risk/score/{customer_id}", auth: "auth" },
       { method: "POST", path: "/risk/analyze", auth: "auth" },
-      { method: "POST", path: "/risk/batch", auth: "auth" },
       { method: "POST", path: "/risk/simulation", auth: "auth" },
       { method: "GET", path: "/risk/model/version", auth: "auth" },
       { method: "GET", path: "/risk/explain/{customer_id}", auth: "auth" },

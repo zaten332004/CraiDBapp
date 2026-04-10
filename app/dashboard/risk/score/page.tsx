@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,26 +8,229 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, TrendingUp } from 'lucide-react';
 import { authJsonHeaders } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
+import { formatUserFacingApiError, formatUserFacingFetchError } from '@/lib/api/format-api-error';
+import { notifyError } from '@/lib/notify';
+import { browserApiFetchAuth } from '@/lib/api/browser';
+import { formatVndDigits, sanitizeVndDigitString, parseVndDigitsToNumber } from '@/lib/money';
+import {
+  RiskScoreExplanationPanel,
+  parseExplanationDetail,
+  riskBadgeOutlineClass,
+  riskExplanationFrameClass,
+} from '@/components/risk-score-explanation';
+
+type ScoreForm = {
+  customerLookup: string;
+  name: string;
+  incomeDigits: string;
+  loanDigits: string;
+  creditHistory: string;
+  age: string;
+  creditScore: string;
+  loanType: string;
+  interestRate: string;
+  loanTermMonths: string;
+  collateralDigits: string;
+  employmentStatus: string;
+  /** Hiển thị theo hồ sơ (read-only), không chỉnh tay */
+  employmentDisplay: string;
+  notes: string;
+};
+
+const initialForm: ScoreForm = {
+  customerLookup: '',
+  name: '',
+  incomeDigits: '',
+  loanDigits: '',
+  creditHistory: '',
+  age: '',
+  creditScore: '',
+  loanType: '',
+  interestRate: '',
+  loanTermMonths: '',
+  collateralDigits: '',
+  employmentStatus: '',
+  employmentDisplay: '',
+  notes: '',
+};
+
+function deriveAgeFromCustomer(c: Record<string, unknown>): number {
+  const a = c.age;
+  if (a != null && Number.isFinite(Number(a))) {
+    return Math.max(18, Math.min(120, Math.round(Number(a))));
+  }
+  const dob = c.date_of_birth;
+  if (dob) {
+    const born = new Date(String(dob));
+    if (!Number.isNaN(born.getTime())) {
+      const t = new Date();
+      let y = t.getFullYear() - born.getFullYear();
+      const m = t.getMonth() - born.getMonth();
+      if (m < 0 || (m === 0 && t.getDate() < born.getDate())) y -= 1;
+      return Math.max(18, Math.min(120, y));
+    }
+  }
+  return 30;
+}
+
+function normalizeEmployment(raw: unknown): string {
+  const s = String(raw || '')
+    .trim()
+    .toLowerCase();
+  if (!s) return '';
+  if (/(employed|permanent|full_time|đang làm)/i.test(s)) return 'employed';
+  if (/(self|tự kinh|freelance)/i.test(s)) return 'self_employed';
+  if (/(unemploy|thất nghiệp)/i.test(s)) return 'unemployed';
+  if (/(contract|part_time|hợp đồng|bán thời)/i.test(s)) return 'contract';
+  return '';
+}
+
+function normalizeLoanType(raw: unknown): string {
+  const s = String(raw || '')
+    .trim()
+    .toLowerCase();
+  if (!s) return '';
+  if (['secured', 'unsecured', 'mortgage', 'business'].includes(s)) return s;
+  return s;
+}
+
+function customerToForm(c: Record<string, unknown>): ScoreForm {
+  const monthly = Math.round(Number(c.monthly_income ?? 0));
+  const loan = Math.round(Number(c.requested_loan_amount ?? 0));
+  const coll = c.collateral_value != null ? Math.round(Number(c.collateral_value)) : 0;
+  return {
+    customerLookup: String(c.external_customer_ref || c.customer_id || ''),
+    name: String(c.full_name || ''),
+    incomeDigits: monthly > 0 ? String(monthly) : '',
+    loanDigits: loan > 0 ? String(loan) : '',
+    creditHistory: '60',
+    age: String(deriveAgeFromCustomer(c)),
+    creditScore: c.credit_score != null ? String(c.credit_score) : '',
+    loanType: normalizeLoanType(c.loan_type),
+    interestRate: c.annual_interest_rate != null ? String(c.annual_interest_rate) : '',
+    loanTermMonths: c.requested_term_months != null ? String(c.requested_term_months) : '',
+    collateralDigits: coll > 0 ? String(coll) : '',
+    employmentStatus: normalizeEmployment(c.employment_status),
+    employmentDisplay: String(c.employment_status ?? '').trim(),
+    notes: String(c.notes || ''),
+  };
+}
+
+function VndDigitField(props: {
+  id: string;
+  label: string;
+  hint?: string;
+  valueDigits: string;
+  onDigitsChange: (digits: string) => void;
+  disabled?: boolean;
+  placeholderDigits?: string;
+}) {
+  const { id, label, hint, valueDigits, onDigitsChange, disabled, placeholderDigits } = props;
+  const [focused, setFocused] = useState(false);
+  const display = focused ? valueDigits : valueDigits ? formatVndDigits(Number(valueDigits)) : '';
+  const ph = placeholderDigits ? formatVndDigits(Number(placeholderDigits)) : undefined;
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      <Input
+        id={id}
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder={ph}
+        value={display}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onChange={(e) => onDigitsChange(sanitizeVndDigitString(e.target.value))}
+        disabled={disabled}
+      />
+    </div>
+  );
+}
 
 export default function RiskScorePage() {
-  const { t } = useI18n();
-  const [formData, setFormData] = useState({
-    customerId: '',
-    name: '',
-    income: '',
-    loanAmount: '',
-    creditHistory: '',
-    notes: '',
-  });
-  const [result, setResult] = useState<any>(null);
+  const { t, locale } = useI18n();
+  const [formData, setFormData] = useState<ScoreForm>(initialForm);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [error, setError] = useState('');
+  const lastFetchedLookupRef = useRef<string>('');
+
+  const applyCustomer = useCallback((c: Record<string, unknown>) => {
+    setFormData(customerToForm(c));
+  }, []);
+
+  const loadCustomerByLookup = useCallback(
+    async (raw: string) => {
+      const q = raw.trim();
+      if (!q) return;
+      if (lastFetchedLookupRef.current === q) return;
+      setProfileLoading(true);
+      try {
+        let customer: Record<string, unknown>;
+        if (/^\d+$/.test(q)) {
+          customer = (await browserApiFetchAuth(`/customers/${parseInt(q, 10)}`, {
+            method: 'GET',
+          })) as Record<string, unknown>;
+        } else {
+          const search = await browserApiFetchAuth<{ items: Record<string, unknown>[] }>(
+            `/customers?page=1&limit=20&search_name=${encodeURIComponent(q)}`,
+            { method: 'GET' },
+          );
+          const items = search.items || [];
+          const qLower = q.toLowerCase();
+          const exactRef = items.find((c) => String(c.external_customer_ref || '').toLowerCase() === qLower);
+          const exactEmail = items.find((c) => String(c.email || '').toLowerCase() === qLower);
+          const picked = exactRef || exactEmail || (items.length === 1 ? items[0] : null);
+          if (!picked) {
+            if (items.length > 1) {
+              throw new Error(t('risk.score.profile_ambiguous'));
+            }
+            throw new Error(t('risk.score.profile_not_found'));
+          }
+          customer = (await browserApiFetchAuth(`/customers/${Number(picked.customer_id)}`, {
+            method: 'GET',
+          })) as Record<string, unknown>;
+        }
+        applyCustomer(customer);
+        lastFetchedLookupRef.current = q;
+      } catch (e) {
+        lastFetchedLookupRef.current = '';
+        notifyError(formatUserFacingApiError(e));
+      } finally {
+        setProfileLoading(false);
+      }
+    },
+    [applyCustomer, t],
+  );
+
+  useEffect(() => {
+    const q = formData.customerLookup.trim();
+    if (q.length < 2 && !/^\d+$/.test(q)) return undefined;
+    const h = setTimeout(() => {
+      void loadCustomerByLookup(q);
+    }, 700);
+    return () => clearTimeout(h);
+  }, [formData.customerLookup, loadCustomerByLookup]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    if (name === 'customerLookup') {
+      lastFetchedLookupRef.current = '';
+      setFormData((prev) => ({
+        ...prev,
+        customerLookup: value,
+        employmentDisplay: '',
+        employmentStatus: '',
+      }));
+      return;
+    }
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -36,39 +239,86 @@ export default function RiskScorePage() {
     setError('');
     setIsLoading(true);
 
+    const income = parseVndDigitsToNumber(formData.incomeDigits);
+    const debt = parseVndDigitsToNumber(formData.loanDigits);
+    const age = parseInt(formData.age, 10);
+    const creditHistory = parseInt(formData.creditHistory, 10) || 60;
+
+    if (!Number.isFinite(income) || income <= 0) {
+      setError(t('risk.score.validation_income'));
+      setIsLoading(false);
+      notifyError(t('risk.score.validation_income'));
+      return;
+    }
+    if (!Number.isFinite(debt) || debt < 0) {
+      setError(t('risk.score.validation_loan'));
+      setIsLoading(false);
+      notifyError(t('risk.score.validation_loan'));
+      return;
+    }
+    if (!Number.isFinite(age) || age < 18 || age > 120) {
+      setError(t('risk.score.validation_age'));
+      setIsLoading(false);
+      notifyError(t('risk.score.validation_age'));
+      return;
+    }
+
+    const body: Record<string, unknown> = {
+      income,
+      debt,
+      age,
+      credit_history_months: Math.max(0, creditHistory),
+    };
+
+    const csRaw = formData.creditScore.trim();
+    if (csRaw) {
+      const cs = parseInt(csRaw, 10);
+      if (Number.isFinite(cs) && cs >= 0 && cs <= 1000) body.credit_score = cs;
+    }
+    if (formData.loanType.trim()) body.loan_type = formData.loanType.trim();
+    const irRaw = formData.interestRate.replace(',', '.').trim();
+    if (irRaw) {
+      const ir = parseFloat(irRaw);
+      if (Number.isFinite(ir) && ir >= 0 && ir <= 100) body.interest_rate = ir;
+    }
+    const termRaw = formData.loanTermMonths.trim();
+    if (termRaw) {
+      const tm = parseInt(termRaw, 10);
+      if (Number.isFinite(tm) && tm >= 0) body.loan_term_months = tm;
+    }
+    const coll = parseVndDigitsToNumber(formData.collateralDigits);
+    if (Number.isFinite(coll) && coll > 0) body.collateral_value = coll;
+    const empPayload = formData.employmentStatus.trim() || formData.employmentDisplay.trim();
+    if (empPayload) body.employment_status = empPayload;
+
     try {
       const response = await fetch('/api/v1/risk/score', {
         method: 'POST',
         headers: authJsonHeaders(),
-        body: JSON.stringify({
-          customer_id: formData.customerId,
-          name: formData.name,
-          income: parseFloat(formData.income),
-          loan_amount: parseFloat(formData.loanAmount),
-          credit_history_months: parseInt(formData.creditHistory),
-          additional_notes: formData.notes,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || t('risk.score.failed'));
+        const bodyText = await response.text();
+        throw new Error(formatUserFacingFetchError(response.status, bodyText));
       }
 
       const data = await response.json();
       setResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('common.error'));
+      const message = err instanceof Error ? err.message : t('common.error');
+      setError(message);
+      notifyError(message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getRiskLevel = (score: number) => {
-    if (score >= 80) return 'low';
-    if (score >= 60) return 'medium';
-    return 'high';
-  };
+  const uiScore = typeof result?.risk_score === 'number'
+    ? Math.max(0, Math.min(100, (1 - Number(result.risk_score)) * 100))
+    : null;
+
+  const getRiskLevel = () => String(result?.risk_label || 'medium');
 
   const riskLevelLabel = (level: string) => {
     switch (level) {
@@ -81,50 +331,52 @@ export default function RiskScorePage() {
     }
   };
 
-  const getRiskBadgeVariant = (level: string): 'default' | 'destructive' | 'outline' | 'secondary' => {
-    switch (level) {
-      case 'low':
-        return 'secondary';
-      case 'medium':
-        return 'default';
-      case 'high':
-        return 'destructive';
-      default:
-        return 'outline';
-    }
-  };
+  let explanationText = '';
+  if (result && typeof result.explanation === 'string') {
+    const en =
+      typeof result.explanation_en === 'string' && result.explanation_en.trim()
+        ? result.explanation_en
+        : '';
+    explanationText = locale === 'en' && en ? en : result.explanation;
+  }
+
+  const structuredExplanation = result ? parseExplanationDetail(result.explanation_detail) : null;
 
   return (
     <div className="flex flex-col gap-8 p-8">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('risk.score.title')}</h1>
-        <p className="text-muted-foreground mt-2">
-          {t('risk.score.desc')}
-        </p>
+        <p className="text-muted-foreground mt-2">{t('risk.score.desc')}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Form */}
         <Card>
           <CardHeader>
             <CardTitle>{t('risk.score.card_title')}</CardTitle>
-            <CardDescription>
-              {t('risk.score.card_desc')}
-            </CardDescription>
+            <CardDescription>{t('risk.score.card_desc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="customerId">{t('customers.customer_id')}</Label>
-                <Input
-                  id="customerId"
-                  name="customerId"
-                  placeholder={t('customers.customer_id_ph')}
-                  value={formData.customerId}
-                  onChange={handleChange}
-                  disabled={isLoading}
-                />
+                <Label htmlFor="customerLookup">{t('customers.customer_id')}</Label>
+                <div className="relative">
+                  <Input
+                    id="customerLookup"
+                    name="customerLookup"
+                    placeholder={t('customers.customer_id_ph')}
+                    value={formData.customerLookup}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                    className="pr-10"
+                    autoComplete="off"
+                  />
+                  {profileLoading ? (
+                    <Loader2
+                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground"
+                      aria-hidden
+                    />
+                  ) : null}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -139,27 +391,49 @@ export default function RiskScorePage() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <VndDigitField
+                  id="incomeDigits"
+                  label={t('risk.score.monthly_income')}
+                  valueDigits={formData.incomeDigits}
+                  onDigitsChange={(d) => setFormData((p) => ({ ...p, incomeDigits: d }))}
+                  disabled={isLoading}
+                  placeholderDigits="20000000"
+                />
+                <VndDigitField
+                  id="loanDigits"
+                  label={t('risk.score.loan_amount')}
+                  valueDigits={formData.loanDigits}
+                  onDigitsChange={(d) => setFormData((p) => ({ ...p, loanDigits: d }))}
+                  disabled={isLoading}
+                  placeholderDigits="500000000"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="income">{t('customers.annual_income')}</Label>
+                  <Label htmlFor="age">{t('risk.score.age')}</Label>
                   <Input
-                    id="income"
-                    name="income"
+                    id="age"
+                    name="age"
                     type="number"
-                    placeholder={t('customers.annual_income_ph')}
-                    value={formData.income}
+                    min={18}
+                    max={120}
+                    placeholder="30"
+                    value={formData.age}
                     onChange={handleChange}
                     disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="loanAmount">{t('customers.loan_amount')}</Label>
+                  <Label htmlFor="creditHistory">{t('customers.credit_history')}</Label>
                   <Input
-                    id="loanAmount"
-                    name="loanAmount"
+                    id="creditHistory"
+                    name="creditHistory"
                     type="number"
-                    placeholder={t('customers.loan_amount_ph')}
-                    value={formData.loanAmount}
+                    min={0}
+                    placeholder={t('customers.credit_history_ph')}
+                    value={formData.creditHistory}
                     onChange={handleChange}
                     disabled={isLoading}
                   />
@@ -167,16 +441,82 @@ export default function RiskScorePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="creditHistory">{t('customers.credit_history')}</Label>
+                <Label htmlFor="creditScore">{t('risk.score.credit_score')}</Label>
                 <Input
-                  id="creditHistory"
-                  name="creditHistory"
+                  id="creditScore"
+                  name="creditScore"
                   type="number"
-                  placeholder={t('customers.credit_history_ph')}
-                  value={formData.creditHistory}
+                  min={0}
+                  max={1000}
+                  placeholder={t('risk.score.credit_score_ph')}
+                  value={formData.creditScore}
                   onChange={handleChange}
                   disabled={isLoading}
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t('customers.loan_type')}</Label>
+                  <Select
+                    value={formData.loanType || '__none__'}
+                    onValueChange={(v) => setFormData((p) => ({ ...p, loanType: v === '__none__' ? '' : v }))}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('risk.score.loan_type_opt.unspecified')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">{t('risk.score.loan_type_opt.unspecified')}</SelectItem>
+                      <SelectItem value="secured">{t('risk.score.loan_type_opt.secured')}</SelectItem>
+                      <SelectItem value="unsecured">{t('risk.score.loan_type_opt.unsecured')}</SelectItem>
+                      <SelectItem value="mortgage">{t('risk.score.loan_type_opt.mortgage')}</SelectItem>
+                      <SelectItem value="business">{t('risk.score.loan_type_opt.business')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="interestRate">{t('risk.score.interest_rate')}</Label>
+                  <Input
+                    id="interestRate"
+                    name="interestRate"
+                    inputMode="decimal"
+                    placeholder="12"
+                    value={formData.interestRate}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="loanTermMonths">{t('risk.score.loan_term_months')}</Label>
+                  <Input
+                    id="loanTermMonths"
+                    name="loanTermMonths"
+                    type="number"
+                    min={0}
+                    placeholder="36"
+                    value={formData.loanTermMonths}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                  />
+                </div>
+                <VndDigitField
+                  id="collateralDigits"
+                  label={t('risk.score.collateral_value')}
+                  valueDigits={formData.collateralDigits}
+                  onDigitsChange={(d) => setFormData((p) => ({ ...p, collateralDigits: d }))}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('risk.score.employment')}</Label>
+                <div className="flex min-h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground">
+                  {formData.employmentDisplay.trim() ? formData.employmentDisplay : '—'}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -209,7 +549,6 @@ export default function RiskScorePage() {
           </CardContent>
         </Card>
 
-        {/* Result */}
         <div className="space-y-4">
           {error && (
             <Alert variant="destructive">
@@ -222,8 +561,7 @@ export default function RiskScorePage() {
               <CardHeader>
                 <CardTitle>{t('risk.score.result_title')}</CardTitle>
                 <CardDescription>
-                  {t('risk.score.calculated_for')}{' '}
-                  {result.name || t('customers.customer')}
+                  {t('risk.score.calculated_for')} {formData.name || t('customers.customer')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -231,38 +569,42 @@ export default function RiskScorePage() {
                   <div>
                     <p className="text-sm text-muted-foreground">{t('customers.risk_score')}</p>
                     <p className="text-4xl font-bold text-accent mt-2">
-                      {typeof result.score === 'number' ? result.score.toFixed(1) : 'N/A'}
+                      {typeof uiScore === 'number' ? uiScore.toFixed(1) : 'N/A'}
                     </p>
                   </div>
-                  <Badge variant={getRiskBadgeVariant(getRiskLevel(result.score || 0))} className="text-lg px-4 py-2">
-                    {riskLevelLabel(getRiskLevel(result.score || 0))}
+                  <Badge variant="outline" className={riskBadgeOutlineClass(getRiskLevel())}>
+                    {riskLevelLabel(getRiskLevel())}
                   </Badge>
                 </div>
 
-                {result.model_version && (
+                {result.cic_score != null && (
                   <div>
-                    <p className="text-sm text-muted-foreground">{t('risk.score.model_version')}</p>
-                    <p className="font-medium mt-1">{result.model_version}</p>
+                    <p className="text-sm text-muted-foreground">CIC</p>
+                    <p className="font-medium mt-1">
+                      {String(result.cic_score)} ({String(result.cic_group)})
+                    </p>
+                    {result.cic_rating != null ? (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {t('risk.score.cic_rating')}: {String(result.cic_rating)}
+                      </p>
+                    ) : null}
                   </div>
                 )}
 
-                {result.factors && (
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-3">{t('risk.analyze.factors_tab')}</p>
-                    <div className="space-y-2">
-                      {Object.entries(result.factors).map(([key, value]: [string, any]) => (
-                        <div key={key} className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</span>
-                          <span className="font-medium">{typeof value === 'number' ? value.toFixed(2) : value}</span>
-                        </div>
-                      ))}
-                    </div>
+                {structuredExplanation ? (
+                  <RiskScoreExplanationPanel
+                    d={structuredExplanation}
+                    locale={locale}
+                    t={t}
+                    riskLevelLabel={riskLevelLabel(getRiskLevel())}
+                    riskLevel={getRiskLevel()}
+                  />
+                ) : explanationText ? (
+                  <div className={riskExplanationFrameClass(getRiskLevel())}>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">{t('risk.score.explanation')}</p>
+                    <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">{explanationText}</div>
                   </div>
-                )}
-
-                <Button className="w-full" variant="outline">
-                  {t('risk.score.view_detailed')}
-                </Button>
+                ) : null}
               </CardContent>
             </Card>
           )}
@@ -270,9 +612,7 @@ export default function RiskScorePage() {
           {!result && !error && (
             <Card>
               <CardContent className="pt-12 pb-12 text-center">
-                <p className="text-muted-foreground">
-                  {t('risk.score.empty')}
-                </p>
+                <p className="text-muted-foreground">{t('risk.score.empty')}</p>
               </CardContent>
             </Card>
           )}

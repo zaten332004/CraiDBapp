@@ -1,20 +1,55 @@
 ﻿'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
-import { getUserRole, type UserRole } from '@/lib/auth/token';
+import { getAccessToken, getUserRole, type UserRole } from '@/lib/auth/token';
 import { cn } from '@/lib/utils';
-import { AlertCircle, Loader2, MessageSquarePlus, RefreshCw, Send, Trash2, X, Pin, PinOff } from 'lucide-react';
+import { notifyError } from '@/lib/notify';
+import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { ChatMarkdown } from '@/components/ai-chat/chat-markdown';
+import {
+  AlertCircle,
+  CircleX,
+  FileText,
+  Loader2,
+  MessageSquarePlus,
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Pin,
+  PinOff,
+  Plus,
+  RefreshCw,
+  Send,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 type ChatSender = 'user' | 'assistant';
 type ModelTier = 'fast' | 'thinking' | 'pro' | (string & {});
@@ -28,12 +63,24 @@ type ModelOption = {
   raw: unknown;
 };
 
+type MessageAttachment = {
+  id: string;
+  name: string;
+  context_text?: string;
+  columns?: string[];
+  preview_rows?: Record<string, unknown>[];
+  row_count?: number;
+  column_count?: number;
+  extension?: string;
+};
+
 type ChatMessage = {
   id: string;
   text: string;
   sender: ChatSender;
   timestamp: Date;
   sources?: string[];
+  attachments?: MessageAttachment[];
   raw?: unknown;
 };
 
@@ -44,6 +91,126 @@ type ChatSession = {
   pinned?: boolean;
   raw: unknown;
 };
+
+type UploadedFileCtx = {
+  id: string;
+  name: string;
+  context_text?: string;
+  row_count?: number;
+  column_count?: number;
+  columns?: string[];
+  preview_rows?: Record<string, unknown>[];
+  extension?: string;
+  [key: string]: unknown;
+};
+
+const PENDING_FILES_STORAGE_KEY = 'crs_ai_chat_pending_uploads_v1';
+const LAST_AI_CHAT_MODEL_STORAGE_KEY = 'crs_ai_chat_last_model_v1';
+
+function readStoredLastAiChatModel(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return String(window.localStorage.getItem(LAST_AI_CHAT_MODEL_STORAGE_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function writeStoredLastAiChatModel(model: string) {
+  if (typeof window === 'undefined') return;
+  const s = String(model || '').trim();
+  if (!s) return;
+  try {
+    window.localStorage.setItem(LAST_AI_CHAT_MODEL_STORAGE_KEY, s);
+  } catch {
+    // ignore quota / private mode
+  }
+}
+const ATTACHMENT_PREVIEW_ROW_CAP_SEND = 50;
+const ATTACHMENT_PREVIEW_ROW_CAP_STORAGE = 40;
+const CHAT_INPUT_MIN_PX = 48;
+/** ~18 lines at ~22px line-height before inner scroll */
+const CHAT_INPUT_MAX_PX = 400;
+const UPLOAD_FILE_ID_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function filterAiChatAcceptedFiles(list: FileList | null | undefined): File[] {
+  if (!list?.length) return [];
+  return Array.from(list).filter((f) => {
+    const n = f.name.toLowerCase();
+    return n.endsWith('.csv') || n.endsWith('.xlsx') || n.endsWith('.xls');
+  });
+}
+
+function dataTransferHasFiles(dt: DataTransfer | null): boolean {
+  if (!dt?.types?.length) return false;
+  try {
+    return Array.from(dt.types as unknown as string[]).includes('Files');
+  } catch {
+    return false;
+  }
+}
+
+function loadPendingFilesFromStorage(): UploadedFileCtx[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = sessionStorage.getItem(PENDING_FILES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (x): x is UploadedFileCtx =>
+        Boolean(x) && typeof x === 'object' && typeof (x as UploadedFileCtx).id === 'string' && typeof (x as UploadedFileCtx).name === 'string',
+    );
+  } catch {
+    return [];
+  }
+}
+
+function normalizeMessageAttachments(raw: unknown): MessageAttachment[] {
+  if (!Array.isArray(raw)) return [];
+  const out: MessageAttachment[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as Record<string, unknown>;
+    const id = String(o.id ?? '').trim();
+    const name = String(o.name ?? o.file_name ?? o.fileName ?? '').trim();
+    if (!id || !name) continue;
+    const pr = o.preview_rows ?? o.previewRows;
+    out.push({
+      id,
+      name,
+      context_text:
+        typeof o.context_text === 'string'
+          ? o.context_text
+          : typeof o.contextText === 'string'
+            ? o.contextText
+            : undefined,
+      columns: Array.isArray(o.columns) ? o.columns.map(String) : undefined,
+      preview_rows: Array.isArray(pr) ? (pr as Record<string, unknown>[]) : undefined,
+      row_count: typeof o.row_count === 'number' ? o.row_count : Number(o.rowCount) || undefined,
+      column_count: typeof o.column_count === 'number' ? o.column_count : Number(o.columnCount) || undefined,
+      extension: typeof o.extension === 'string' ? o.extension : undefined,
+    });
+  }
+  return out;
+}
+
+function uploadedCtxToMessageAttachments(files: UploadedFileCtx[]): MessageAttachment[] {
+  return files.map((f) => {
+    const pr = Array.isArray(f.preview_rows) ? f.preview_rows.slice(0, ATTACHMENT_PREVIEW_ROW_CAP_SEND) : undefined;
+    return {
+      id: f.id,
+      name: f.name,
+      context_text: typeof f.context_text === 'string' ? f.context_text : undefined,
+      columns: Array.isArray(f.columns) ? f.columns.map(String) : undefined,
+      preview_rows: pr,
+      row_count: f.row_count,
+      column_count: f.column_count,
+      extension: typeof f.extension === 'string' ? f.extension : undefined,
+    };
+  });
+}
 
 function roleRank(role: UserRole | null) {
   switch (role) {
@@ -94,7 +261,8 @@ function normalizeSession(item: any): ChatSession | null {
   if (!item || typeof item !== 'object') return null;
   const id = String(item.session_id ?? item.sessionId ?? item.id ?? '').trim();
   if (!id) return null;
-  const title = String(item.title ?? item.name ?? item.label ?? '').trim() || null;
+  const title =
+    String(item.session_name ?? item.sessionName ?? item.title ?? item.name ?? item.label ?? '').trim() || null;
   const updatedAt = String(item.updated_at ?? item.updatedAt ?? item.last_active_at ?? item.lastActiveAt ?? '').trim() || null;
   const pinned = Boolean(item.is_pinned ?? item.isPinned ?? item.pinned ?? false);
   return { id, title, updatedAt, pinned, raw: item };
@@ -105,7 +273,8 @@ function normalizeHistoryMessage(item: any, idx: number): ChatMessage | null {
   const role = String(item.sender ?? item.role ?? item.type ?? '').toLowerCase();
   const sender: ChatSender = role === 'user' ? 'user' : 'assistant';
   const text = String(item.text ?? item.content ?? item.message ?? item.response ?? '').trim();
-  if (!text) return null;
+  const attachments = sender === 'user' ? normalizeMessageAttachments(item.attachments) : [];
+  if (!text && attachments.length === 0) return null;
   const tsRaw = item.timestamp ?? item.created_at ?? item.createdAt ?? item.time ?? null;
   const ts = tsRaw ? new Date(String(tsRaw)) : new Date();
   return {
@@ -114,8 +283,70 @@ function normalizeHistoryMessage(item: any, idx: number): ChatMessage | null {
     sender,
     timestamp: Number.isFinite(ts.getTime()) ? ts : new Date(),
     sources: Array.isArray(item.sources) ? item.sources.map(String) : undefined,
+    attachments: attachments.length ? attachments : undefined,
     raw: item,
   };
+}
+
+async function postAiChatUpload(file: File): Promise<UploadedFileCtx[]> {
+  const form = new FormData();
+  form.append('file', file);
+  const token = getAccessToken();
+  const res = await fetch('/api/v1/ai-chat/upload-file', {
+    method: 'POST',
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  const text = await res.text();
+  let data: unknown;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(text || `Upload failed (${res.status})`);
+  }
+  if (!res.ok) {
+    const msg =
+      typeof data === 'object' && data && 'detail' in data
+        ? String((data as { detail?: unknown }).detail ?? res.statusText)
+        : text || res.statusText;
+    throw new Error(msg);
+  }
+  const uploaded =
+    typeof data === 'object' && data && 'uploaded_files' in data
+      ? (data as { uploaded_files?: unknown }).uploaded_files
+      : null;
+  if (!Array.isArray(uploaded)) return [];
+  return uploaded.filter((x): x is UploadedFileCtx => x && typeof x === 'object' && typeof (x as UploadedFileCtx).id === 'string');
+}
+
+/** Cap preview_rows for request size; backend persists columns + preview for history UI. */
+function slimUploadedFilesForSend(files: UploadedFileCtx[]): Record<string, unknown>[] {
+  return files.map((f) => {
+    const ext =
+      typeof f.extension === 'string'
+        ? f.extension
+        : String(f.name || '').includes('.')
+          ? String(f.name).split('.').pop() || ''
+          : '';
+    const columns = Array.isArray(f.columns) ? f.columns.map(String).filter(Boolean) : [];
+    const previewSlice =
+      Array.isArray(f.preview_rows) && f.preview_rows.length
+        ? (f.preview_rows as Record<string, unknown>[]).slice(0, ATTACHMENT_PREVIEW_ROW_CAP_SEND)
+        : [];
+    const base: Record<string, unknown> = {
+      id: f.id,
+      name: f.name,
+      file_name: f.name,
+      status: 'ready',
+      extension: ext,
+      row_count: f.row_count,
+      column_count: f.column_count,
+      context_text: String(f.context_text ?? '').trim(),
+    };
+    if (columns.length) base.columns = columns;
+    if (previewSlice.length) base.preview_rows = previewSlice;
+    return base;
+  });
 }
 
 export default function AIChatPage() {
@@ -131,25 +362,37 @@ export default function AIChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [debugData, setDebugData] = useState<any>(null);
-  const [contextPreview, setContextPreview] = useState<any>(null);
-  const [activeSideTab, setActiveSideTab] = useState<'debug' | 'context'>('debug');
+  const [pendingFiles, setPendingFiles] = useState<UploadedFileCtx[]>([]);
+  const skipPendingPersistOnceRef = useRef(true);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<MessageAttachment | null>(null);
+  const [resolvedAttachment, setResolvedAttachment] = useState<{
+    columns: string[];
+    rows: Record<string, unknown>[];
+    truncated: boolean;
+    row_count: number;
+    returned_rows: number;
+  } | null>(null);
+  const [attachmentDetailLoading, setAttachmentDetailLoading] = useState(false);
+  const [attachmentFullFetchFailed, setAttachmentFullFetchFailed] = useState(false);
 
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
-  const [defaultModel, setDefaultModel] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
-  const [activeModel, setActiveModel] = useState<string>('');
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const selectedSession = useMemo(
-    () => (sessionId ? sessions.find((s) => s.id === sessionId) ?? null : null),
-    [sessionId, sessions],
-  );
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  /** Incremented when sending the first message from the hero layout (triggers bottom snap animation). */
+  const [composerSnapGeneration, setComposerSnapGeneration] = useState(0);
+  const [composerSnapPlaying, setComposerSnapPlaying] = useState(false);
+  const [firstSessionMessagesAnim, setFirstSessionMessagesAnim] = useState(false);
+  const [dropChatHighlight, setDropChatHighlight] = useState(false);
+  const dragChatDepthRef = useRef(0);
 
   const hasConversation = useMemo(() => {
     if (messages.some((m) => m.sender === 'user')) return true;
-    if (messages.some((m) => m.id !== 'init')) return true;
+    if (messages.some((m) => m.sender === 'assistant')) return true;
     return false;
   }, [messages]);
 
@@ -158,10 +401,174 @@ export default function AIChatPage() {
     [modelOptions, selectedModel],
   );
 
+  const previewTableColumns = useMemo(() => {
+    if (resolvedAttachment?.columns?.length) return resolvedAttachment.columns;
+    const att = previewAttachment;
+    if (!att) return [];
+    if (att.columns?.length) return att.columns;
+    const pr = att.preview_rows;
+    if (pr?.length && pr[0] && typeof pr[0] === 'object') return Object.keys(pr[0] as object);
+    return [];
+  }, [previewAttachment, resolvedAttachment]);
+
+  const previewTableRows = useMemo(() => {
+    if (resolvedAttachment?.rows?.length) return resolvedAttachment.rows;
+    return previewAttachment?.preview_rows ?? [];
+  }, [previewAttachment, resolvedAttachment]);
+
+  const isShowingFullAttachmentData = Boolean(resolvedAttachment?.rows?.length);
+
+  const syncChatInputHeight = useCallback(() => {
+    const el = chatInputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const next = Math.min(CHAT_INPUT_MAX_PX, Math.max(CHAT_INPUT_MIN_PX, el.scrollHeight));
+    el.style.height = `${next}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    syncChatInputHeight();
+  }, [input, syncChatInputHeight, hasConversation, pendingFiles.length]);
+
+  useLayoutEffect(() => {
+    if (!hasConversation) {
+      setComposerSnapPlaying(false);
+      setFirstSessionMessagesAnim(false);
+      return;
+    }
+    if (composerSnapGeneration === 0) return;
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+    let cancelled = false;
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) {
+          setFirstSessionMessagesAnim(true);
+          setComposerSnapPlaying(true);
+        }
+      });
+    });
+    const tid = window.setTimeout(() => {
+      if (!cancelled) {
+        setComposerSnapPlaying(false);
+        setFirstSessionMessagesAnim(false);
+      }
+    }, 1000);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(id);
+      window.clearTimeout(tid);
+    };
+  }, [hasConversation, composerSnapGeneration]);
+
   useEffect(() => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, isSending]);
+    if (!composerSnapPlaying || typeof window === 'undefined') return;
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    setComposerSnapPlaying(false);
+    setFirstSessionMessagesAnim(false);
+  }, [composerSnapPlaying]);
+
+  useEffect(() => {
+    if (!selectedModel || modelOptions.length === 0) return;
+    const opt = modelOptions.find((o) => o.model === selectedModel);
+    if (!opt || !isModelAllowed(opt)) return;
+    writeStoredLastAiChatModel(selectedModel);
+  }, [selectedModel, modelOptions, userRole]);
+
+  useEffect(() => {
+    if (!previewAttachment?.id) {
+      setResolvedAttachment(null);
+      setAttachmentDetailLoading(false);
+      setAttachmentFullFetchFailed(false);
+      return;
+    }
+    const id = previewAttachment.id.trim();
+    let cancelled = false;
+    setResolvedAttachment(null);
+    setAttachmentFullFetchFailed(false);
+    if (!UPLOAD_FILE_ID_UUID_RE.test(id)) {
+      setAttachmentDetailLoading(false);
+      return;
+    }
+    setAttachmentDetailLoading(true);
+    (async () => {
+      try {
+        const data = await browserApiFetchAuth<{
+          columns?: unknown;
+          rows?: unknown;
+          truncated?: boolean;
+          row_count?: number;
+          returned_rows?: number;
+        }>(`/ai-chat/uploaded-file/${encodeURIComponent(id)}`, { method: 'GET' });
+        if (cancelled) return;
+        const rows = Array.isArray(data?.rows) ? (data.rows as Record<string, unknown>[]) : [];
+        let cols = Array.isArray(data?.columns) ? data.columns.map(String) : [];
+        if (!cols.length && rows.length && rows[0] && typeof rows[0] === 'object') {
+          cols = Object.keys(rows[0] as object);
+        }
+        if (rows.length === 0 && cols.length === 0) {
+          setResolvedAttachment(null);
+        } else {
+          setResolvedAttachment({
+            columns: cols,
+            rows,
+            truncated: Boolean(data?.truncated),
+            row_count: Number(data?.row_count) || rows.length,
+            returned_rows: Number(data?.returned_rows) || rows.length,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setResolvedAttachment(null);
+          setAttachmentFullFetchFailed(true);
+        }
+      } finally {
+        if (!cancelled) setAttachmentDetailLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [previewAttachment?.id]);
+
+  useEffect(() => {
+    const restored = loadPendingFilesFromStorage();
+    if (restored.length) setPendingFiles(restored);
+    else if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (skipPendingPersistOnceRef.current) {
+      skipPendingPersistOnceRef.current = false;
+      return;
+    }
+    try {
+      if (pendingFiles.length === 0) {
+        sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
+        return;
+      }
+      const capped = pendingFiles.map((f) => ({
+        ...f,
+        preview_rows: Array.isArray(f.preview_rows)
+          ? f.preview_rows.slice(0, ATTACHMENT_PREVIEW_ROW_CAP_STORAGE)
+          : f.preview_rows,
+      }));
+      sessionStorage.setItem(PENDING_FILES_STORAGE_KEY, JSON.stringify(capped));
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [pendingFiles]);
+
+  useEffect(() => {
+    if (!sessionId || isLoading) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+      });
+    });
+  }, [sessionId, messages, isLoading, isSending]);
 
   const resolveModelLabel = (tier: ModelTier, fallback?: string | null) => {
     if (fallback) return fallback;
@@ -208,10 +615,11 @@ export default function AIChatPage() {
       options.sort((a, b) => order(a.tier) - order(b.tier));
 
       setModelOptions(options);
-      setDefaultModel(defaultModelValue);
 
       setSelectedModel((prev) => {
         if (prev && options.some((o) => o.model === prev && isModelAllowed(o))) return prev;
+        const saved = readStoredLastAiChatModel();
+        if (saved && options.some((o) => o.model === saved && isModelAllowed(o))) return saved;
         if (defaultModelValue) {
           const def = options.find((o) => o.model === defaultModelValue);
           if (def && isModelAllowed(def)) return def.model;
@@ -237,100 +645,53 @@ export default function AIChatPage() {
             : [];
       const list = rawList.map(normalizeSession).filter(Boolean) as ChatSession[];
       setSessions(list);
-      if (!sessionId && list[0]?.id) setSessionId(list[0].id);
     } catch (err) {
       setError(formatApiError(err));
     }
   };
 
-  const startSession = async () => {
+  const resetDraft = () => {
+    setSessionId(null);
+    setMessages([]);
+    setInput('');
+    setPendingFiles([]);
     setError(null);
-    setIsLoading(true);
-    try {
-      const body: Record<string, unknown> = {};
-      if (selectedModel) body.model = selectedModel;
-      const data = await browserApiFetchAuth<any>('/ai-chat/start', { method: 'POST', body });
-      const newId = String(data?.session_id ?? data?.sessionId ?? data?.id ?? '').trim();
-      const usedModel = String(data?.model ?? data?.used_model ?? data?.model_id ?? data?.modelId ?? '').trim();
-      if (usedModel) setActiveModel(usedModel);
-      await loadSessions();
-      if (newId) setSessionId(newId);
-      setMessages([
-        {
-          id: 'init',
-          text: t('ai_chat.initial_message'),
-          sender: 'assistant',
-          timestamp: new Date(),
-        },
-      ]);
-    } catch (err) {
-      setError(formatApiError(err));
-    } finally {
-      setIsLoading(false);
-    }
+    setComposerSnapGeneration(0);
+    setComposerSnapPlaying(false);
+    setFirstSessionMessagesAnim(false);
+    dragChatDepthRef.current = 0;
+    setDropChatHighlight(false);
+    if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
+  };
+
+  const fetchHistoryMessages = async (id: string): Promise<ChatMessage[]> => {
+    const data = await browserApiFetchAuth<any>(`/ai-chat/history/${encodeURIComponent(id)}`, {
+      method: 'GET',
+    });
+    const rawList = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.messages)
+          ? data.messages
+          : Array.isArray(data?.value)
+            ? data.value
+            : [];
+    return rawList.map(normalizeHistoryMessage).filter(Boolean) as ChatMessage[];
   };
 
   const loadHistory = async (id: string) => {
     setError(null);
+    setMessages([]);
     setIsLoading(true);
     try {
-      const data = await browserApiFetchAuth<any>(`/ai-chat/history/${encodeURIComponent(id)}?limit=50`, {
-        method: 'GET',
-      });
-      const rawList = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.items)
-          ? data.items
-          : Array.isArray(data?.messages)
-            ? data.messages
-            : Array.isArray(data?.value)
-              ? data.value
-              : [];
-      const list = rawList.map(normalizeHistoryMessage).filter(Boolean) as ChatMessage[];
-      setMessages(
-        list.length > 0
-          ? list
-          : [
-              {
-                id: 'init',
-                text: t('ai_chat.initial_message'),
-                sender: 'assistant',
-                timestamp: new Date(),
-              },
-            ],
-      );
+      const list = await fetchHistoryMessages(id);
+      setMessages(list);
     } catch (err) {
       setError(formatApiError(err));
-      setMessages([
-        {
-          id: 'init',
-          text: t('ai_chat.initial_message'),
-          sender: 'assistant',
-          timestamp: new Date(),
-        },
-      ]);
+      setMessages([]);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const refreshDebug = async () => {
-    setError(null);
-    try {
-      const data = await browserApiFetchAuth<any>('/ai-chat/debug', { method: 'GET' });
-      setDebugData(data);
-    } catch (err) {
-      setError(formatApiError(err));
-    }
-  };
-
-  const refreshContext = async () => {
-    setError(null);
-    try {
-      const data = await browserApiFetchAuth<any>('/ai-chat/context-preview', { method: 'GET' });
-      setContextPreview(data);
-    } catch (err) {
-      setError(formatApiError(err));
     }
   };
 
@@ -339,7 +700,7 @@ export default function AIChatPage() {
     setIsLoading(true);
     try {
       const data = await browserApiFetchAuth<any>(`/ai-chat/close/${encodeURIComponent(sid)}`, { method: 'POST' });
-      if (opts?.appendSummary) {
+      if (opts?.appendSummary && sessionId === sid) {
         setMessages((prev) => [
           ...prev,
           {
@@ -351,8 +712,6 @@ export default function AIChatPage() {
           },
         ]);
       }
-      const usedModel = String(data?.model ?? data?.used_model ?? data?.model_id ?? data?.modelId ?? '').trim();
-      if (usedModel) setActiveModel(usedModel);
 
       if (opts?.clearIfActive && sessionId === sid) {
         setSessionId(null);
@@ -365,12 +724,6 @@ export default function AIChatPage() {
       setIsLoading(false);
     }
   };
-
-  const closeSession = async () => {
-    if (!sessionId) return;
-    return closeSessionById(sessionId, { appendSummary: true });
-  };
-
 
   const setPinned = async (id: string, pinned: boolean) => {
     setError(null);
@@ -391,6 +744,7 @@ export default function AIChatPage() {
   const deleteSession = async (id?: string | null) => {
     const sid = (id ?? sessionId) ?? null;
     if (!sid) return;
+    if (typeof window !== 'undefined' && !window.confirm(t('ai_chat.delete_confirm'))) return;
     setError(null);
     setIsLoading(true);
     try {
@@ -407,18 +761,26 @@ export default function AIChatPage() {
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
-    if (!sessionId) return;
+    if (!input.trim() && pendingFiles.length === 0) return;
 
-    const text = input;
+    if (!hasConversation) {
+      setComposerSnapGeneration((g) => g + 1);
+    }
+
+    const text = input.trim();
+    const attachForMsg = pendingFiles.length ? uploadedCtxToMessageAttachments(pendingFiles) : undefined;
     const userMessage: ChatMessage = {
       id: `u-${Date.now()}`,
       text,
       sender: 'user',
       timestamp: new Date(),
+      ...(attachForMsg?.length ? { attachments: attachForMsg } : {}),
     };
+
+    const customerContext =
+      pendingFiles.length > 0 ? { uploaded_files: slimUploadedFilesForSend(pendingFiles) } : undefined;
 
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
@@ -430,33 +792,61 @@ export default function AIChatPage() {
         selectedModel && modelOptions.some((o) => o.model === selectedModel && isModelAllowed(o))
           ? selectedModel
           : '';
+      const body: Record<string, unknown> = {
+        message: text,
+        ...(sessionId ? { session_id: sessionId, sessionId } : {}),
+        ...(modelToSend ? { model: modelToSend } : {}),
+        ...(customerContext ? { customer_context: customerContext } : {}),
+      };
       const data = await browserApiFetchAuth<any>('/ai-chat/send', {
         method: 'POST',
-        body: {
-          session_id: sessionId,
-          sessionId,
-          message: text,
-          ...(modelToSend ? { model: modelToSend } : {}),
-        },
+        body,
       });
 
-      const reply = String(data?.response ?? data?.reply ?? data?.message ?? '').trim() || t('ai_chat.default_reply');
-      const usedModel = String(data?.model ?? data?.used_model ?? data?.model_id ?? data?.modelId ?? '').trim();
-      if (usedModel) setActiveModel(usedModel);
-      const assistantMessage: ChatMessage = {
-        id: `a-${Date.now() + 1}`,
-        text: reply,
-        sender: 'assistant',
-        timestamp: new Date(),
-        sources: Array.isArray(data?.sources) ? data.sources.map(String) : undefined,
-        raw: data,
-      };
+      const newSid = String(data?.session_id ?? data?.sessionId ?? '').trim();
+      const created = Boolean(data?.created_session ?? data?.createdSession);
+      setPendingFiles([]);
 
-      setMessages((prev) => [...prev, assistantMessage]);
-      void loadSessions();
+      if (created && newSid) {
+        setSessionId(newSid);
+        try {
+          const list = await fetchHistoryMessages(newSid);
+          setMessages(list);
+        } catch (histErr) {
+          setError(formatApiError(histErr));
+          const reply =
+            String(data?.response ?? data?.reply ?? data?.message ?? '').trim() || t('ai_chat.default_reply');
+          setMessages((prev) => [
+            ...prev.filter((m) => m.id !== userMessage.id),
+            userMessage,
+            {
+              id: `a-${Date.now() + 1}`,
+              text: reply,
+              sender: 'assistant',
+              timestamp: new Date(),
+              sources: Array.isArray(data?.sources) ? data.sources.map(String) : undefined,
+              raw: data,
+            },
+          ]);
+        }
+        setSessionsOpen(true);
+        void loadSessions();
+      } else {
+        const reply = String(data?.response ?? data?.reply ?? data?.message ?? '').trim() || t('ai_chat.default_reply');
+        const assistantMessage: ChatMessage = {
+          id: `a-${Date.now() + 1}`,
+          text: reply,
+          sender: 'assistant',
+          timestamp: new Date(),
+          sources: Array.isArray(data?.sources) ? data.sources.map(String) : undefined,
+          raw: data,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        void loadSessions();
+      }
     } catch (err) {
       setMessages((prev) => [
-        ...prev,
+        ...prev.filter((m) => m.id !== userMessage.id),
         {
           id: `e-${Date.now() + 2}`,
           text: t('ai_chat.error_generic'),
@@ -468,6 +858,80 @@ export default function AIChatPage() {
     } finally {
       setIsSending(false);
     }
+  };
+
+  const onComposerKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    e.preventDefault();
+    if (isSending) return;
+    if (!input.trim() && pendingFiles.length === 0) return;
+    e.currentTarget.form?.requestSubmit();
+  };
+
+  const applyPickedFiles = useCallback(async (files: File[]) => {
+    if (!files.length) return;
+    setIsUploadingFile(true);
+    try {
+      const next: UploadedFileCtx[] = [];
+      for (const file of files) {
+        const uploaded = await postAiChatUpload(file);
+        next.push(...uploaded);
+      }
+      if (next.length) setPendingFiles((prev) => [...prev, ...next]);
+    } catch (err) {
+      notifyError(formatUserFacingApiError(err));
+    } finally {
+      setIsUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, []);
+
+  const chatDropZoneProps = useMemo(() => {
+    const disabled = isSending || isUploadingFile;
+    return {
+      onDragEnter: (e: DragEvent<HTMLDivElement>) => {
+        if (disabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (!dataTransferHasFiles(e.dataTransfer)) return;
+        dragChatDepthRef.current += 1;
+        setDropChatHighlight(true);
+      },
+      onDragLeave: (e: DragEvent<HTMLDivElement>) => {
+        if (disabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragChatDepthRef.current = Math.max(0, dragChatDepthRef.current - 1);
+        if (dragChatDepthRef.current === 0) setDropChatHighlight(false);
+      },
+      onDragOver: (e: DragEvent<HTMLDivElement>) => {
+        if (disabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (dataTransferHasFiles(e.dataTransfer)) {
+          e.dataTransfer.dropEffect = 'copy';
+        }
+      },
+      onDrop: async (e: DragEvent<HTMLDivElement>) => {
+        if (disabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragChatDepthRef.current = 0;
+        setDropChatHighlight(false);
+        const accepted = filterAiChatAcceptedFiles(e.dataTransfer.files);
+        const dropped = e.dataTransfer.files?.length ?? 0;
+        if (!accepted.length) {
+          if (dropped > 0) notifyError(t('ai_chat.drop_invalid_type'));
+          return;
+        }
+        await applyPickedFiles(accepted);
+      },
+    };
+  }, [isSending, isUploadingFile, applyPickedFiles, t]);
+
+  const onPickFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    await applyPickedFiles(Array.from(files));
   };
 
   useEffect(() => {
@@ -484,115 +948,228 @@ export default function AIChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!sessionId) return;
-    void loadHistory(sessionId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  const sessionDisplayTitle = (s: ChatSession) => {
+    const base = (s.title || '').trim();
+    if (base) return `${s.pinned ? '📌 ' : ''}${base}`;
+    return `${s.pinned ? '📌 ' : ''}${t('ai_chat.session')}`;
+  };
 
-  useEffect(() => {
-    void refreshDebug();
-    void refreshContext();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const renderModelSelect = (roundedFull?: boolean) => (
+    <Select
+      value={selectedModel}
+      onValueChange={(value) => {
+        const option = modelOptions.find((o) => o.model === value);
+        if (option && !isModelAllowed(option)) return;
+        setSelectedModel(value);
+      }}
+    >
+      <SelectTrigger
+        size="default"
+        className={cn(
+          'min-w-[140px] justify-between rounded-full h-10',
+          roundedFull && 'min-w-[150px]',
+        )}
+        aria-label={t('ai_chat.model.label')}
+        disabled={isSending || modelOptions.length === 0}
+      >
+        <span className="truncate">
+          {selectedModelOption ? resolveModelLabel(selectedModelOption.tier, selectedModelOption.label) : t('ai_chat.model.label')}
+        </span>
+      </SelectTrigger>
+      <SelectContent>
+        {modelOptions.map((o) => {
+          const allowed = isModelAllowed(o);
+          const label = resolveModelLabel(o.tier, o.label);
+          const desc = resolveModelDesc(o.tier, o.description);
+          const needs = o.minRole ? `${t('ai_chat.model.min_role')}: ${t(`role.${o.minRole}`)}` : '';
+          return (
+            <SelectItem key={o.model} value={o.model} disabled={!allowed}>
+              <div className="flex flex-col">
+                <span className="font-medium">{label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {desc}
+                  {!allowed && needs ? ` • ${needs}` : ''}
+                </span>
+              </div>
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-8 h-[calc(100vh-5rem)]">
-      {/* Sessions */}
-      <Card className="lg:col-span-3 flex flex-col min-h-0 min-w-0 overflow-hidden">
-        <CardHeader className="space-y-2">
-          <CardTitle className="text-base">{t('ai_chat.sessions')}</CardTitle>
-          <CardDescription>{t('ai_chat.sessions_desc')}</CardDescription>
-          <div className="flex gap-2">
-            <Button onClick={startSession} disabled={isLoading} className="flex-1">
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquarePlus className="mr-2 h-4 w-4" />}
-              {t('ai_chat.new_session')}
-            </Button>
-            <Button variant="outline" onClick={() => void loadSessions()} disabled={isLoading} size="icon" aria-label="Refresh sessions">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          </div>
-          {selectedSession && (
-            <div className="flex items-center justify-between gap-2">
-              <Badge variant="secondary" className="font-mono">
-                {selectedSession.id.slice(0, 8)}…
-              </Badge>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void setPinned(selectedSession.id, !Boolean(selectedSession.pinned))}
-                  disabled={isLoading}
-                >
-                  {selectedSession.pinned ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
-                  {selectedSession.pinned ? t('ai_chat.unpin') || 'Bỏ ghim' : t('ai_chat.pin') || 'Ghim'}
-                </Button>
-                <Button variant="outline" size="sm" onClick={closeSession} disabled={isLoading}>
-                  <X className="mr-2 h-4 w-4" />
-                  {t('ai_chat.close_session')}
-                </Button>
-                <Button variant="destructive" size="sm" onClick={() => void deleteSession(selectedSession.id)} disabled={isLoading}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {t('ai_chat.delete_session') || 'Xóa'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardHeader>
-        <CardContent className="flex-1 min-h-0">
-          <ScrollArea className="h-full pr-3">
-            <div className="space-y-2">
-              {sessions.length === 0 && (
-                <div className="text-sm text-muted-foreground">{t('ai_chat.no_sessions')}</div>
-              )}
-              {sessions.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSessionId(s.id)}
-                  className={`w-full text-left rounded-md border px-3 py-2 transition-colors ${
-                    s.id === sessionId ? 'bg-secondary border-border' : 'hover:bg-secondary/60 border-border/60'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{s.pinned ? '📌 ' : ''}{s.title || t('ai_chat.session')}</p>
-                      <p className="text-xs text-muted-foreground font-mono truncate">{s.id}</p>
-                    </div>
-                    {s.updatedAt && (
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                        {s.updatedAt}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+    <div className="flex flex-row items-stretch gap-0 md:gap-3 p-6 md:p-8 h-[calc(100vh-5rem)] min-h-0">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,.xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+        className="hidden"
+        multiple
+        onChange={(e) => void onPickFiles(e.target.files)}
+      />
 
-      {/* Chat */}
-      <Card
+      {/* Cột nút mở — cùng vùng điều khiển Lịch sử */}
+      <div
         className={cn(
-          'flex flex-col min-h-0 min-w-0 overflow-hidden',
-          hasConversation ? 'lg:col-span-6' : 'lg:col-span-9',
+          'shrink-0 flex flex-col items-center pt-1 transition-[width,opacity,margin] duration-300 ease-in-out overflow-hidden',
+          sessionsOpen ? 'w-0 opacity-0 pointer-events-none md:mr-0' : 'w-11 opacity-100 mr-1 md:mr-2',
         )}
       >
+        {!sessionsOpen && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="shrink-0 rounded-lg h-10 w-10 border-border shadow-sm"
+            aria-label={t('ai_chat.open_history')}
+            onClick={() => setSessionsOpen(true)}
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
+      {/* Panel Lịch sử — animation kéo ngang (đủ rộng để luôn thấy nút ⋯) */}
+      <div
+        className={cn(
+          'shrink-0 min-h-0 overflow-hidden transition-[width] duration-300 ease-in-out',
+          sessionsOpen ? 'w-[min(calc(100vw-2.5rem),22rem)] sm:w-96' : 'w-0',
+        )}
+      >
+        <div className="h-full w-full min-h-0 flex flex-col pr-0 sm:pr-1">
+          <Card className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border shadow-sm">
+            <CardHeader className="space-y-3 pb-2 px-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 rounded-lg h-9 w-9"
+                  aria-label={t('ai_chat.hide_sessions')}
+                  onClick={() => setSessionsOpen(false)}
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </Button>
+                <CardTitle className="text-base flex-1 min-w-0 truncate">{t('ai_chat.history_title')}</CardTitle>
+                <Button
+                  variant="outline"
+                  onClick={() => void loadSessions()}
+                  disabled={isLoading}
+                  size="icon"
+                  className="shrink-0 rounded-lg h-9 w-9"
+                  aria-label="Refresh sessions"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button
+                type="button"
+                onClick={resetDraft}
+                disabled={isLoading}
+                variant="secondary"
+                className="w-full justify-start"
+              >
+                <MessageSquarePlus className="mr-2 h-4 w-4 shrink-0" />
+                {t('ai_chat.new_draft')}
+              </Button>
+            </CardHeader>
+            <CardContent className="flex-1 min-h-0 flex flex-col px-3 pb-4 pt-0 overflow-hidden">
+              <ScrollArea className="flex-1 min-h-0 pr-2">
+                <div className="space-y-2 pb-2 min-w-0">
+                  {sessions.length === 0 && (
+                    <div className="text-sm text-muted-foreground">{t('ai_chat.no_sessions')}</div>
+                  )}
+                  {sessions.map((s) => (
+                    <div
+                      key={s.id}
+                      className={cn(
+                        'grid grid-cols-[minmax(0,1fr)_2.75rem] items-stretch rounded-md border transition-colors',
+                        s.id === sessionId ? 'bg-secondary border-border' : 'border-border/60 hover:bg-secondary/60',
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSessionId(s.id);
+                          void loadHistory(s.id);
+                        }}
+                        className="min-w-0 text-left pl-2.5 pr-1 py-2 rounded-l-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <p className="text-sm font-medium truncate">{sessionDisplayTitle(s)}</p>
+                      </button>
+                      <div className="flex min-h-9 min-w-[2.75rem] items-stretch justify-center border-l border-border/60 bg-muted/20">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-auto min-h-9 w-full min-w-[2.75rem] shrink-0 rounded-none rounded-r-md"
+                              disabled={isLoading}
+                              aria-label={t('ai_chat.more_actions')}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="h-4 w-4 shrink-0" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.preventDefault();
+                              void setPinned(s.id, !s.pinned);
+                            }}
+                          >
+                            {s.pinned ? (
+                              <PinOff className="mr-2 h-4 w-4 shrink-0" />
+                            ) : (
+                              <Pin className="mr-2 h-4 w-4 shrink-0" />
+                            )}
+                            {s.pinned ? t('ai_chat.unpin') : t('ai_chat.pin')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.preventDefault();
+                              void closeSessionById(s.id, { appendSummary: false, clearIfActive: true });
+                            }}
+                          >
+                            <CircleX className="mr-2 h-4 w-4 shrink-0" />
+                            {t('ai_chat.close_session')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              void deleteSession(s.id);
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4 shrink-0" />
+                            {t('ai_chat.delete_session')}
+                          </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <Card className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden border shadow-sm">
         <CardHeader className="space-y-1">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle>{t('ai_chat.title')}</CardTitle>
-              <CardDescription>{t('ai_chat.desc')}</CardDescription>
-            </div>
-            {(activeModel || defaultModel) && (
-              <Badge variant="outline" className="font-mono">
-                {(activeModel || defaultModel) ?? ''}
-              </Badge>
-            )}
-          </div>
+          <CardTitle>{t('ai_chat.title')}</CardTitle>
+          <CardDescription>{t('ai_chat.desc')}</CardDescription>
         </CardHeader>
-        <CardContent className={cn('flex-1 flex flex-col min-h-0', !hasConversation && 'py-10')}>
+        <CardContent
+          className={cn(
+            'flex min-h-0 flex-1 flex-col',
+            !hasConversation && 'py-10',
+            hasConversation && 'pb-2 pt-0',
+          )}
+        >
           {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
@@ -601,80 +1178,87 @@ export default function AIChatPage() {
           )}
 
           {!hasConversation ? (
-            <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-6">
-              <div className="text-center space-y-2 max-w-2xl">
+            <div
+              className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-6 px-1"
+              {...chatDropZoneProps}
+            >
+              {dropChatHighlight ? (
+                <div
+                  className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center rounded-3xl border-2 border-dashed border-accent bg-accent/12 px-4 text-center text-sm font-semibold text-accent-foreground ring-2 ring-inset ring-accent/25"
+                  aria-hidden
+                >
+                  {t('ai_chat.drop_files_hint')}
+                </div>
+              ) : null}
+              <div className="w-full max-w-5xl space-y-2 px-2 text-center">
                 <h2 className="text-4xl font-semibold tracking-tight">{t('ai_chat.title')}</h2>
-                <p className="text-muted-foreground">{t('ai_chat.desc')}</p>
+                <p className="text-muted-foreground">{t('ai_chat.hero_subtitle')}</p>
               </div>
 
-              <div className="w-full max-w-2xl">
-                <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
-                  <Input
+              <div className="w-full max-w-5xl px-2">
+                <form
+                  onSubmit={handleSendMessage}
+                  className="flex flex-col gap-2 rounded-2xl border border-border/80 bg-muted/15 p-3 shadow-sm dark:bg-muted/20"
+                >
+                  {pendingFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {pendingFiles.map((f) => (
+                        <Badge key={f.id} variant="secondary" className="gap-1 pr-1 font-normal max-w-full">
+                          <FileText className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                          <span className="truncate max-w-[min(280px,70vw)]">{f.name}</span>
+                          <button
+                            type="button"
+                            className="rounded-full p-0.5 hover:bg-muted shrink-0"
+                            aria-label={t('ai_chat.remove_attachment')}
+                            onClick={() => setPendingFiles((prev) => prev.filter((x) => x.id !== f.id))}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <Textarea
+                    ref={chatInputRef}
                     placeholder={t('ai_chat.placeholder')}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    disabled={isSending || !sessionId}
-                    className="flex-1 rounded-full h-12 px-5"
+                    onInput={syncChatInputHeight}
+                    onKeyDown={onComposerKeyDown}
+                    disabled={isSending}
+                    rows={1}
+                    style={{ maxHeight: CHAT_INPUT_MAX_PX, fieldSizing: 'fixed' }}
+                    className="min-h-[48px] w-full resize-none overflow-y-auto border-0 bg-transparent px-1 py-2 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
                   />
-                  <Select
-                    value={selectedModel}
-                    onValueChange={(value) => {
-                      const option = modelOptions.find((o) => o.model === value);
-                      if (option && !isModelAllowed(option)) return;
-                      setSelectedModel(value);
-                    }}
-                  >
-                    <SelectTrigger
-                      size="default"
-                      className="min-w-[140px] justify-between rounded-full h-12"
-                      aria-label={t('ai_chat.model.label')}
-                      disabled={isSending || !sessionId || modelOptions.length === 0}
+                  <div className="flex flex-wrap items-end justify-between gap-2 pt-1 border-t border-border/60">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0 rounded-full h-10 w-10"
+                      disabled={isSending || isUploadingFile}
+                      aria-label={t('ai_chat.attach_file')}
+                      onClick={() => fileInputRef.current?.click()}
                     >
-                      <span className="truncate">
-                        {selectedModelOption
-                          ? resolveModelLabel(selectedModelOption.tier, selectedModelOption.label)
-                          : t('ai_chat.model.label')}
-                      </span>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {modelOptions.map((o) => {
-                        const allowed = isModelAllowed(o);
-                        const label = resolveModelLabel(o.tier, o.label);
-                        const desc = resolveModelDesc(o.tier, o.description);
-                        const needs = o.minRole ? `${t('ai_chat.model.min_role')}: ${t(`role.${o.minRole}`)}` : '';
-                        return (
-                          <SelectItem key={o.model} value={o.model} disabled={!allowed}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{label}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {desc}
-                                {!allowed && needs ? ` • ${needs}` : ''}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="submit"
-                    size="icon"
-                    disabled={isSending || !input.trim() || !sessionId}
-                    className="shrink-0 rounded-full h-12 w-12"
-                  >
-                    {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  </Button>
+                      {isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    </Button>
+                    <div className="flex flex-wrap items-center gap-2 ml-auto">
+                      {renderModelSelect(true)}
+                      <Button
+                        type="submit"
+                        size="icon"
+                        disabled={isSending || (!input.trim() && pendingFiles.length === 0)}
+                        className="shrink-0 rounded-full h-10 w-10"
+                      >
+                        {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
                 </form>
 
                 <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
                   {[t('ai_chat.prompt_1'), t('ai_chat.prompt_2'), t('ai_chat.prompt_3'), t('ai_chat.prompt_4')].map((prompt, idx) => (
-                    <Button
-                      key={idx}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setInput(prompt)}
-                      className="rounded-full"
-                    >
+                    <Button key={idx} variant="outline" size="sm" onClick={() => setInput(prompt)} className="rounded-full">
                       {prompt}
                     </Button>
                   ))}
@@ -682,8 +1266,28 @@ export default function AIChatPage() {
               </div>
             </div>
           ) : (
-            <>
-              <ScrollArea className="flex-1 min-h-0 pr-4" ref={scrollRef}>
+            <div className="relative flex min-h-0 flex-1 flex-col" {...chatDropZoneProps}>
+              {dropChatHighlight ? (
+                <div
+                  className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center rounded-xl border-2 border-dashed border-accent bg-accent/12 px-4 text-center text-sm font-semibold text-accent-foreground"
+                  aria-hidden
+                >
+                  {t('ai_chat.drop_files_hint')}
+                </div>
+              ) : null}
+              <div
+                className={cn(
+                  'flex min-h-0 flex-1 flex-col pr-0',
+                  firstSessionMessagesAnim && 'ai-chat-messages-reveal',
+                )}
+                onAnimationEnd={(ev) => {
+                  if (ev.target !== ev.currentTarget) return;
+                  if (String(ev.animationName || '').includes('ai-chat-messages-reveal')) {
+                    setFirstSessionMessagesAnim(false);
+                  }
+                }}
+              >
+                <ScrollArea className="min-h-0 flex-1 pr-4">
                 <div className="space-y-4">
                   {messages.map((message) => (
                     <div
@@ -693,13 +1297,30 @@ export default function AIChatPage() {
                       <div className="max-w-4xl min-w-0">
                         <div
                           className={`rounded-lg px-4 py-3 ${
-                            message.sender === 'user'
-                              ? 'bg-accent text-accent-foreground'
-                              : 'bg-secondary text-foreground'
+                            message.sender === 'user' ? 'bg-accent text-accent-foreground' : 'bg-secondary text-foreground'
                           }`}
                         >
-                          <p className="text-sm whitespace-pre-wrap break-words">{message.text}</p>
-                          <span className="text-xs opacity-70 mt-2 block">
+                          {message.sender === 'user' && message.attachments && message.attachments.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {message.attachments.map((a) => (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  onClick={() => setPreviewAttachment(a)}
+                                  className="inline-flex items-center gap-1.5 rounded-md border border-accent-foreground/25 bg-background/15 px-2 py-1 text-xs font-medium text-accent-foreground hover:bg-background/25 text-left max-w-full"
+                                >
+                                  <FileText className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                                  <span className="truncate min-w-0">{a.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {message.sender === 'assistant' ? (
+                            <ChatMarkdown text={message.text} />
+                          ) : message.text ? (
+                            <p className="text-sm whitespace-pre-wrap break-words">{message.text}</p>
+                          ) : null}
+                          <span className="text-xs opacity-70 mt-3 block">
                             {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
@@ -724,106 +1345,192 @@ export default function AIChatPage() {
                       </div>
                     </div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
+              </div>
 
-              <form onSubmit={handleSendMessage} className="flex gap-2 mt-4 items-center">
-                <Input
+              <div
+                className={cn(
+                  'mt-auto w-full shrink-0 pt-3',
+                  composerSnapPlaying && 'ai-chat-composer-snap-to-bottom',
+                )}
+                onAnimationEnd={(ev) => {
+                  if (ev.target !== ev.currentTarget) return;
+                  if (String(ev.animationName || '').includes('ai-chat-composer-snap-to-bottom')) {
+                    setComposerSnapPlaying(false);
+                  }
+                }}
+              >
+                <form
+                  onSubmit={handleSendMessage}
+                  className="flex flex-col gap-2 rounded-2xl border border-border/80 bg-muted/15 p-3 shadow-sm dark:bg-muted/20"
+                >
+                {pendingFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {pendingFiles.map((f) => (
+                      <Badge key={f.id} variant="secondary" className="gap-1 pr-1 font-normal max-w-full">
+                        <FileText className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                        <span className="truncate max-w-[min(280px,55vw)]">{f.name}</span>
+                        <button
+                          type="button"
+                          className="rounded-full p-0.5 hover:bg-muted shrink-0"
+                          aria-label={t('ai_chat.remove_attachment')}
+                          onClick={() => setPendingFiles((prev) => prev.filter((x) => x.id !== f.id))}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <Textarea
+                  ref={chatInputRef}
                   placeholder={t('ai_chat.placeholder')}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  disabled={isSending || !sessionId}
-                  className="flex-1"
+                  onInput={syncChatInputHeight}
+                  onKeyDown={onComposerKeyDown}
+                  disabled={isSending}
+                  rows={1}
+                  style={{ maxHeight: CHAT_INPUT_MAX_PX, fieldSizing: 'fixed' }}
+                  className="min-h-[48px] w-full resize-none overflow-y-auto border-0 bg-transparent px-1 py-2 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
                 />
-                <Select
-                  value={selectedModel}
-                  onValueChange={(value) => {
-                    const option = modelOptions.find((o) => o.model === value);
-                    if (option && !isModelAllowed(option)) return;
-                    setSelectedModel(value);
-                  }}
-                >
-                  <SelectTrigger
-                    size="default"
-                    className="min-w-[140px] justify-between rounded-full"
-                    aria-label={t('ai_chat.model.label')}
-                    disabled={isSending || !sessionId || modelOptions.length === 0}
+                <div className="flex flex-wrap items-end justify-between gap-2 pt-1 border-t border-border/60">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0 rounded-full h-10 w-10"
+                    disabled={isSending || isUploadingFile}
+                    aria-label={t('ai_chat.attach_file')}
+                    onClick={() => fileInputRef.current?.click()}
                   >
-                    <span className="truncate">
-                      {selectedModelOption
-                        ? resolveModelLabel(selectedModelOption.tier, selectedModelOption.label)
-                        : t('ai_chat.model.label')}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {modelOptions.map((o) => {
-                      const allowed = isModelAllowed(o);
-                      const label = resolveModelLabel(o.tier, o.label);
-                      const desc = resolveModelDesc(o.tier, o.description);
-                      const needs = o.minRole ? `${t('ai_chat.model.min_role')}: ${t(`role.${o.minRole}`)}` : '';
-                      return (
-                        <SelectItem key={o.model} value={o.model} disabled={!allowed}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{label}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {desc}
-                              {!allowed && needs ? ` • ${needs}` : ''}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-                <Button type="submit" size="icon" disabled={isSending || !input.trim() || !sessionId} className="shrink-0">
-                  {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
+                    {isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  </Button>
+                  <div className="flex flex-wrap items-center gap-2 ml-auto">
+                    {renderModelSelect(false)}
+                    <Button
+                      type="submit"
+                      size="icon"
+                      disabled={isSending || (!input.trim() && pendingFiles.length === 0)}
+                      className="shrink-0 rounded-full h-10 w-10"
+                    >
+                      {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
               </form>
-            </>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Debug / Context */}
-      {hasConversation && (
-        <Card className="lg:col-span-3 flex flex-col min-h-0 min-w-0 overflow-hidden">
-        <CardHeader className="space-y-2">
-          <CardTitle className="text-base">{t('ai_chat.debug_tools')}</CardTitle>
-          <CardDescription>{t('ai_chat.debug_tools_desc')}</CardDescription>
-          <Tabs value={activeSideTab} onValueChange={(v) => setActiveSideTab(v as any)}>
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="debug">{t('ai_chat.debug')}</TabsTrigger>
-              <TabsTrigger value="context">{t('ai_chat.context_preview')}</TabsTrigger>
-            </TabsList>
-            <TabsContent value="debug" />
-            <TabsContent value="context" />
-          </Tabs>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => (activeSideTab === 'debug' ? void refreshDebug() : void refreshContext())}
-              className="flex-1"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              {t('common.refresh')}
-            </Button>
-            <Button variant="outline" onClick={() => void loadModels()} size="icon" aria-label={t('ai_chat.model.refresh')}>
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+      <Dialog
+        open={!!previewAttachment}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewAttachment(null);
+            setResolvedAttachment(null);
+            setAttachmentDetailLoading(false);
+            setAttachmentFullFetchFailed(false);
+          }
+        }}
+      >
+        <DialogContent className="flex h-[min(92vh,920px)] w-[min(98vw,1400px)] max-h-[92vh] max-w-[min(98vw,1400px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(98vw,1400px)]">
+          <DialogHeader className="shrink-0 px-6 pt-5 pb-2">
+            <DialogTitle>{t('ai_chat.attachment_detail_title')}</DialogTitle>
+            <DialogDescription className="space-y-1">
+              <span className="block truncate" title={previewAttachment?.name}>
+                {previewAttachment?.name ?? ''}
+              </span>
+              {previewAttachment && previewTableColumns.length > 0 && previewTableRows.length > 0 ? (
+                <span className="text-xs">
+                  {isShowingFullAttachmentData
+                    ? t('ai_chat.attachment_full_hint')
+                        .replace('{rows}', String(previewTableRows.length))
+                        .replace('{cols}', String(previewTableColumns.length))
+                    : t('ai_chat.attachment_rows_hint')
+                        .replace('{rows}', String(previewTableRows.length))
+                        .replace('{cols}', String(previewTableColumns.length))}
+                </span>
+              ) : null}
+              {resolvedAttachment?.truncated ? (
+                <span className="text-xs text-amber-700 dark:text-amber-400 block">
+                  {t('ai_chat.attachment_truncated')
+                    .replace('{shown}', String(resolvedAttachment.returned_rows))
+                    .replace('{total}', String(resolvedAttachment.row_count))}
+                </span>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-2 px-6 pb-5">
+            {attachmentDetailLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                {t('ai_chat.attachment_loading')}
+              </div>
+            ) : null}
+            {attachmentFullFetchFailed && (previewAttachment?.preview_rows?.length || previewAttachment?.context_text) ? (
+              <p className="text-xs text-muted-foreground shrink-0">{t('ai_chat.attachment_preview_fallback')}</p>
+            ) : null}
+            {previewAttachment && previewTableColumns.length > 0 && previewTableRows.length > 0 ? (
+              <div className="flex min-h-0 flex-1 flex-col rounded-md border bg-muted/30 p-2">
+                <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-background">
+                  <table className="w-max border-separate border-spacing-0 text-xs leading-5">
+                    <thead>
+                      <tr>
+                        <th className="sticky left-0 top-0 z-20 border-r border-border bg-muted px-2 py-2 text-left font-semibold w-10 min-w-[2.5rem]">
+                          #
+                        </th>
+                        {previewTableColumns.map((col) => (
+                          <th
+                            key={col}
+                            title={col}
+                            className="sticky top-0 z-10 bg-muted px-2 py-2 text-left font-semibold whitespace-nowrap min-w-[120px] max-w-[min(280px,40vw)]"
+                          >
+                            <span className="block truncate" title={col}>
+                              {col}
+                            </span>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewTableRows.map((row, idx) => (
+                        <tr key={`${previewAttachment.id}-${idx}`} className="border-t border-border/60">
+                          <td className="sticky left-0 z-[1] border-r border-border bg-background px-2 py-1.5 text-muted-foreground align-top">
+                            {idx + 1}
+                          </td>
+                          {previewTableColumns.map((col) => (
+                            <td
+                              key={`${idx}-${col}`}
+                              title={row?.[col] == null ? '-' : String(row[col])}
+                              className="px-2 py-1.5 align-top min-w-[120px] max-w-[min(280px,40vw)]"
+                            >
+                              <span className="block truncate" title={row?.[col] == null ? '-' : String(row[col])}>
+                                {row?.[col] == null ? '-' : String(row[col])}
+                              </span>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : previewAttachment?.context_text?.trim() ? (
+              <ScrollArea className="h-[min(58vh,480px)] min-h-[240px] w-full rounded-md border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground mb-2">{t('ai_chat.attachment_text_fallback')}</p>
+                <pre className="text-xs whitespace-pre-wrap break-words font-mono">{previewAttachment.context_text}</pre>
+              </ScrollArea>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">{t('ai_chat.attachment_no_preview')}</p>
+            )}
           </div>
-        </CardHeader>
-        <CardContent className="flex-1 min-h-0">
-          <ScrollArea className="h-full pr-3">
-            <pre className="text-xs whitespace-pre-wrap break-all text-muted-foreground">
-              {JSON.stringify(activeSideTab === 'debug' ? debugData : contextPreview, null, 2)}
-            </pre>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
-
-

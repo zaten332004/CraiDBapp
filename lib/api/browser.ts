@@ -1,14 +1,33 @@
-import { ApiFetchOptions, fetchJson } from "@/lib/api/shared";
+import { ApiError, ApiFetchOptions, fetchJson } from "@/lib/api/shared";
 import { getAccessToken } from "@/lib/auth/token";
+import { logoutDueToSessionExpired } from "@/lib/auth/session-expired";
+
+function isAuthPublicPath(cleanPath: string) {
+  const p = cleanPath.toLowerCase();
+  return (
+    p.includes("/auth/login") ||
+    p.includes("/auth/register") ||
+    p.includes("/auth/forgot-password") ||
+    p.includes("/auth/oauth") ||
+    p.includes("/token")
+  );
+}
 
 /**
  * Browser-safe API helper that calls the Next.js proxy route (/api/v1),
  * so you don't need CORS and you don't expose server env vars to the client.
  */
-export function browserApiFetch<T>(path: string, options?: ApiFetchOptions) {
+export async function browserApiFetch<T>(path: string, options?: ApiFetchOptions) {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   const url = `/api/v1${cleanPath}`;
-  return fetchJson<T>(url, options);
+  try {
+    return await fetchJson<T>(url, options);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401 && !isAuthPublicPath(cleanPath) && getAccessToken()) {
+      logoutDueToSessionExpired("token");
+    }
+    throw e;
+  }
 }
 
 export function browserApiFetchAuth<T>(path: string, options: ApiFetchOptions = {}) {

@@ -19,7 +19,10 @@ const HOP_BY_HOP_HEADERS = new Set([
 ]);
 
 function getApiBaseUrl() {
-  const baseUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+  const baseUrl =
+    process.env.API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    "http://127.0.0.1:8000/api/v1";
   if (!baseUrl) return null;
   return baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
 }
