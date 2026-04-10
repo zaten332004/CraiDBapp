@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Upload, CheckCircle, AlertCircle, File } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, File, Loader2 } from 'lucide-react';
 import { authHeaders } from '@/lib/auth/token';
 import { getUserRole } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
@@ -17,6 +17,28 @@ import { formatUserFacingFetchError } from '@/lib/api/format-api-error';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { CRAIDB_UPLOAD_COMPLETED_EVENT } from '@/lib/profile-sync-event';
 import { formatDateTimeVietnam } from '@/lib/datetime';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+
+function normalizeJobErrorRow(item: any) {
+  let msg = item?.message ?? item?.error_message ?? item?.reason ?? item?.error;
+  if (msg == null || String(msg).trim() === '') {
+    const d = item?.detail;
+    if (d != null) msg = typeof d === 'string' ? d : JSON.stringify(d);
+  }
+  return {
+    row_number: item?.row ?? item?.row_number ?? item?.line,
+    error_message: String(msg ?? '').trim() || '—',
+    customer_name: item?.customer_name ?? item?.full_name,
+    email: item?.email,
+  };
+}
 
 export default function UploadPage() {
   const { t, locale } = useI18n();
@@ -170,15 +192,14 @@ export default function UploadPage() {
     setIsLoadingErrors(true);
     try {
       const firstPage = await getJsonWithAuthFallback<any>(`/jobs/${encodeURIComponent(clean)}/errors?offset=0`);
-      const total = Number(firstPage?.total_errors || 0);
-      const firstItems = Array.isArray(firstPage?.errors) ? firstPage.errors : [];
+      const total = Number(firstPage?.total_errors ?? firstPage?.total ?? 0);
+      const firstItems = Array.isArray(firstPage?.errors)
+        ? firstPage.errors
+        : Array.isArray(firstPage?.items)
+          ? firstPage.items
+          : [];
       if (total <= firstItems.length || total === 0) {
-        setImportErrors(firstItems.map((item: any) => ({
-          row_number: item.row ?? item.row_number,
-          error_message: item.message ?? item.error_message,
-          customer_name: item.customer_name,
-          email: item.email,
-        })));
+        setImportErrors(firstItems.map((item: any) => normalizeJobErrorRow(item)));
         return;
       }
       const pageSize = Number(firstPage?.limit || firstItems.length || 200);
@@ -189,21 +210,14 @@ export default function UploadPage() {
         requests.push(getJsonWithAuthFallback<any>(`/jobs/${encodeURIComponent(clean)}/errors?offset=${offset}`));
       }
       const rest = await Promise.all(requests);
-      const merged = [...firstItems].map((item: any) => ({
-        row_number: item.row ?? item.row_number,
-        error_message: item.message ?? item.error_message,
-        customer_name: item.customer_name,
-        email: item.email,
-      }));
+      const merged = [...firstItems].map((item: any) => normalizeJobErrorRow(item));
       for (const pageData of rest) {
-        if (Array.isArray(pageData?.errors)) {
-          merged.push(...pageData.errors.map((item: any) => ({
-            row_number: item.row ?? item.row_number,
-            error_message: item.message ?? item.error_message,
-            customer_name: item.customer_name,
-            email: item.email,
-          })));
-        }
+        const rows = Array.isArray(pageData?.errors)
+          ? pageData.errors
+          : Array.isArray(pageData?.items)
+            ? pageData.items
+            : [];
+        merged.push(...rows.map((item: any) => normalizeJobErrorRow(item)));
       }
       setImportErrors(merged);
     } catch (err) {
@@ -245,9 +259,25 @@ export default function UploadPage() {
     const counts = { duplicateId: 0, duplicateEmail: 0, duplicateName: 0 };
     for (const item of importErrors) {
       const msg = String(item.error_message ?? '').toLowerCase();
-      if (msg.includes('trùng id') || msg.includes('trùng mã khách hàng tham chiếu')) counts.duplicateId += 1;
-      if (msg.includes('trùng email')) counts.duplicateEmail += 1;
-      if (msg.includes('trùng tên')) counts.duplicateName += 1;
+      if (
+        msg.includes('trùng id') ||
+        msg.includes('trùng mã khách hàng') ||
+        msg.includes('duplicate id') ||
+        msg.includes('duplicate key') ||
+        /unique.*(id|customer|reference)/i.test(msg)
+      ) {
+        counts.duplicateId += 1;
+      }
+      if (msg.includes('trùng email') || msg.includes('duplicate email') || msg.includes('email already')) {
+        counts.duplicateEmail += 1;
+      }
+      if (
+        msg.includes('trùng tên') ||
+        msg.includes('duplicate name') ||
+        msg.includes('duplicate full name')
+      ) {
+        counts.duplicateName += 1;
+      }
     }
     return counts;
   };
@@ -446,7 +476,60 @@ export default function UploadPage() {
                 <p>Thất bại do trùng ID: <span className="font-semibold text-rose-700">{duplicateCounts.duplicateId}</span></p>
                 <p>Thất bại do trùng email: <span className="font-semibold text-rose-700">{duplicateCounts.duplicateEmail}</span></p>
                 <p>Thất bại do trùng tên: <span className="font-semibold text-rose-700">{duplicateCounts.duplicateName}</span></p>
+                <p className="mt-2 text-muted-foreground text-xs">
+                  Các lỗi khác (thiếu cột, sai kiểu dữ liệu, vi phạm validation…) không nằm trong ba nhóm trên — xem bảng chi tiết bên dưới.
+                </p>
               </div>
+
+              {isLoadingErrors && summary.failedRows > 0 ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Đang tải chi tiết lỗi từng dòng…
+                </div>
+              ) : null}
+
+              {!isLoadingErrors && summary.failedRows > 0 && importErrors.length === 0 && derivedJobId ? (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Có {summary.failedRows} dòng lỗi nhưng không lấy được danh sách từ API{' '}
+                    <code className="text-xs">/jobs/{derivedJobId}/errors</code>. Kiểm tra backend hoặc quyền truy cập.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+
+              {importErrors.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Chi tiết lỗi theo dòng</p>
+                  <div className="max-h-[320px] overflow-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-16">Dòng</TableHead>
+                          <TableHead>Tên / Email</TableHead>
+                          <TableHead>Lý do</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {importErrors.map((row, idx) => (
+                          <TableRow key={`${row.row_number ?? idx}-${idx}`}>
+                            <TableCell className="tabular-nums text-muted-foreground">
+                              {row.row_number != null ? row.row_number : '—'}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <div className="font-medium">{String(row.customer_name || '—')}</div>
+                              <div className="text-xs text-muted-foreground">{String(row.email || '')}</div>
+                            </TableCell>
+                            <TableCell className="text-sm whitespace-pre-wrap break-words max-w-[480px]">
+                              {String(row.error_message || '—')}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </div>
