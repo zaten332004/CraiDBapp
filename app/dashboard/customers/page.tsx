@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +32,7 @@ import { formatUserFacingApiError } from '@/lib/api/format-api-error';
 import { ListPagination } from '@/components/list-pagination';
 import { getAccessToken } from '@/lib/auth/token';
 import { formatVnd } from '@/lib/money';
+import { CRAIDB_UPLOAD_COMPLETED_EVENT } from '@/lib/profile-sync-event';
 
 function getRiskBadgeClass(level: string) {
   const normalized = String(level || '').toLowerCase();
@@ -61,6 +62,26 @@ function getStatusBadgeClass(status: string) {
   return 'border-slate-200 bg-slate-50 text-slate-700';
 }
 
+/** Backend có thể trả `items`, `customers`, `data` hoặc `results`. */
+function normalizeCustomerListResponse(data: unknown): { items: any[]; total: number } {
+  if (data == null || typeof data !== 'object') return { items: [], total: 0 };
+  const d = data as Record<string, unknown>;
+  let items: any[] = [];
+  if (Array.isArray(d.items)) items = d.items;
+  else if (Array.isArray(d.customers)) items = d.customers;
+  else if (Array.isArray(d.data)) items = d.data;
+  else if (Array.isArray(d.results)) items = d.results;
+  const rawTotal = d.total ?? d.total_count ?? d.count ?? d.totalCount;
+  let total = 0;
+  if (typeof rawTotal === 'number' && Number.isFinite(rawTotal)) total = rawTotal;
+  else if (typeof rawTotal === 'string' && rawTotal.trim() !== '') {
+    const n = Number(rawTotal);
+    if (Number.isFinite(n)) total = n;
+  }
+  if (total <= 0 && items.length > 0) total = items.length;
+  return { items, total: Math.max(0, total) };
+}
+
 export default function CustomersPage() {
   const PAGE_SIZE = 15;
   const { t, locale } = useI18n();
@@ -85,43 +106,50 @@ export default function CustomersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+
+  const loadCustomers = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const query = new URLSearchParams();
+      query.set('page', String(page));
+      query.set('limit', String(PAGE_SIZE));
+      if (search.trim()) query.set('search_name', search.trim());
+      if (riskFilter !== 'all') query.set('risk_level', riskFilter);
+      const raw = await browserApiFetchAuth<Record<string, unknown>>(`/customers?${query.toString()}`, {
+        method: 'GET',
+      });
+      const { items, total } = normalizeCustomerListResponse(raw);
+      setTotalCount(total);
+      setCustomers(
+        items.map((item) => ({
+          id: String(item.customer_id ?? item.id ?? ''),
+          name: String(item.full_name ?? item.name ?? '-'),
+          email: String(item.email || '-'),
+          loanType: String(item.loan_type || item.product_type || '-'),
+          loanAmount: item.requested_loan_amount != null ? Number(item.requested_loan_amount) : null,
+          termMonths: item.requested_term_months != null ? Number(item.requested_term_months) : null,
+          annualRate: item.annual_interest_rate != null ? Number(item.annual_interest_rate) : null,
+          riskLevel: String(item.risk_level || 'medium').toLowerCase(),
+          status: String(item.application_status || item.status || 'active').toLowerCase(),
+        })),
+      );
+    } catch (err) {
+      notifyError(formatUserFacingApiError(err));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page, search, riskFilter]);
 
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setIsLoading(true);
-      setPage(1);
-      try {
-        const query = new URLSearchParams();
-        query.set('page', '1');
-        if (search.trim()) query.set('search_name', search.trim());
-        if (riskFilter !== 'all') query.set('risk_level', riskFilter);
-        const data = await browserApiFetchAuth<{ items: any[] }>(`/customers?${query.toString()}`, { method: 'GET' });
-        if (cancelled) return;
-        setCustomers(
-          (data.items || []).map((item) => ({
-            id: String(item.customer_id),
-            name: String(item.full_name || '-'),
-            email: String(item.email || '-'),
-            loanType: String(item.loan_type || item.product_type || '-'),
-            loanAmount: item.requested_loan_amount != null ? Number(item.requested_loan_amount) : null,
-            termMonths: item.requested_term_months != null ? Number(item.requested_term_months) : null,
-            annualRate: item.annual_interest_rate != null ? Number(item.annual_interest_rate) : null,
-            riskLevel: String(item.risk_level || 'medium').toLowerCase(),
-            status: String(item.application_status || 'active').toLowerCase(),
-          })),
-        );
-      } catch (err) {
-        if (!cancelled) notifyError(formatUserFacingApiError(err));
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [search, riskFilter]);
+    void loadCustomers();
+  }, [loadCustomers]);
+
+  useEffect(() => {
+    const onUploadDone = () => void loadCustomers();
+    window.addEventListener(CRAIDB_UPLOAD_COMPLETED_EVENT, onUploadDone);
+    return () => window.removeEventListener(CRAIDB_UPLOAD_COMPLETED_EVENT, onUploadDone);
+  }, [loadCustomers]);
 
   const riskLabel = (level: string) => {
     switch (level) {
@@ -145,9 +173,8 @@ export default function CustomersPage() {
     return value || '-';
   };
 
-  const filteredCustomers = customers;
-  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / PAGE_SIZE));
-  const pagedCustomers = filteredCustomers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const effectiveTotal = Math.max(totalCount, customers.length);
+  const totalPages = Math.max(1, Math.ceil(effectiveTotal / PAGE_SIZE));
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -247,11 +274,20 @@ export default function CustomersPage() {
               <Input
                 placeholder={t('customers.search_ph')}
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 className="pl-10"
               />
             </div>
-            <Select value={riskFilter} onValueChange={setRiskFilter}>
+            <Select
+              value={riskFilter}
+              onValueChange={(v) => {
+                setRiskFilter(v);
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="w-full md:w-40">
                 <SelectValue />
               </SelectTrigger>
@@ -290,9 +326,9 @@ export default function CustomersPage() {
                   <TableRow>
                     <TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell>
                   </TableRow>
-                ) : pagedCustomers.map((customer) => (
+                ) : customers.map((customer, rowIdx) => (
                   <TableRow
-                    key={customer.id}
+                    key={customer.id ? customer.id : `row-${rowIdx}`}
                     className="cursor-pointer border-b border-black/15 hover:bg-muted/30"
                     onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
                   >

@@ -15,6 +15,7 @@ import { browserApiFetchAuth } from '@/lib/api/browser';
 import { ApiError } from '@/lib/api/shared';
 import { formatUserFacingFetchError } from '@/lib/api/format-api-error';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { CRAIDB_UPLOAD_COMPLETED_EVENT } from '@/lib/profile-sync-event';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 
 export default function UploadPage() {
@@ -135,6 +136,7 @@ export default function UploadPage() {
       setUploadResult(data);
       setFile(null);
       setUploadProgress(100);
+      window.dispatchEvent(new Event(CRAIDB_UPLOAD_COMPLETED_EVENT));
       notifySuccess(t('upload.upload_file'), {
         details: [
           `File: ${file.name}`,
