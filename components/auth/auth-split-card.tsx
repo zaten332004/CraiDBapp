@@ -342,7 +342,36 @@ export function AuthSplitCard() {
         throw new Error(data?.detail || data?.message || t('auth.register_failed'));
       }
 
-      router.push(`/auth/verify-email?email=${encodeURIComponent(regData.email)}`);
+      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      const accessToken = typeof data.access_token === 'string' ? data.access_token : '';
+      const normalized = normalizeAuthPayload(data);
+      const normalizedRole = String(normalized.role || regData.registrationType || '').trim().toLowerCase();
+      const normalizedStatus = String(normalized.status || 'pending').trim().toLowerCase();
+      if (accessToken) {
+        setSession({
+          accessToken,
+          role: normalizedRole,
+          status: normalizedStatus,
+          hasPin: normalized.hasPin ?? false,
+        });
+        if (normalizedStatus === 'approved') {
+          router.push(defaultDashboardAfterLogin(normalizedRole));
+        } else {
+          const params = new URLSearchParams({
+            mode: 'pending',
+            email: regData.email,
+            role: normalizedRole || 'analyst',
+          });
+          router.push(`/auth/verify-email?${params.toString()}`);
+        }
+      } else {
+        const params = new URLSearchParams({
+          mode: 'pending',
+          email: regData.email,
+          role: normalizedRole || 'analyst',
+        });
+        router.push(`/auth/verify-email?${params.toString()}`);
+      }
     } catch (err) {
       setRegError(err instanceof Error ? err.message : t('common.error'));
     } finally {

@@ -13,7 +13,7 @@ import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
 import { useI18n } from '@/components/i18n-provider';
-import { authHeaders, getUserHasPin, getUserRole, getUserStatus, setUserHasPin, setUserRole, setUserStatus } from '@/lib/auth/token';
+import { authHeaders, clearAccessToken, getAccessToken, getUserHasPin, getUserRole, getUserStatus, setUserHasPin, setUserRole, setUserStatus } from '@/lib/auth/token';
 import { isNumericPin } from '@/lib/validation/account';
 
 type PendingStatusResponse = {
@@ -33,6 +33,11 @@ function normalizeRoleFromPayload(data: Record<string, unknown>): string {
   return String(raw).trim().toLowerCase();
 }
 
+function isAuthErrorMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  return normalized.includes('not authenticated') || normalized.includes('unauthorized') || normalized.includes('401');
+}
+
 function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,6 +54,7 @@ function VerifyEmailContent() {
   const [pinMessage, setPinMessage] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
   const emailQuery = (searchParams.get('email') || '').trim();
+  const roleQuery = (searchParams.get('role') || '').trim().toLowerCase();
 
   useEffect(() => {
     void fetchPendingStatus();
@@ -56,6 +62,9 @@ function VerifyEmailContent() {
   }, []);
 
   const fetchPendingStatus = async () => {
+    if (!getAccessToken()) {
+      return null;
+    }
     setLoadingPending(true);
     setError('');
     try {
@@ -99,7 +108,10 @@ function VerifyEmailContent() {
       setUserHasPin(Boolean(normalizedPayload.has_pin));
       return normalizedPayload;
     } catch (err) {
-      setError(err instanceof Error ? err.message : (isVi ? 'Không thể tải trạng thái tài khoản.' : 'Could not load account status.'));
+      const msg = err instanceof Error ? err.message : '';
+      if (!isAuthErrorMessage(msg)) {
+        setError(msg || (isVi ? 'Không thể tải trạng thái tài khoản.' : 'Could not load account status.'));
+      }
       return null;
     } finally {
       setLoadingPending(false);
@@ -118,6 +130,11 @@ function VerifyEmailContent() {
     }
   };
 
+  const handleBackToLogin = () => {
+    clearAccessToken();
+    router.push('/auth?mode=login');
+  };
+
   const submitSetPin = async () => {
     setPinMessage('');
     setError('');
@@ -126,7 +143,7 @@ function VerifyEmailContent() {
       return;
     }
     if (pin !== confirmPin) {
-      setError(isVi ? 'PIN xác nhận không khớp.' : 'PIN confirmation does not match.');
+      setError(isVi ? 'Mã PIN xác nhận chưa khớp với mã PIN đã nhập.' : 'Confirmation PIN does not match the entered PIN.');
       return;
     }
     setPinLoading(true);
@@ -149,7 +166,12 @@ function VerifyEmailContent() {
       setUserHasPin(true);
       await fetchPendingStatus();
     } catch (err) {
-      setError(err instanceof Error ? err.message : (isVi ? 'Có lỗi xảy ra.' : 'Something went wrong.'));
+      const msg = err instanceof Error ? err.message : '';
+      if (isAuthErrorMessage(msg)) {
+        setError(isVi ? 'Bạn cần đăng nhập để thiết lập mã PIN.' : 'Please sign in to set your PIN.');
+      } else {
+        setError(msg || (isVi ? 'Có lỗi xảy ra.' : 'Something went wrong.'));
+      }
     } finally {
       setPinLoading(false);
     }
@@ -163,7 +185,7 @@ function VerifyEmailContent() {
       return;
     }
     if (newPin !== newPinConfirm) {
-      setError(isVi ? 'PIN mới xác nhận không khớp.' : 'New PIN confirmation does not match.');
+      setError(isVi ? 'Mã PIN mới xác nhận chưa khớp với mã PIN mới đã nhập.' : 'New PIN confirmation does not match the entered new PIN.');
       return;
     }
     setPinLoading(true);
@@ -189,7 +211,12 @@ function VerifyEmailContent() {
       setNewPinConfirm('');
       await fetchPendingStatus();
     } catch (err) {
-      setError(err instanceof Error ? err.message : (isVi ? 'Có lỗi xảy ra.' : 'Something went wrong.'));
+      const msg = err instanceof Error ? err.message : '';
+      if (isAuthErrorMessage(msg)) {
+        setError(isVi ? 'Bạn cần đăng nhập để đổi mã PIN.' : 'Please sign in to change your PIN.');
+      } else {
+        setError(msg || (isVi ? 'Có lỗi xảy ra.' : 'Something went wrong.'));
+      }
     } finally {
       setPinLoading(false);
     }
@@ -199,7 +226,7 @@ function VerifyEmailContent() {
   const fallbackStatus = getUserStatus();
   const fallbackHasPin = getUserHasPin();
   const resolvedEmail = pendingInfo?.email || emailQuery || '';
-  const resolvedRole = pendingInfo?.role || fallbackRole || '';
+  const resolvedRole = pendingInfo?.role || roleQuery || fallbackRole || 'analyst';
   const currentStatus = String(pendingInfo?.status || fallbackStatus || 'pending').toLowerCase();
   const resolvedHasPin = typeof pendingInfo?.has_pin === 'boolean' ? pendingInfo.has_pin : fallbackHasPin;
   const isApproved = currentStatus === 'approved';
@@ -259,11 +286,11 @@ function VerifyEmailContent() {
                   <Button className="w-full">{isVi ? 'Vào hệ thống' : 'Go to dashboard'}</Button>
                 </Link>
               )}
-              <Link href="/auth?mode=login" className="block">
-                <Button type="button" className="w-full">
+              <div className="block">
+                <Button type="button" className="w-full" onClick={handleBackToLogin}>
                   {isVi ? 'Quay lại trang đăng nhập' : 'Back to login'}
                 </Button>
-              </Link>
+              </div>
             </CardContent>
           </Card>
 
