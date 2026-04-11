@@ -161,8 +161,8 @@ export default function RiskScorePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [isSyncingCustomer, setIsSyncingCustomer] = useState(false);
-  const [isExplanationOpen, setIsExplanationOpen] = useState(false);
   const [loadedCustomerId, setLoadedCustomerId] = useState<number | null>(null);
+  const [isExplanationOpen, setIsExplanationOpen] = useState(false);
   const [error, setError] = useState('');
   const lastFetchedLookupRef = useRef<string>('');
 
@@ -205,9 +205,12 @@ export default function RiskScorePage() {
           })) as Record<string, unknown>;
         }
         applyCustomer(customer);
+        const cid = Number((customer as Record<string, unknown>).customer_id);
+        setLoadedCustomerId(Number.isFinite(cid) ? cid : null);
         lastFetchedLookupRef.current = q;
       } catch (e) {
         lastFetchedLookupRef.current = '';
+        setLoadedCustomerId(null);
         notifyError(formatUserFacingApiError(e));
       } finally {
         setProfileLoading(false);
@@ -242,47 +245,37 @@ export default function RiskScorePage() {
   };
 
   const syncCustomerAfterScoring = useCallback(
-    async (riskLabel: unknown) => {
+    async (riskLabel: unknown, riskScore: unknown) => {
       if (!loadedCustomerId) return;
-      const normalizedLoanType = formData.loanType.trim();
-      const normalizedEmployment = formData.employmentStatus.trim() || formData.employmentDisplay.trim();
-      const payload: Record<string, unknown> = {
-        full_name: formData.name.trim() || null,
-        monthly_income: parseVndDigitsToNumber(formData.incomeDigits),
-        requested_loan_amount: parseVndDigitsToNumber(formData.loanDigits),
-        loan_amount: parseVndDigitsToNumber(formData.loanDigits),
-        age: Number.parseInt(formData.age, 10),
-        credit_score: formData.creditScore.trim() ? Number.parseInt(formData.creditScore, 10) : null,
-        loan_type: normalizedLoanType || null,
-        product_type: normalizedLoanType || null,
-        annual_interest_rate: formData.interestRate.trim() ? Number.parseFloat(formData.interestRate.replace(',', '.')) : null,
-        interest_rate: formData.interestRate.trim() ? Number.parseFloat(formData.interestRate.replace(',', '.')) : null,
-        requested_term_months: formData.loanTermMonths.trim() ? Number.parseInt(formData.loanTermMonths, 10) : null,
-        loan_term_months: formData.loanTermMonths.trim() ? Number.parseInt(formData.loanTermMonths, 10) : null,
-        collateral_value: parseVndDigitsToNumber(formData.collateralDigits) || null,
-        collateral_amount: parseVndDigitsToNumber(formData.collateralDigits) || null,
-        employment_status: normalizedEmployment || null,
-        notes: formData.notes.trim() || null,
-        risk_level: String(riskLabel ?? '').trim().toLowerCase() || null,
-      };
       setIsSyncingCustomer(true);
       try {
+        const normalizedRiskLabel = String(riskLabel || '').trim().toLowerCase();
+        const scoreValue = Number(riskScore);
         await browserApiFetchAuth(`/customers/${loadedCustomerId}`, {
           method: 'PUT',
-          body: payload,
+          body: {
+            full_name: formData.name.trim() || undefined,
+            monthly_income: parseVndDigitsToNumber(formData.incomeDigits),
+            requested_loan_amount: parseVndDigitsToNumber(formData.loanDigits),
+            age: Number(formData.age),
+            credit_score: formData.creditScore ? Number(formData.creditScore) : undefined,
+            loan_type: formData.loanType.trim() || undefined,
+            requested_term_months: formData.loanTermMonths ? Number(formData.loanTermMonths) : undefined,
+            annual_interest_rate: formData.interestRate ? Number(formData.interestRate.replace(',', '.')) : undefined,
+            collateral_value: formData.collateralDigits ? parseVndDigitsToNumber(formData.collateralDigits) : undefined,
+            employment_status: formData.employmentStatus.trim() || formData.employmentDisplay.trim() || undefined,
+            notes: formData.notes.trim() || undefined,
+            risk_level: ['low', 'medium', 'high'].includes(normalizedRiskLabel) ? normalizedRiskLabel : undefined,
+            risk_score: Number.isFinite(scoreValue) ? scoreValue : undefined,
+          },
         });
-      } catch (syncErr) {
-        notifyError(
-          locale === 'vi'
-            ? 'Đã chấm điểm nhưng chưa đồng bộ được hồ sơ khách hàng.'
-            : 'Scoring succeeded but customer profile sync failed.',
-          formatUserFacingApiError(syncErr),
-        );
+      } catch (err) {
+        notifyError(formatUserFacingApiError(err));
       } finally {
         setIsSyncingCustomer(false);
       }
     },
-    [formData, loadedCustomerId, locale],
+    [formData, loadedCustomerId],
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -357,7 +350,7 @@ export default function RiskScorePage() {
       const data = await response.json();
       setResult(data);
       setIsExplanationOpen(false);
-      await syncCustomerAfterScoring(data?.risk_label);
+      await syncCustomerAfterScoring(data?.risk_label, data?.risk_score);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');
       setError(message);
@@ -657,6 +650,11 @@ export default function RiskScorePage() {
                   >
                     {locale === 'vi' ? 'Xem chi tiết' : 'View details'}
                   </Button>
+                ) : null}
+                {isSyncingCustomer ? (
+                  <p className="text-xs text-muted-foreground">
+                    {locale === 'vi' ? 'Đang đồng bộ hồ sơ khách hàng...' : 'Syncing customer profile...'}
+                  </p>
                 ) : null}
               </CardContent>
             </Card>

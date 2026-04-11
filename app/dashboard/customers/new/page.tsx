@@ -22,6 +22,29 @@ import {
   sanitizeVietnamNationalId,
 } from '@/lib/validation/account';
 
+function getAgeFromDateOfBirth(dateOfBirth: string): number | null {
+  const normalized = String(dateOfBirth || '').trim();
+  if (!normalized) return null;
+  const birth = new Date(`${normalized}T00:00:00`);
+  if (Number.isNaN(birth.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const monthDiff = now.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+    age -= 1;
+  }
+  return age;
+}
+
+function getAdultDateMax(): string {
+  const now = new Date();
+  const adult = new Date(now.getFullYear() - 18, now.getMonth(), now.getDate());
+  const year = adult.getFullYear();
+  const month = String(adult.getMonth() + 1).padStart(2, '0');
+  const day = String(adult.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function NewCustomerPage() {
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -38,6 +61,8 @@ export default function NewCustomerPage() {
     date_of_birth: '',
     gender: '',
     national_id: '',
+    id_issue_date: '',
+    id_issue_place: '',
     nationality: '',
     marital_status: '',
     occupation: '',
@@ -137,6 +162,7 @@ export default function NewCustomerPage() {
       const monthlyIncome = Number(formData.monthly_income);
       const requestedLoanAmount = Number(formData.requested_loan_amount);
       const requestedTermMonths = Number(formData.requested_term_months);
+      const age = getAgeFromDateOfBirth(formData.date_of_birth);
 
       if (!trimmedFullName) {
         throw new Error(isVi ? 'Vui lòng nhập họ và tên khách hàng.' : 'Please enter customer full name.');
@@ -149,6 +175,13 @@ export default function NewCustomerPage() {
           isVi
             ? 'CCCD phải gồm đúng 12 chữ số. Không được nhập chữ hoặc ký tự đặc biệt.'
             : 'National ID must contain exactly 12 digits. Letters and special characters are not allowed.',
+        );
+      }
+      if (formData.date_of_birth.trim() && (age == null || age < 18)) {
+        throw new Error(
+          isVi
+            ? 'Khách hàng phải từ đủ 18 tuổi trở lên.'
+            : 'Customer must be at least 18 years old.',
         );
       }
       if (!normalizedLoanType) {
@@ -187,6 +220,8 @@ export default function NewCustomerPage() {
           date_of_birth: formData.date_of_birth || undefined,
           gender: formData.gender || undefined,
           national_id: normalizedNationalId,
+          id_issue_date: formData.id_issue_date || undefined,
+          id_issue_place: formData.id_issue_place.trim() || undefined,
           nationality: formData.nationality.trim() || undefined,
           marital_status: formData.marital_status.trim() || undefined,
           occupation: formData.occupation.trim() || undefined,
@@ -339,7 +374,15 @@ export default function NewCustomerPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="date_of_birth">Ngày sinh</Label>
-                  <Input id="date_of_birth" name="date_of_birth" type="date" value={formData.date_of_birth} onChange={handleChange} disabled={isLoading} />
+                  <Input
+                    id="date_of_birth"
+                    name="date_of_birth"
+                    type="date"
+                    max={getAdultDateMax()}
+                    value={formData.date_of_birth}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="gender">Giới tính</Label>
@@ -360,6 +403,31 @@ export default function NewCustomerPage() {
                     disabled={isLoading}
                     className="placeholder:text-muted-foreground/55"
                     required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="id_issue_date">Ngày cấp CCCD</Label>
+                  <Input
+                    id="id_issue_date"
+                    name="id_issue_date"
+                    type="date"
+                    value={formData.id_issue_date}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="id_issue_place">Nơi cấp CCCD</Label>
+                  <Input
+                    id="id_issue_place"
+                    name="id_issue_place"
+                    placeholder="VD: Cục CSQLHC về TTXH"
+                    value={formData.id_issue_place}
+                    onChange={handleChange}
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">

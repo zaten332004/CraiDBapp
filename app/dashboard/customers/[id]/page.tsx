@@ -489,6 +489,10 @@ export default function CustomerDetailPage() {
                     ? `${customer.annual_interest_rate ?? customer.interest_rate}%/năm`
                     : '-',
                 ],
+                [
+                  'Điểm rủi ro',
+                  customer.risk_score != null ? Number(customer.risk_score).toFixed(4) : '-',
+                ],
                 ['Mức rủi ro', <Badge key="risk-badge" variant="outline" className={riskBadgeClass}>{riskBadgeLabel}</Badge>],
                 ['Trạng thái hồ sơ', <Badge key="status-badge" variant="outline" className={statusBadgeClass}>{statusBadgeLabel}</Badge>],
                 ['Mã tài sản bảo đảm', customer.collateral_id],
