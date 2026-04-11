@@ -60,47 +60,73 @@ function normalizeAuditLog(item: any, idx: number): AuditLogRow {
 }
 
 function formatAuditTs(ts: string, locale: string) {
-  if (!ts || ts === '—') {
-    return locale === 'vi' ? 'Không có' : 'N/A';
-  }
-  if (/^\d+$/.test(ts.trim())) {
-    const numeric = Number(ts.trim());
-    const ms = ts.trim().length <= 10 ? numeric * 1000 : numeric;
-    const fromEpoch = new Date(ms);
-    if (!Number.isNaN(fromEpoch.getTime())) {
-      return formatDateTimeVietnam(fromEpoch, locale);
-    }
-  }
-  const value = new Date(ts);
-  if (Number.isNaN(value.getTime())) return ts;
-  return formatDateTimeVietnam(value, locale);
+  const dateOnly = formatAuditDateOnly(ts, locale);
+  const timeOnly = formatAuditTimeOnly(ts, locale);
+  if (dateOnly === (locale === 'vi' ? 'Không có' : 'N/A')) return dateOnly;
+  return `${dateOnly} ${timeOnly}`;
 }
 
-function parseAuditDate(ts: string): Date | null {
-  if (!ts || ts === '—') return null;
+function hasTimezoneOffset(raw: string) {
+  return /(?:z|[+-]\d{2}:\d{2})$/i.test(raw);
+}
+
+function parseNaiveAuditParts(raw: string) {
+  const match = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})[t\s](\d{2}):(\d{2})(?::(\d{2}))?/i,
+  );
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second] = match;
+  return {
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second: second ?? '00',
+  };
+}
+
+function parseAuditDate(ts: string): { date: Date | null; naiveParts: ReturnType<typeof parseNaiveAuditParts> } {
+  if (!ts || ts === '—') return { date: null, naiveParts: null };
   const raw = ts.trim();
-  if (!raw) return null;
+  if (!raw) return { date: null, naiveParts: null };
+
+  const naiveParts = !hasTimezoneOffset(raw) ? parseNaiveAuditParts(raw) : null;
+  if (naiveParts) {
+    return { date: null, naiveParts };
+  }
+
   if (/^\d+$/.test(raw)) {
     const numeric = Number(raw);
     const ms = raw.length <= 10 ? numeric * 1000 : numeric;
     const fromEpoch = new Date(ms);
-    return Number.isNaN(fromEpoch.getTime()) ? null : fromEpoch;
+    return { date: Number.isNaN(fromEpoch.getTime()) ? null : fromEpoch, naiveParts: null };
   }
   const value = new Date(raw);
-  return Number.isNaN(value.getTime()) ? null : value;
+  return { date: Number.isNaN(value.getTime()) ? null : value, naiveParts: null };
 }
 
 function formatAuditDateOnly(ts: string, locale: string) {
-  const value = parseAuditDate(ts);
-  if (!value) return locale === 'vi' ? 'Không có' : 'N/A';
-  return formatDateVietnam(value, locale);
+  const parsed = parseAuditDate(ts);
+  if (!parsed) return locale === 'vi' ? 'Không có' : 'N/A';
+  if (parsed.naiveParts) {
+    const { day, month, year } = parsed.naiveParts;
+    return locale === 'vi' ? `${day}/${month}/${year}` : `${year}-${month}-${day}`;
+  }
+  if (!parsed.date) return locale === 'vi' ? 'Không có' : 'N/A';
+  return formatDateVietnam(parsed.date, locale);
 }
 
 function formatAuditTimeOnly(ts: string, locale: string) {
-  const value = parseAuditDate(ts);
-  if (!value) return '--:--:--';
+  const parsed = parseAuditDate(ts);
+  if (!parsed) return '--:--:--';
+  if (parsed.naiveParts) {
+    const { hour, minute, second } = parsed.naiveParts;
+    return `${hour}:${minute}:${second}`;
+  }
+  if (!parsed.date) return '--:--:--';
   const language = locale === 'vi' ? 'vi-VN' : 'en-GB';
-  return value.toLocaleTimeString(language, {
+  return parsed.date.toLocaleTimeString(language, {
     hour12: false,
     timeZone: 'Asia/Ho_Chi_Minh',
   });
@@ -460,21 +486,21 @@ export default function AdminAuditLogsPage() {
         </CardHeader>
         <CardContent className="pt-0 pb-3">
           <div className="overflow-x-auto rounded-xl border border-black/70 bg-white min-h-[620px]">
-            <Table className="w-full table-fixed">
+            <Table className="w-full min-w-[980px] table-fixed">
               <colgroup>
-                <col className="w-[16%]" />
+                <col className="w-[14%]" />
                 <col className="w-[12%]" />
-                <col className="w-[18%]" />
                 <col className="w-[20%]" />
+                <col className="w-[22%]" />
                 <col />
               </colgroup>
               <TableHeader>
                 <TableRow className="bg-muted/35 hover:bg-muted/35">
-                  <TableHead className="py-2.5 text-[13px] font-semibold">{t('common.date')}</TableHead>
-                  <TableHead className="py-2.5 text-[13px] font-semibold">{locale === 'vi' ? 'Giờ' : 'Time'}</TableHead>
-                  <TableHead className="py-2.5 text-[13px] font-semibold">{t('admin.audit.actor')}</TableHead>
-                  <TableHead className="py-2.5 text-[13px] font-semibold">{t('admin.audit.action')}</TableHead>
-                  <TableHead className="py-2.5 pr-3 text-[13px] font-semibold">{locale === 'vi' ? 'Mô tả ngắn' : 'Short description'}</TableHead>
+                  <TableHead className="px-4 py-3 text-[13px] font-semibold">{t('common.date')}</TableHead>
+                  <TableHead className="px-4 py-3 text-[13px] font-semibold">{locale === 'vi' ? 'Giờ' : 'Time'}</TableHead>
+                  <TableHead className="px-4 py-3 text-[13px] font-semibold">{t('admin.audit.actor')}</TableHead>
+                  <TableHead className="px-4 py-3 text-[13px] font-semibold">{t('admin.audit.action')}</TableHead>
+                  <TableHead className="px-4 py-3 text-[13px] font-semibold">{locale === 'vi' ? 'Mô tả ngắn' : 'Short description'}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -484,17 +510,17 @@ export default function AdminAuditLogsPage() {
                     className="cursor-pointer border-b border-black/15 hover:bg-muted/30"
                     onClick={() => setSelected(r)}
                   >
-                    <TableCell className="py-2 whitespace-nowrap text-[13px]">{formatAuditDateOnly(r.ts, locale)}</TableCell>
-                    <TableCell className="py-2 whitespace-nowrap text-[13px]">{formatAuditTimeOnly(r.ts, locale)}</TableCell>
-                    <TableCell className="py-2 text-[13px] font-medium">
+                    <TableCell className="px-4 py-2.5 whitespace-nowrap text-[13px]">{formatAuditDateOnly(r.ts, locale)}</TableCell>
+                    <TableCell className="px-4 py-2.5 whitespace-nowrap text-[13px]">{formatAuditTimeOnly(r.ts, locale)}</TableCell>
+                    <TableCell className="px-4 py-2.5 text-[13px] font-medium">
                       {resolveActorDisplay(r)}
                     </TableCell>
-                    <TableCell className="py-2">
+                    <TableCell className="px-4 py-2.5">
                       <Badge variant="outline" className={getActionBadgeClass(r.action)}>
                         {getActionLabel(r.action, locale)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="py-2 pr-3 text-[13px] text-muted-foreground">
+                    <TableCell className="px-4 py-2.5 text-[13px] text-muted-foreground">
                       {getActionShortDescription(r.action, locale)}
                     </TableCell>
                   </TableRow>
