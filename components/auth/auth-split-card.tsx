@@ -37,6 +37,26 @@ function postLoginRoute(args: { role?: string | null; status?: string | null }) 
   return defaultDashboardAfterLogin(args.role);
 }
 
+function normalizeAuthPayload(payload: Record<string, unknown>) {
+  const role =
+    (typeof payload.role === 'string' && payload.role) ||
+    (typeof payload.user_role === 'string' && payload.user_role) ||
+    (typeof payload.registration_type === 'string' && payload.registration_type) ||
+    undefined;
+  const status =
+    (typeof payload.status === 'string' && payload.status) ||
+    (typeof payload.user_status === 'string' && payload.user_status) ||
+    undefined;
+  const hasPin =
+    typeof payload.has_pin === 'boolean'
+      ? payload.has_pin
+      : typeof payload.user_has_pin === 'boolean'
+        ? payload.user_has_pin
+        : undefined;
+
+  return { role, status, hasPin };
+}
+
 export function AuthSplitCard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -195,26 +215,26 @@ export function AuthSplitCard() {
           throw new Error(message);
         }
 
-        const data = (await response.json()) as {
-          access_token: string;
-          role?: string;
-          status?: string;
-          has_pin?: boolean;
-        };
+        const data = (await response.json()) as Record<string, unknown>;
+        const accessToken = typeof data.access_token === 'string' ? data.access_token : '';
+        const normalized = normalizeAuthPayload(data);
+        if (!accessToken) {
+          throw new Error(isVi ? 'Phản hồi đăng nhập không hợp lệ.' : 'Invalid login response.');
+        }
         setSession({
-          accessToken: data.access_token,
-          role: data.role,
-          status: data.status,
-          hasPin: data.has_pin,
+          accessToken,
+          role: normalized.role,
+          status: normalized.status,
+          hasPin: normalized.hasPin,
         });
-        router.push(safeNext ?? postLoginRoute({ role: data.role, status: data.status }));
+        router.push(safeNext ?? postLoginRoute({ role: normalized.role, status: normalized.status }));
       } catch (err) {
         setLoginError(err instanceof Error ? err.message : t('common.error'));
       } finally {
         setLoginLoading(false);
       }
     },
-    [router, safeNext, t],
+    [isVi, router, safeNext, t],
   );
 
   useEffect(() => {
@@ -257,19 +277,19 @@ export function AuthSplitCard() {
         throw new Error(message);
       }
 
-      const data = (await response.json()) as {
-        access_token: string;
-        role?: string;
-        status?: string;
-        has_pin?: boolean;
-      };
+      const data = (await response.json()) as Record<string, unknown>;
+      const accessToken = typeof data.access_token === 'string' ? data.access_token : '';
+      const normalized = normalizeAuthPayload(data);
+      if (!accessToken) {
+        throw new Error(isVi ? 'Phản hồi đăng nhập không hợp lệ.' : 'Invalid login response.');
+      }
       setSession({
-        accessToken: data.access_token,
-        role: data.role,
-        status: data.status,
-        hasPin: data.has_pin,
+        accessToken,
+        role: normalized.role,
+        status: normalized.status,
+        hasPin: normalized.hasPin,
       });
-      router.push(safeNext ?? postLoginRoute({ role: data.role, status: data.status }));
+      router.push(safeNext ?? postLoginRoute({ role: normalized.role, status: normalized.status }));
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : t('common.error'));
     } finally {

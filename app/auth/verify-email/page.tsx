@@ -13,7 +13,7 @@ import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
 import { useI18n } from '@/components/i18n-provider';
-import { authHeaders, getUserHasPin, getUserRole, getUserStatus, setUserHasPin, setUserStatus } from '@/lib/auth/token';
+import { authHeaders, getUserHasPin, getUserRole, getUserStatus, setUserHasPin, setUserRole, setUserStatus } from '@/lib/auth/token';
 import { isNumericPin } from '@/lib/validation/account';
 
 type PendingStatusResponse = {
@@ -23,6 +23,15 @@ type PendingStatusResponse = {
   status: 'pending' | 'approved' | 'rejected' | string;
   has_pin: boolean;
 };
+
+function normalizeRoleFromPayload(data: Record<string, unknown>): string {
+  const raw =
+    (typeof data.role === 'string' && data.role) ||
+    (typeof data.user_role === 'string' && data.user_role) ||
+    (typeof data.registration_type === 'string' && data.registration_type) ||
+    '';
+  return String(raw).trim().toLowerCase();
+}
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -58,11 +67,37 @@ function VerifyEmailContent() {
       if (!response.ok) {
         throw new Error(data?.detail || data?.message || (isVi ? 'Không thể tải trạng thái tài khoản.' : 'Could not load account status.'));
       }
-      const payload = data as PendingStatusResponse;
-      setPendingInfo(payload);
-      setUserStatus((payload.status || 'pending') as 'pending' | 'approved' | 'rejected');
-      setUserHasPin(Boolean(payload.has_pin));
-      return payload;
+      const payload = data as Record<string, unknown>;
+      const normalizedRole = normalizeRoleFromPayload(payload) || getUserRole() || 'analyst';
+      const normalizedEmail =
+        (typeof payload.email === 'string' && payload.email.trim()) ||
+        emailQuery ||
+        '';
+      const normalizedStatus =
+        (typeof payload.status === 'string' && payload.status) ||
+        (typeof payload.user_status === 'string' && payload.user_status) ||
+        'pending';
+      const normalizedHasPin =
+        typeof payload.has_pin === 'boolean'
+          ? payload.has_pin
+          : typeof payload.user_has_pin === 'boolean'
+            ? payload.user_has_pin
+            : getUserHasPin();
+
+      const normalizedPayload: PendingStatusResponse = {
+        user_id: Number(payload.user_id || 0),
+        email: normalizedEmail,
+        role: normalizedRole,
+        status: normalizedStatus,
+        has_pin: Boolean(normalizedHasPin),
+      };
+      setPendingInfo(normalizedPayload);
+      if (normalizedRole === 'admin' || normalizedRole === 'manager' || normalizedRole === 'analyst' || normalizedRole === 'viewer') {
+        setUserRole(normalizedRole);
+      }
+      setUserStatus((normalizedPayload.status || 'pending') as 'pending' | 'approved' | 'rejected');
+      setUserHasPin(Boolean(normalizedPayload.has_pin));
+      return normalizedPayload;
     } catch (err) {
       setError(err instanceof Error ? err.message : (isVi ? 'Không thể tải trạng thái tài khoản.' : 'Could not load account status.'));
       return null;
