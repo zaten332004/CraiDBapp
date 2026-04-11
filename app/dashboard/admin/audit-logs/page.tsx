@@ -486,21 +486,21 @@ export default function AdminAuditLogsPage() {
         </CardHeader>
         <CardContent className="pt-0 pb-3">
           <div className="overflow-x-auto rounded-xl border border-black/70 bg-white min-h-[620px]">
-            <Table className="w-full min-w-[980px] table-fixed">
+            <Table className="w-full min-w-[1100px] table-fixed">
               <colgroup>
-                <col className="w-[14%]" />
+                <col className="w-[15%]" />
                 <col className="w-[12%]" />
-                <col className="w-[20%]" />
+                <col className="w-[21%]" />
                 <col className="w-[22%]" />
                 <col />
               </colgroup>
               <TableHeader>
                 <TableRow className="bg-muted/35 hover:bg-muted/35">
-                  <TableHead className="px-4 py-3 text-[13px] font-semibold">{t('common.date')}</TableHead>
-                  <TableHead className="px-4 py-3 text-[13px] font-semibold">{locale === 'vi' ? 'Giờ' : 'Time'}</TableHead>
-                  <TableHead className="px-4 py-3 text-[13px] font-semibold">{t('admin.audit.actor')}</TableHead>
-                  <TableHead className="px-4 py-3 text-[13px] font-semibold">{t('admin.audit.action')}</TableHead>
-                  <TableHead className="px-4 py-3 text-[13px] font-semibold">{locale === 'vi' ? 'Mô tả ngắn' : 'Short description'}</TableHead>
+                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('common.date')}</TableHead>
+                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{locale === 'vi' ? 'Giờ' : 'Time'}</TableHead>
+                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('admin.audit.actor')}</TableHead>
+                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('admin.audit.action')}</TableHead>
+                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{locale === 'vi' ? 'Mô tả ngắn' : 'Short description'}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -510,17 +510,17 @@ export default function AdminAuditLogsPage() {
                     className="cursor-pointer border-b border-black/15 hover:bg-muted/30"
                     onClick={() => setSelected(r)}
                   >
-                    <TableCell className="px-4 py-2.5 whitespace-nowrap text-[13px]">{formatAuditDateOnly(r.ts, locale)}</TableCell>
-                    <TableCell className="px-4 py-2.5 whitespace-nowrap text-[13px]">{formatAuditTimeOnly(r.ts, locale)}</TableCell>
-                    <TableCell className="px-4 py-2.5 text-[13px] font-medium">
+                    <TableCell className="px-6 py-3 whitespace-nowrap text-[13px]">{formatAuditDateOnly(r.ts, locale)}</TableCell>
+                    <TableCell className="px-6 py-3 whitespace-nowrap text-[13px]">{formatAuditTimeOnly(r.ts, locale)}</TableCell>
+                    <TableCell className="px-6 py-3 text-[13px] font-medium">
                       {resolveActorDisplay(r)}
                     </TableCell>
-                    <TableCell className="px-4 py-2.5">
+                    <TableCell className="px-6 py-3">
                       <Badge variant="outline" className={getActionBadgeClass(r.action)}>
                         {getActionLabel(r.action, locale)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="px-4 py-2.5 text-[13px] text-muted-foreground">
+                    <TableCell className="px-6 py-3 text-[13px] text-muted-foreground">
                       {getActionShortDescription(r.action, locale)}
                     </TableCell>
                   </TableRow>
