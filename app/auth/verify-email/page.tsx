@@ -108,16 +108,17 @@ function VerifyEmailContent() {
   const emailQuery = (searchParams.get('email') || '').trim();
   const roleQuery = (searchParams.get('role') || '').trim().toLowerCase();
 
-  const fetchRegistrationReasonByUserId = async (userId: number): Promise<string | null> => {
-    if (!userId || !getAccessToken()) return null;
+  /** Same row as DB `User.rejection_reason`; works for the logged-in user (admin-only GET /registration/{id} does not). */
+  const fetchMyRegistrationRejectionFallback = async (): Promise<string | null> => {
+    if (!getAccessToken()) return null;
     try {
-      const response = await fetch(`/api/v1/auth/register/registration/${encodeURIComponent(String(userId))}`, {
+      const response = await fetch('/api/v1/auth/register/me/status', {
         method: 'GET',
         headers: authHeaders(),
       });
       if (!response.ok) return null;
-      const details = await response.json().catch(() => ({}));
-      return extractRejectionReason(details);
+      const details = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      return pickTopLevelRejectionFromPayload(details) ?? extractRejectionReason(details);
     } catch {
       return null;
     }
@@ -175,7 +176,7 @@ function VerifyEmailContent() {
         normalizedPayload.rejection_reason = null;
       }
       if (String(normalizedStatus).trim().toLowerCase() === 'rejected' && !normalizedPayload.rejection_reason) {
-        const fallbackReason = await fetchRegistrationReasonByUserId(normalizedPayload.user_id);
+        const fallbackReason = await fetchMyRegistrationRejectionFallback();
         if (fallbackReason) {
           normalizedPayload.rejection_reason = fallbackReason;
         }
