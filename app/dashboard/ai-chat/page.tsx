@@ -18,7 +18,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -129,6 +141,25 @@ function normalizeCustomerSearchResponse(data: unknown): Array<{ customer_id: nu
     out.push({ customer_id: id, label });
   }
   return out;
+}
+
+function normalizeCustomerListResponse(data: unknown): { items: unknown[]; total: number } {
+  if (data == null || typeof data !== 'object') return { items: [], total: 0 };
+  const d = data as Record<string, unknown>;
+  let items: unknown[] = [];
+  if (Array.isArray(d.items)) items = d.items;
+  else if (Array.isArray(d.customers)) items = d.customers;
+  else if (Array.isArray(d.data)) items = d.data;
+  else if (Array.isArray(d.results)) items = d.results;
+  const rawTotal = d.total ?? d.total_count ?? d.count ?? d.totalCount;
+  let total = 0;
+  if (typeof rawTotal === 'number' && Number.isFinite(rawTotal)) total = rawTotal;
+  else if (typeof rawTotal === 'string' && rawTotal.trim() !== '') {
+    const n = Number(rawTotal);
+    if (Number.isFinite(n)) total = n;
+  }
+  if (total <= 0 && items.length > 0) total = items.length;
+  return { items, total: Math.max(0, total) };
 }
 
 const PENDING_FILES_STORAGE_KEY = 'crs_ai_chat_pending_uploads_v1';
@@ -376,12 +407,11 @@ export default function AIChatPage() {
 
   const [aiDataSource, setAiDataSource] = useState<AiDataSource>('portfolio');
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
-  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
-  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
-  const [customerSearchResults, setCustomerSearchResults] = useState<Array<{ customer_id: number; label: string }>>(
-    [],
-  );
-  const [selectedCustomer, setSelectedCustomer] = useState<{ customer_id: number; label: string } | null>(null);
+  const [customerListLoading, setCustomerListLoading] = useState(false);
+  const [customerListFull, setCustomerListFull] = useState<Array<{ customer_id: number; label: string }>>([]);
+  const [customerListFilter, setCustomerListFilter] = useState('');
+  const [pickerDraftIds, setPickerDraftIds] = useState<number[]>([]);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<number[]>([]);
 
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -406,6 +436,8 @@ export default function AIChatPage() {
   } | null>(null);
   const [attachmentDetailLoading, setAttachmentDetailLoading] = useState(false);
   const [attachmentFullFetchFailed, setAttachmentFullFetchFailed] = useState(false);
+  const [deleteSessionDialogOpen, setDeleteSessionDialogOpen] = useState(false);
+  const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null);
 
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
@@ -429,9 +461,9 @@ export default function AIChatPage() {
   const canSubmitComposer = useMemo(() => {
     if (!input.trim() && pendingFiles.length === 0) return false;
     if (aiDataSource === 'upload') return pendingFiles.length > 0;
-    if (aiDataSource === 'customer') return Boolean(selectedCustomer);
+    if (aiDataSource === 'customer') return selectedCustomerIds.length > 0;
     return true;
-  }, [input, pendingFiles.length, aiDataSource, selectedCustomer]);
+  }, [input, pendingFiles.length, aiDataSource, selectedCustomerIds.length]);
 
   const selectedModelOption = useMemo(
     () => (selectedModel ? modelOptions.find((o) => o.model === selectedModel) ?? null : null),
@@ -574,7 +606,7 @@ export default function AIChatPage() {
     if (restored.length) {
       setPendingFiles(restored);
       setAiDataSource('upload');
-      setSelectedCustomer(null);
+      setSelectedCustomerIds([]);
     } else if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
   }, []);
 
@@ -601,40 +633,58 @@ export default function AIChatPage() {
     }
   }, [pendingFiles]);
 
+  const customerListFiltered = useMemo(() => {
+    const q = customerListFilter.trim().toLowerCase();
+    if (!q) return customerListFull;
+    return customerListFull.filter(
+      (r) => r.label.toLowerCase().includes(q) || String(r.customer_id).includes(q),
+    );
+  }, [customerListFull, customerListFilter]);
+
   useEffect(() => {
     if (!customerPickerOpen) return;
-    const q = customerSearchQuery.trim();
-    if (!q) {
-      setCustomerSearchResults([]);
-      setCustomerSearchLoading(false);
-      return;
-    }
+    setPickerDraftIds([...selectedCustomerIds].sort((a, b) => a - b));
+    setCustomerListFilter('');
     let cancelled = false;
-    const tid = window.setTimeout(() => {
-      void (async () => {
-        setCustomerSearchLoading(true);
-        try {
+    void (async () => {
+      setCustomerListLoading(true);
+      try {
+        const limit = 200;
+        const merged: Array<{ customer_id: number; label: string }> = [];
+        const seen = new Set<number>();
+        let page = 1;
+        let total = Number.POSITIVE_INFINITY;
+        while (!cancelled && merged.length < total) {
           const raw = await browserApiFetchAuth<Record<string, unknown>>(
-            `/customers?page=1&limit=20&search_name=${encodeURIComponent(q)}`,
+            `/customers?page=${page}&limit=${limit}`,
             { method: 'GET' },
           );
           if (cancelled) return;
-          setCustomerSearchResults(normalizeCustomerSearchResponse(raw));
-        } catch (err) {
-          if (!cancelled) {
-            setCustomerSearchResults([]);
-            notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
+          const { items, total: t } = normalizeCustomerListResponse(raw);
+          if (t > 0) total = t;
+          const batch = normalizeCustomerSearchResponse({ items });
+          for (const row of batch) {
+            if (seen.has(row.customer_id)) continue;
+            seen.add(row.customer_id);
+            merged.push(row);
           }
-        } finally {
-          if (!cancelled) setCustomerSearchLoading(false);
+          if (batch.length === 0 || batch.length < limit) break;
+          page += 1;
         }
-      })();
-    }, 320);
+        if (!cancelled) setCustomerListFull(merged);
+      } catch (err) {
+        if (!cancelled) {
+          setCustomerListFull([]);
+          notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
+        }
+      } finally {
+        if (!cancelled) setCustomerListLoading(false);
+      }
+    })();
     return () => {
       cancelled = true;
-      window.clearTimeout(tid);
     };
-  }, [customerPickerOpen, customerSearchQuery, t, msgLocale]);
+  }, [customerPickerOpen, t, msgLocale]);
 
   useEffect(() => {
     if (!sessionId || isLoading) return;
@@ -729,10 +779,11 @@ export default function AIChatPage() {
     setInput('');
     setPendingFiles([]);
     setAiDataSource('portfolio');
-    setSelectedCustomer(null);
+    setSelectedCustomerIds([]);
+    setPickerDraftIds([]);
     setCustomerPickerOpen(false);
-    setCustomerSearchQuery('');
-    setCustomerSearchResults([]);
+    setCustomerListFull([]);
+    setCustomerListFilter('');
     setComposerSnapGeneration(0);
     setComposerSnapPlaying(false);
     setFirstSessionMessagesAnim(false);
@@ -815,10 +866,18 @@ export default function AIChatPage() {
     }
   };
 
-  const deleteSession = async (id?: string | null) => {
-    const sid = (id ?? sessionId) ?? null;
+  const openDeleteSessionDialog = (id: string) => {
+    const sid = id.trim();
     if (!sid) return;
-    if (typeof window !== 'undefined' && !window.confirm(t('ai_chat.delete_confirm'))) return;
+    setPendingDeleteSessionId(sid);
+    setDeleteSessionDialogOpen(true);
+  };
+
+  const confirmDeleteSession = async () => {
+    const sid = pendingDeleteSessionId;
+    if (!sid) return;
+    setDeleteSessionDialogOpen(false);
+    setPendingDeleteSessionId(null);
     setIsLoading(true);
     try {
       await browserApiFetchAuth<any>(`/ai-chat/sessions/${encodeURIComponent(sid)}`, { method: 'DELETE' });
@@ -841,7 +900,7 @@ export default function AIChatPage() {
       notifyError(t('ai_chat.error_upload_mode_no_files'));
       return;
     }
-    if (aiDataSource === 'customer' && !selectedCustomer) {
+    if (aiDataSource === 'customer' && selectedCustomerIds.length === 0) {
       notifyError(t('ai_chat.error_customer_mode_no_customer'));
       return;
     }
@@ -874,8 +933,8 @@ export default function AIChatPage() {
     const customerContext: Record<string, unknown> = {
       ai_data_source: aiDataSource,
     };
-    if (aiDataSource === 'customer' && selectedCustomer) {
-      customerContext.customer_id = selectedCustomer.customer_id;
+    if (aiDataSource === 'customer' && selectedCustomerIds.length > 0) {
+      customerContext.customer_ids = [...selectedCustomerIds];
     }
     if (pendingFiles.length > 0) {
       customerContext.uploaded_files = slimUploadedFilesForSend(pendingFiles);
@@ -978,7 +1037,7 @@ export default function AIChatPage() {
       }
       if (next.length) {
         setAiDataSource('upload');
-        setSelectedCustomer(null);
+        setSelectedCustomerIds([]);
         setPendingFiles((prev) => [...prev, ...next]);
       }
     } catch (err) {
@@ -1120,8 +1179,6 @@ export default function AIChatPage() {
           onClick={() => {
             setAiDataSource('customer');
             setPendingFiles([]);
-            setCustomerSearchQuery('');
-            setCustomerSearchResults([]);
             setCustomerPickerOpen(true);
           }}
         >
@@ -1131,7 +1188,7 @@ export default function AIChatPage() {
         <DropdownMenuItem
           onClick={() => {
             setAiDataSource('upload');
-            setSelectedCustomer(null);
+            setSelectedCustomerIds([]);
             window.setTimeout(() => fileInputRef.current?.click(), 0);
           }}
         >
@@ -1141,7 +1198,7 @@ export default function AIChatPage() {
         <DropdownMenuItem
           onClick={() => {
             setAiDataSource('powerbi');
-            setSelectedCustomer(null);
+            setSelectedCustomerIds([]);
             setPendingFiles([]);
             if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
           }}
@@ -1153,7 +1210,7 @@ export default function AIChatPage() {
         <DropdownMenuItem
           onClick={() => {
             setAiDataSource('portfolio');
-            setSelectedCustomer(null);
+            setSelectedCustomerIds([]);
           }}
         >
           <LayoutDashboard className="mr-2 h-4 w-4 shrink-0 opacity-80" />
@@ -1165,25 +1222,36 @@ export default function AIChatPage() {
 
   const renderComposerSourceHint = () => (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
-      <span className="shrink-0">{t('ai_chat.data_source_active')}:</span>
-      <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">
-        {aiDataSource === 'customer'
-          ? selectedCustomer
-            ? `${t('ai_chat.data_source_customer')} — ${selectedCustomer.label}`
-            : t('ai_chat.data_source_customer')
-          : aiDataSource === 'portfolio'
-            ? t('ai_chat.data_source_portfolio')
-            : aiDataSource === 'upload'
-              ? t('ai_chat.data_source_upload')
-              : t('ai_chat.data_source_powerbi')}
-      </span>
-      {selectedCustomer ? (
+      {aiDataSource === 'customer' && selectedCustomerIds.length > 0 ? (
+        <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">
+          {t('ai_chat.source_customer_list_note')}
+        </span>
+      ) : (
+        <>
+          <span className="shrink-0">{t('ai_chat.data_source_active')}:</span>
+          <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">
+            {aiDataSource === 'customer'
+              ? t('ai_chat.data_source_customer')
+              : aiDataSource === 'portfolio'
+                ? t('ai_chat.data_source_portfolio')
+                : aiDataSource === 'upload'
+                  ? t('ai_chat.data_source_upload')
+                  : t('ai_chat.data_source_powerbi')}
+          </span>
+        </>
+      )}
+      {aiDataSource === 'customer' && selectedCustomerIds.length > 0 ? (
+        <span className="text-[11px] text-muted-foreground shrink-0">
+          {t('ai_chat.source_customer_list_count').replace('{n}', String(selectedCustomerIds.length))}
+        </span>
+      ) : null}
+      {aiDataSource === 'customer' && selectedCustomerIds.length > 0 ? (
         <Button
           type="button"
           variant="ghost"
           size="sm"
           className="h-7 px-2 text-xs shrink-0"
-          onClick={() => setSelectedCustomer(null)}
+          onClick={() => setSelectedCustomerIds([])}
           disabled={isSending}
         >
           <X className="mr-1 h-3 w-3" />
@@ -1335,7 +1403,7 @@ export default function AIChatPage() {
                             variant="destructive"
                             onClick={(e) => {
                               e.preventDefault();
-                              void deleteSession(s.id);
+                              openDeleteSessionDialog(s.id);
                             }}
                           >
                             <Trash2 className="mr-2 h-4 w-4 shrink-0" />
@@ -1602,52 +1670,136 @@ export default function AIChatPage() {
         onOpenChange={(open) => {
           setCustomerPickerOpen(open);
           if (!open) {
-            setCustomerSearchQuery('');
-            setCustomerSearchResults([]);
+            setCustomerListFilter('');
+            setCustomerListFull([]);
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('ai_chat.customer_picker_title')}</DialogTitle>
             <DialogDescription>{t('ai_chat.customer_picker_desc')}</DialogDescription>
           </DialogHeader>
           <Input
-            value={customerSearchQuery}
-            onChange={(e) => setCustomerSearchQuery(e.target.value)}
-            placeholder={t('ai_chat.customer_picker_search_placeholder')}
-            autoFocus
+            value={customerListFilter}
+            onChange={(e) => setCustomerListFilter(e.target.value)}
+            placeholder={t('ai_chat.customer_list_filter_ph')}
+            disabled={customerListLoading}
           />
-          <ScrollArea className="mt-2 h-64 rounded-md border p-2">
-            {!customerSearchQuery.trim() ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">{t('ai_chat.customer_picker_hint')}</p>
-            ) : customerSearchLoading ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">{t('ai_chat.customer_picker_loading')}</p>
-            ) : customerSearchResults.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">{t('ai_chat.customer_picker_empty')}</p>
+          <div className="mt-2 flex items-center gap-2 rounded-md border px-2 py-2 bg-muted/30">
+            <Checkbox
+              id="ai-chat-select-all-customers"
+              checked={
+                customerListFiltered.length > 0 &&
+                customerListFiltered.every((r) => pickerDraftIds.includes(r.customer_id))
+                  ? true
+                  : customerListFiltered.some((r) => pickerDraftIds.includes(r.customer_id))
+                    ? 'indeterminate'
+                    : false
+              }
+              onCheckedChange={() => {
+                const ids = customerListFiltered.map((r) => r.customer_id);
+                const allOn = ids.length > 0 && ids.every((id) => pickerDraftIds.includes(id));
+                setPickerDraftIds((prev) => {
+                  if (allOn) return prev.filter((id) => !ids.includes(id)).sort((a, b) => a - b);
+                  const s = new Set([...prev, ...ids]);
+                  return Array.from(s).sort((a, b) => a - b);
+                });
+              }}
+              disabled={customerListLoading || customerListFiltered.length === 0}
+            />
+            <Label htmlFor="ai-chat-select-all-customers" className="text-sm cursor-pointer font-medium">
+              {t('ai_chat.customer_list_select_all_visible')}
+            </Label>
+          </div>
+          <ScrollArea className="mt-2 h-[min(50vh,320px)] rounded-md border p-2">
+            {customerListLoading ? (
+              <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                {t('ai_chat.customer_list_loading')}
+              </div>
+            ) : customerListFull.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">{t('ai_chat.customer_list_empty')}</p>
+            ) : customerListFiltered.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">{t('ai_chat.customer_list_filter_empty')}</p>
             ) : (
               <div className="space-y-1 pr-2">
-                {customerSearchResults.map((row) => (
-                  <Button
-                    key={row.customer_id}
-                    type="button"
-                    variant="ghost"
-                    className="flex h-auto w-full items-center justify-start gap-2 px-2 py-2 text-left font-normal"
-                    onClick={() => {
-                      setSelectedCustomer({ customer_id: row.customer_id, label: row.label });
-                      setAiDataSource('customer');
-                      setCustomerPickerOpen(false);
-                    }}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{row.label}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">#{row.customer_id}</span>
-                  </Button>
-                ))}
+                {customerListFiltered.map((row) => {
+                  const cid = row.customer_id;
+                  const checked = pickerDraftIds.includes(cid);
+                  const boxId = `ai-chat-pick-${cid}`;
+                  return (
+                    <div
+                      key={cid}
+                      className="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60"
+                    >
+                      <Checkbox
+                        id={boxId}
+                        checked={checked}
+                        onCheckedChange={() => {
+                          setPickerDraftIds((prev) =>
+                            prev.includes(cid)
+                              ? prev.filter((x) => x !== cid).sort((a, b) => a - b)
+                              : [...prev, cid].sort((a, b) => a - b),
+                          );
+                        }}
+                        className="mt-0.5"
+                      />
+                      <Label htmlFor={boxId} className="flex-1 cursor-pointer text-sm font-normal leading-snug">
+                        <span className="block truncate">{row.label}</span>
+                        <span className="text-xs text-muted-foreground">#{cid}</span>
+                      </Label>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </ScrollArea>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setCustomerPickerOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setSelectedCustomerIds([...pickerDraftIds].sort((a, b) => a - b));
+                setAiDataSource('customer');
+                setCustomerPickerOpen(false);
+              }}
+            >
+              {t('ai_chat.customer_list_apply')}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={deleteSessionDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteSessionDialogOpen(open);
+          if (!open) setPendingDeleteSessionId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('ai_chat.delete_session_title')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('ai_chat.delete_session_desc')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDeleteSession();
+              }}
+              disabled={isLoading}
+            >
+              {t('ai_chat.delete_session_confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={!!previewAttachment}
