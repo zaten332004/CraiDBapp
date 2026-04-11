@@ -30,7 +30,6 @@ const PIN_COPY: Record<
     pin_not_set: string;
     new_pin: string;
     confirm_pin: string;
-    save_pin: string;
     pin_invalid: string;
     pin_mismatch: string;
     pin_saved: string;
@@ -39,13 +38,12 @@ const PIN_COPY: Record<
   vi: {
     section_title: 'Mã PIN tài khoản',
     section_hint:
-      'Đặt hoặc thay mã PIN 6 chữ số để người dùng dùng cho quên mật khẩu và thao tác nhạy cảm. Không hiển thị lại PIN sau khi lưu.',
+      'Đặt hoặc thay mã PIN 6 chữ số để người dùng dùng cho quên mật khẩu và thao tác nhạy cảm. Không hiển thị lại PIN sau khi lưu. Dùng nút Lưu thay đổi bên dưới để áp dụng cả vai trò và mã PIN.',
     pin_status: 'Trạng thái PIN',
     pin_set: 'Đã đặt PIN',
     pin_not_set: 'Chưa đặt PIN',
     new_pin: 'Mã PIN mới (6 số)',
     confirm_pin: 'Xác nhận PIN',
-    save_pin: 'Lưu mã PIN',
     pin_invalid: 'PIN phải gồm đúng 6 chữ số.',
     pin_mismatch: 'Hai lần nhập PIN không khớp.',
     pin_saved: 'Đã cập nhật mã PIN.',
@@ -53,13 +51,12 @@ const PIN_COPY: Record<
   en: {
     section_title: 'Account PIN',
     section_hint:
-      'Set or replace the 6-digit PIN for forgot-password and sensitive actions. The PIN is never shown after saving.',
+      'Set or replace the 6-digit PIN for forgot-password and sensitive actions. The PIN is never shown after saving. Use Save changes below to apply both role and PIN.',
     pin_status: 'PIN status',
     pin_set: 'PIN is set',
     pin_not_set: 'PIN not set',
     new_pin: 'New PIN (6 digits)',
     confirm_pin: 'Confirm PIN',
-    save_pin: 'Save PIN',
     pin_invalid: 'PIN must be exactly 6 digits.',
     pin_mismatch: 'PIN entries do not match.',
     pin_saved: 'PIN updated.',
@@ -184,28 +181,6 @@ export default function AdminUsersPage() {
     }
   };
 
-  const setUserRole = async (userId: string, role: string) => {
-    setIsLoading(true);
-    try {
-      const response = await browserApiFetchAuth<{ role?: string }>(`/admin/users/${encodeURIComponent(userId)}/role`, {
-        method: 'PATCH',
-        body: { role },
-      });
-      const updatedRole = String(response?.role || role).toLowerCase();
-      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: updatedRole } : u)));
-      setSelectedUser((prev) => (prev && prev.id === userId ? { ...prev, role: updatedRole } : prev));
-      setSelectedRole(updatedRole);
-      notifySuccess(locale === 'vi' ? 'Đã cập nhật vai trò người dùng.' : 'User role updated successfully.');
-    } catch (err) {
-      const message = apiErr(err);
-      notifyError(locale === 'vi' ? 'Không thể cập nhật vai trò người dùng.' : 'Could not update user role.', {
-        description: message,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const deleteUser = async (user: AdminUser) => {
     setIsLoading(true);
     try {
@@ -227,33 +202,59 @@ export default function AdminUsersPage() {
     }
   };
 
-  const saveUserPin = async () => {
+  const saveDetailChanges = async () => {
     if (!selectedUser) return;
+    const roleTarget = String(selectedRole || selectedUser.role).toLowerCase();
+    const roleChanged = roleTarget !== selectedUser.role;
     const a = pinNew.replace(/\D/g, '');
     const b = pinConfirm.replace(/\D/g, '');
-    if (a.length !== 6) {
+    const pinSavable = a.length === 6 && b.length === 6 && a === b;
+    const pinDirty = a.length > 0 || b.length > 0;
+
+    if (pinDirty && !pinSavable) {
       notifyError(pinT.pin_invalid);
       return;
     }
-    if (a !== b) {
-      notifyError(pinT.pin_mismatch);
-      return;
-    }
+    if (!roleChanged && !pinSavable) return;
+
     setIsLoading(true);
     try {
-      const updated = await browserApiFetchAuth<{ has_pin?: boolean }>(
-        `/admin/users/${encodeURIComponent(selectedUser.id)}/pin`,
-        { method: 'POST', body: { pin: a } },
-      );
-      const hasPin = Boolean(updated?.has_pin ?? true);
-      setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? { ...u, hasPin } : u)));
-      setSelectedUser((prev) => (prev && prev.id === selectedUser.id ? { ...prev, hasPin } : prev));
-      setPinNew('');
-      setPinConfirm('');
-      notifySuccess(pinT.pin_saved);
+      if (roleChanged) {
+        const response = await browserApiFetchAuth<{ role?: string }>(
+          `/admin/users/${encodeURIComponent(selectedUser.id)}/role`,
+          { method: 'PATCH', body: { role: roleTarget } },
+        );
+        const updatedRole = String(response?.role || roleTarget).toLowerCase();
+        setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? { ...u, role: updatedRole } : u)));
+        setSelectedUser((prev) => (prev && prev.id === selectedUser.id ? { ...prev, role: updatedRole } : prev));
+        setSelectedRole(updatedRole);
+      }
+      if (pinSavable) {
+        const updated = await browserApiFetchAuth<{ has_pin?: boolean }>(
+          `/admin/users/${encodeURIComponent(selectedUser.id)}/pin`,
+          { method: 'POST', body: { pin: a } },
+        );
+        const hasPin = Boolean(updated?.has_pin ?? true);
+        setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? { ...u, hasPin } : u)));
+        setSelectedUser((prev) => (prev && prev.id === selectedUser.id ? { ...prev, hasPin } : prev));
+        setPinNew('');
+        setPinConfirm('');
+      }
+
+      const partsVi: string[] = [];
+      const partsEn: string[] = [];
+      if (roleChanged) {
+        partsVi.push('vai trò');
+        partsEn.push('role');
+      }
+      if (pinSavable) {
+        partsVi.push('mã PIN');
+        partsEn.push('PIN');
+      }
+      notifySuccess(locale === 'vi' ? `Đã lưu: ${partsVi.join(' và ')}.` : `Saved: ${partsEn.join(' and ')}.`);
     } catch (err) {
       const message = apiErr(err);
-      notifyError(locale === 'vi' ? 'Không thể cập nhật mã PIN.' : 'Could not update PIN.', { description: message });
+      notifyError(locale === 'vi' ? 'Không thể lưu thay đổi.' : 'Could not save changes.', { description: message });
     } finally {
       setIsLoading(false);
     }
@@ -348,7 +349,18 @@ export default function AdminUsersPage() {
     ];
   }, [selectedUser, t, pinT]);
 
-  const pinReady = pinNew.replace(/\D/g, '').length === 6 && pinConfirm.replace(/\D/g, '').length === 6;
+  const detailSaveState = useMemo(() => {
+    if (!selectedUser) return { canSave: false };
+    const roleTarget = String(selectedRole || selectedUser.role).toLowerCase();
+    const roleChanged = roleTarget !== selectedUser.role;
+    const a = pinNew.replace(/\D/g, '');
+    const b = pinConfirm.replace(/\D/g, '');
+    const pinSavable = a.length === 6 && b.length === 6 && a === b;
+    const pinDirty = a.length > 0 || b.length > 0;
+    const pinIncomplete = pinDirty && !pinSavable;
+    const canSave = !pinIncomplete && (roleChanged || pinSavable);
+    return { canSave };
+  }, [selectedUser, selectedRole, pinNew, pinConfirm]);
 
   return (
     <div className="flex flex-col gap-6 p-6 bg-[#f4f7fc]">
@@ -566,10 +578,6 @@ export default function AdminUsersPage() {
                   />
                 </div>
               </div>
-              <Button type="button" variant="secondary" disabled={isLoading || !pinReady} onClick={() => void saveUserPin()}>
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {pinT.save_pin}
-              </Button>
             </div>
           ) : null}
           <DialogFooter>
@@ -589,8 +597,8 @@ export default function AdminUsersPage() {
                 <Button
                   variant="outline"
                   className="min-w-[140px]"
-                  onClick={() => void setUserRole(selectedUser.id, selectedRole || selectedUser.role)}
-                  disabled={isLoading || !(selectedRole || selectedUser.role) || (selectedRole || selectedUser.role) === selectedUser.role}
+                  onClick={() => void saveDetailChanges()}
+                  disabled={isLoading || !detailSaveState.canSave || !(selectedRole || selectedUser.role)}
                 >
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   {t('common.save_changes')}
