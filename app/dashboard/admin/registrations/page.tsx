@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, XCircle, Loader2, RefreshCw } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { CheckCircle, XCircle, Loader2, RefreshCw, MoreHorizontal } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
@@ -28,12 +29,24 @@ type RegistrationRow = {
   raw: unknown;
 };
 
+function usernameFromEmail(email: unknown) {
+  const raw = String(email ?? '').trim();
+  if (!raw) return '';
+  const atIndex = raw.indexOf('@');
+  if (atIndex <= 0) return raw;
+  return raw.slice(0, atIndex).trim();
+}
+
 function normalizeRegistration(item: any, fallbackType: RegistrationType): RegistrationRow | null {
   if (!item || typeof item !== 'object') return null;
   const id = String(item.user_id ?? item.userId ?? item.id ?? item.registration_id ?? item.registrationId ?? '').trim();
   if (!id) return null;
-  const name = String(item.name ?? item.full_name ?? item.fullName ?? item.username ?? '').trim() || id;
   const email = String(item.email ?? '').trim() || '—';
+  const preferredUsername =
+    usernameFromEmail(email) ||
+    String(item.username ?? '').trim() ||
+    String(item.name ?? item.full_name ?? item.fullName ?? '').trim();
+  const name = preferredUsername || id;
   const type = String(item.reg_type ?? item.type ?? item.role ?? fallbackType).trim().toLowerCase() || fallbackType;
   const requestedAt = String(item.requested_at ?? item.requestedAt ?? item.created_at ?? item.createdAt ?? '') || null;
   return { id, name, email, type, requestedAt, raw: item };
@@ -129,6 +142,7 @@ export default function AdminRegistrationsPage() {
   const openRegistrationDetails = async (regId: string) => {
     setIsLoading(true);
     setDetails(null);
+    setSelectedId(regId);
     try {
       const data = await browserApiFetchAuth<any>(
         `/auth/register/registration/${encodeURIComponent(regId)}`,
@@ -256,7 +270,7 @@ export default function AdminRegistrationsPage() {
               <Button
                 size="sm"
                 variant={statusFilter === 'pending' ? 'default' : 'outline'}
-                className="h-7"
+                className="h-8 min-w-[110px] justify-center"
                 onClick={() => setStatusFilter('pending')}
               >
                 {locale === 'vi' ? 'Chưa duyệt' : 'Pending'}
@@ -264,7 +278,7 @@ export default function AdminRegistrationsPage() {
               <Button
                 size="sm"
                 variant={statusFilter === 'approved' ? 'default' : 'outline'}
-                className="h-7"
+                className="h-8 min-w-[110px] justify-center"
                 onClick={() => setStatusFilter('approved')}
               >
                 {locale === 'vi' ? 'Đã duyệt' : 'Approved'}
@@ -272,7 +286,7 @@ export default function AdminRegistrationsPage() {
               <Button
                 size="sm"
                 variant={statusFilter === 'rejected' ? 'default' : 'outline'}
-                className="h-7"
+                className="h-8 min-w-[110px] justify-center"
                 onClick={() => setStatusFilter('rejected')}
               >
                 {locale === 'vi' ? 'Từ chối' : 'Rejected'}
@@ -326,39 +340,57 @@ export default function AdminRegistrationsPage() {
                         {(() => {
                           const rowStatus = String((reg.raw as any)?.status ?? statusFilter).trim().toLowerCase();
                           return (
-                            <div className="flex flex-col items-end gap-2">
+                            <div className="flex items-center justify-end gap-2 min-h-8">
                               <Badge variant="outline" className={statusBadgeClass(rowStatus)}>
                                 {formatStatusLabel(rowStatus, locale)}
                               </Badge>
-                              {rowStatus === 'pending' && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAction(reg.id, 'approve');
-                              }}
-                              disabled={isLoading}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              {t('common.approve')}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAction(reg.id, 'reject');
-                              }}
-                              disabled={isLoading}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              {t('common.reject')}
-                            </Button>
-                          </>
-                              )}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0"
+                                    disabled={isLoading}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void openRegistrationDetails(reg.id);
+                                    }}
+                                  >
+                                    {locale === 'vi' ? 'Xem chi tiết' : 'View details'}
+                                  </DropdownMenuItem>
+                                  {rowStatus === 'pending' && (
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleAction(reg.id, 'approve');
+                                        }}
+                                        className="text-emerald-700 focus:text-emerald-800"
+                                      >
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        {t('common.approve')}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleAction(reg.id, 'reject');
+                                        }}
+                                        className="text-red-600 focus:text-red-700"
+                                      >
+                                        <XCircle className="mr-2 h-4 w-4" />
+                                        {t('common.reject')}
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           );
                         })()}
@@ -438,13 +470,19 @@ export default function AdminRegistrationsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
             {[
               { label: locale === 'vi' ? 'Mã người dùng' : 'User ID', value: details?.user_id ?? details?.userId },
-              { label: locale === 'vi' ? 'Tên đăng nhập' : 'Username', value: details?.username },
+              {
+                label: locale === 'vi' ? 'Tên đăng nhập' : 'Username',
+                value:
+                  usernameFromEmail(details?.email) ||
+                  details?.username ||
+                  details?.user_name ||
+                  details?.userName,
+              },
               { label: locale === 'vi' ? 'Họ và tên' : 'Full name', value: details?.full_name ?? details?.fullName },
               { label: 'Email', value: details?.email },
               { label: locale === 'vi' ? 'Số điện thoại' : 'Phone', value: details?.phone },
               { label: locale === 'vi' ? 'Loại người dùng' : 'User type', value: details?.user_type ?? details?.userType },
               { label: locale === 'vi' ? 'Trạng thái' : 'Status', value: formatStatusLabel(details?.status, locale) },
-              { label: locale === 'vi' ? 'Đã xác thực email' : 'Email verified', value: details?.is_email_verified ? (locale === 'vi' ? 'Có' : 'Yes') : (locale === 'vi' ? 'Không' : 'No') },
               { label: locale === 'vi' ? 'Thời gian tạo' : 'Created at', value: formatDateTime(details?.created_at ?? details?.createdAt, locale) },
               { label: locale === 'vi' ? 'Người duyệt' : 'Approved by', value: details?.approved_by_name ?? details?.approved_by ?? details?.approvedBy },
               { label: locale === 'vi' ? 'Thời gian duyệt' : 'Approved at', value: formatDateTime(details?.approved_at ?? details?.approvedAt, locale) },
@@ -459,6 +497,33 @@ export default function AdminRegistrationsPage() {
             ))}
           </div>
           <DialogFooter>
+            {String(details?.status ?? '').trim().toLowerCase() === 'pending' && (
+              <>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    const targetId = String(details?.user_id ?? details?.userId ?? selectedId ?? '').trim();
+                    if (!targetId) return;
+                    setIsDetailsOpen(false);
+                    handleAction(targetId, 'reject');
+                  }}
+                  disabled={isLoading}
+                >
+                  {t('common.reject')}
+                </Button>
+                <Button
+                  onClick={() => {
+                    const targetId = String(details?.user_id ?? details?.userId ?? selectedId ?? '').trim();
+                    if (!targetId) return;
+                    setIsDetailsOpen(false);
+                    handleAction(targetId, 'approve');
+                  }}
+                  disabled={isLoading}
+                >
+                  {t('common.approve')}
+                </Button>
+              </>
+            )}
             <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
               {t('common.close')}
             </Button>

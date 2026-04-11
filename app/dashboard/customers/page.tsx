@@ -120,9 +120,7 @@ export default function CustomersPage() {
         method: 'GET',
       });
       const { items, total } = normalizeCustomerListResponse(raw);
-      setTotalCount(total);
-      setCustomers(
-        items.map((item) => ({
+      const mapped = items.map((item) => ({
           id: String(item.customer_id ?? item.id ?? ''),
           name: String(item.full_name ?? item.name ?? '-'),
           email: String(item.email || '-'),
@@ -132,8 +130,18 @@ export default function CustomersPage() {
           annualRate: item.annual_interest_rate != null ? Number(item.annual_interest_rate) : null,
           riskLevel: String(item.risk_level || 'medium').toLowerCase(),
           status: String(item.application_status || item.status || 'active').toLowerCase(),
-        })),
-      );
+      }));
+      const normalizedSearch = search.trim().toLowerCase();
+      const filtered = !normalizedSearch
+        ? mapped
+        : mapped.filter((customer) =>
+            [customer.id, customer.name, customer.email, customer.loanType]
+              .filter(Boolean)
+              .some((field) => String(field).toLowerCase().includes(normalizedSearch)),
+          );
+
+      setCustomers(filtered);
+      setTotalCount(total);
     } catch (err) {
       notifyError(formatUserFacingApiError(err));
     } finally {

@@ -40,7 +40,6 @@ export default function CustomerDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [statusDraft, setStatusDraft] = useState('pending');
   const [editForm, setEditForm] = useState({
     phone_number: '',
     email: '',
@@ -58,6 +57,42 @@ export default function CustomerDetailPage() {
     collateral_value: '',
   });
 
+  const LOAN_TYPE_OPTIONS = [
+    { value: 'secured', labelVi: 'Có tài sản bảo đảm', labelEn: 'Secured' },
+    { value: 'unsecured', labelVi: 'Tín chấp', labelEn: 'Unsecured' },
+    { value: 'mortgage', labelVi: 'Thế chấp', labelEn: 'Mortgage' },
+    { value: 'business', labelVi: 'Kinh doanh', labelEn: 'Business' },
+  ] as const;
+
+  const EMPLOYMENT_STATUS_OPTIONS = [
+    { value: 'employed', labelVi: 'Đang làm việc', labelEn: 'Employed' },
+    { value: 'self_employed', labelVi: 'Tự kinh doanh', labelEn: 'Self-employed' },
+    { value: 'contract', labelVi: 'Hợp đồng / bán thời gian', labelEn: 'Contract / part-time' },
+    { value: 'unemployed', labelVi: 'Thất nghiệp', labelEn: 'Unemployed' },
+  ] as const;
+
+  const normalizeLoanType = (value: unknown): string => {
+    const normalized = String(value ?? '').trim().toLowerCase();
+    if (!normalized) return '';
+    if (['secured', 'unsecured', 'mortgage', 'business'].includes(normalized)) return normalized;
+    if (normalized.includes('tài sản')) return 'secured';
+    if (normalized.includes('tín chấp')) return 'unsecured';
+    if (normalized.includes('thế chấp')) return 'mortgage';
+    if (normalized.includes('kinh doanh')) return 'business';
+    return normalized;
+  };
+
+  const normalizeEmploymentStatus = (value: unknown): string => {
+    const normalized = String(value ?? '').trim().toLowerCase();
+    if (!normalized) return '';
+    if (['employed', 'self_employed', 'contract', 'unemployed'].includes(normalized)) return normalized;
+    if (normalized.includes('tự kinh doanh')) return 'self_employed';
+    if (normalized.includes('hợp đồng') || normalized.includes('bán thời gian')) return 'contract';
+    if (normalized.includes('thất nghiệp')) return 'unemployed';
+    if (normalized.includes('đang làm việc')) return 'employed';
+    return normalized;
+  };
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -65,22 +100,21 @@ export default function CustomerDetailPage() {
         const customerData = await browserApiFetchAuth<any>(`/customers/${customerId}`, { method: 'GET' });
         if (cancelled) return;
         setCustomer(customerData);
-        setStatusDraft(String(customerData.application_status || 'pending').toLowerCase());
         setEditForm({
           phone_number: String(customerData.phone_number ?? customerData.phone ?? ''),
           email: String(customerData.email ?? ''),
           occupation: String(customerData.occupation ?? ''),
-          employment_status: String(customerData.employment_status ?? ''),
+          employment_status: normalizeEmploymentStatus(customerData.employment_status),
           monthly_income: customerData.monthly_income != null ? String(customerData.monthly_income) : '',
           permanent_address: String(customerData.permanent_address ?? ''),
           current_address: String(customerData.current_address ?? ''),
-          loan_type: String(customerData.loan_type ?? ''),
+          loan_type: normalizeLoanType(customerData.loan_type ?? customerData.product_type),
           loan_purpose: String(customerData.loan_purpose ?? ''),
-          requested_loan_amount: customerData.requested_loan_amount != null ? String(customerData.requested_loan_amount) : '',
-          requested_term_months: customerData.requested_term_months != null ? String(customerData.requested_term_months) : '',
-          annual_interest_rate: customerData.annual_interest_rate != null ? String(customerData.annual_interest_rate) : '',
+          requested_loan_amount: customerData.requested_loan_amount != null ? String(customerData.requested_loan_amount) : customerData.loan_amount != null ? String(customerData.loan_amount) : '',
+          requested_term_months: customerData.requested_term_months != null ? String(customerData.requested_term_months) : customerData.loan_term_months != null ? String(customerData.loan_term_months) : '',
+          annual_interest_rate: customerData.annual_interest_rate != null ? String(customerData.annual_interest_rate) : customerData.interest_rate != null ? String(customerData.interest_rate) : '',
           collateral_id: String(customerData.collateral_id ?? ''),
-          collateral_value: customerData.collateral_value != null ? String(customerData.collateral_value) : '',
+          collateral_value: customerData.collateral_value != null ? String(customerData.collateral_value) : customerData.collateral_amount != null ? String(customerData.collateral_amount) : '',
         });
       } catch (err) {
         if (!cancelled) {
@@ -199,17 +233,22 @@ export default function CustomerDetailPage() {
         phone_number: sanitizePhoneInput(editForm.phone_number || ''),
         email: editForm.email || null,
         occupation: editForm.occupation || null,
-        employment_status: editForm.employment_status || null,
+        employment_status: normalizeEmploymentStatus(editForm.employment_status) || null,
         monthly_income: editForm.monthly_income ? Number(editForm.monthly_income) : null,
         permanent_address: editForm.permanent_address || null,
         current_address: editForm.current_address || null,
-        loan_type: editForm.loan_type || null,
+        loan_type: normalizeLoanType(editForm.loan_type) || null,
+        product_type: normalizeLoanType(editForm.loan_type) || null,
         loan_purpose: editForm.loan_purpose || null,
         requested_loan_amount: editForm.requested_loan_amount ? Number(editForm.requested_loan_amount) : null,
+        loan_amount: editForm.requested_loan_amount ? Number(editForm.requested_loan_amount) : null,
         requested_term_months: editForm.requested_term_months ? Number(editForm.requested_term_months) : null,
+        loan_term_months: editForm.requested_term_months ? Number(editForm.requested_term_months) : null,
         annual_interest_rate: editForm.annual_interest_rate ? Number(editForm.annual_interest_rate) : null,
+        interest_rate: editForm.annual_interest_rate ? Number(editForm.annual_interest_rate) : null,
         collateral_id: editForm.collateral_id || null,
         collateral_value: editForm.collateral_value ? Number(editForm.collateral_value) : null,
+        collateral_amount: editForm.collateral_value ? Number(editForm.collateral_value) : null,
       };
       const updated = await browserApiFetchAuth<any>(`/customers/${customerId}`, {
         method: 'PUT',
@@ -235,31 +274,11 @@ export default function CustomerDetailPage() {
         body: { application_status: nextStatus },
       });
       setCustomer(updated);
-      setStatusDraft(String(updated.application_status || nextStatus).toLowerCase());
       setIsEditing(false);
       notifySuccess(nextStatus === 'approved' ? (isVi ? 'Đã duyệt hồ sơ.' : 'Application approved.') : (isVi ? 'Đã từ chối hồ sơ.' : 'Application rejected.'));
     } catch (err) {
       const message = formatUserFacingApiError(err);
       notifyError(isVi ? `Không thể xử lý hồ sơ. ${message}` : message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleUpdateStatus = async () => {
-    if (!customer || !canManageProfile) return;
-    setIsSaving(true);
-    try {
-      const updated = await browserApiFetchAuth<any>(`/customers/${customerId}/status`, {
-        method: 'PATCH',
-        body: { application_status: statusDraft },
-      });
-      setCustomer(updated);
-      setStatusDraft(String(updated.application_status || statusDraft).toLowerCase());
-      notifySuccess(isVi ? 'Đã cập nhật trạng thái hồ sơ.' : 'Application status updated.');
-    } catch (err) {
-      const message = formatUserFacingApiError(err);
-      notifyError(isVi ? `Không thể cập nhật trạng thái hồ sơ. ${message}` : message);
     } finally {
       setIsSaving(false);
     }
@@ -314,24 +333,6 @@ export default function CustomerDetailPage() {
               </Button>
             </>
           ) : null}
-          <Select value={statusDraft} onValueChange={setStatusDraft} disabled={!canManageProfile || isSaving || isDeleting}>
-            <SelectTrigger className="w-[170px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending">{isVi ? 'Đang chờ' : 'Pending'}</SelectItem>
-              <SelectItem value="approved">{isVi ? 'Đã duyệt' : 'Approved'}</SelectItem>
-              <SelectItem value="rejected">{isVi ? 'Từ chối' : 'Rejected'}</SelectItem>
-              <SelectItem value="disbursed">{isVi ? 'Đã giải ngân' : 'Disbursed'}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            onClick={() => void handleUpdateStatus()}
-            disabled={!canManageProfile || isSaving || isDeleting || statusDraft === String(customer?.application_status || 'pending').toLowerCase()}
-          >
-            {isVi ? 'Cập nhật trạng thái' : 'Update status'}
-          </Button>
           <Button variant="secondary" onClick={() => setIsEditing((prev) => !prev)} disabled={!isPending || isSaving || !canManageProfile}>
             <Edit className="mr-2 h-4 w-4" />
             {isEditing ? (isVi ? 'Hủy sửa' : 'Cancel') : t('customers.detail.edit')}
@@ -383,28 +384,44 @@ export default function CustomerDetailPage() {
                 <div key={String(label)} className="rounded-lg border p-3">
                   <p className="text-xs text-muted-foreground">{label}</p>
                   {isEditing && isPending && ['Số điện thoại', 'Email', 'Nghề nghiệp', 'Tình trạng nghề nghiệp', 'Thu nhập hàng tháng', 'Địa chỉ thường trú', 'Địa chỉ hiện tại'].includes(String(label)) ? (
-                    <Input
-                      className="mt-1 h-9"
-                      value={
-                        String(label) === 'Số điện thoại' ? editForm.phone_number
-                          : String(label) === 'Email' ? editForm.email
-                          : String(label) === 'Nghề nghiệp' ? editForm.occupation
-                          : String(label) === 'Tình trạng nghề nghiệp' ? editForm.employment_status
-                          : String(label) === 'Thu nhập hàng tháng' ? editForm.monthly_income
-                          : String(label) === 'Địa chỉ thường trú' ? editForm.permanent_address
-                          : editForm.current_address
-                      }
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (String(label) === 'Số điện thoại') setEditForm((p) => ({ ...p, phone_number: sanitizePhoneInput(v) }));
-                        else if (String(label) === 'Email') setEditForm((p) => ({ ...p, email: v }));
-                        else if (String(label) === 'Nghề nghiệp') setEditForm((p) => ({ ...p, occupation: v }));
-                        else if (String(label) === 'Tình trạng nghề nghiệp') setEditForm((p) => ({ ...p, employment_status: v }));
-                        else if (String(label) === 'Thu nhập hàng tháng') setEditForm((p) => ({ ...p, monthly_income: v.replace(/[^\d.]/g, '') }));
-                        else if (String(label) === 'Địa chỉ thường trú') setEditForm((p) => ({ ...p, permanent_address: v }));
-                        else setEditForm((p) => ({ ...p, current_address: v }));
-                      }}
-                    />
+                    String(label) === 'Tình trạng nghề nghiệp' ? (
+                      <Select
+                        value={editForm.employment_status || ''}
+                        onValueChange={(v) => setEditForm((p) => ({ ...p, employment_status: v }))}
+                      >
+                        <SelectTrigger className="mt-1 h-9 w-full">
+                          <SelectValue placeholder={isVi ? 'Chọn tình trạng nghề nghiệp' : 'Select employment status'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EMPLOYMENT_STATUS_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {isVi ? opt.labelVi : opt.labelEn}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        className="mt-1 h-9"
+                        value={
+                          String(label) === 'Số điện thoại' ? editForm.phone_number
+                            : String(label) === 'Email' ? editForm.email
+                            : String(label) === 'Nghề nghiệp' ? editForm.occupation
+                            : String(label) === 'Thu nhập hàng tháng' ? editForm.monthly_income
+                            : String(label) === 'Địa chỉ thường trú' ? editForm.permanent_address
+                            : editForm.current_address
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (String(label) === 'Số điện thoại') setEditForm((p) => ({ ...p, phone_number: sanitizePhoneInput(v) }));
+                          else if (String(label) === 'Email') setEditForm((p) => ({ ...p, email: v }));
+                          else if (String(label) === 'Nghề nghiệp') setEditForm((p) => ({ ...p, occupation: v }));
+                          else if (String(label) === 'Thu nhập hàng tháng') setEditForm((p) => ({ ...p, monthly_income: v.replace(/[^\d.]/g, '') }));
+                          else if (String(label) === 'Địa chỉ thường trú') setEditForm((p) => ({ ...p, permanent_address: v }));
+                          else setEditForm((p) => ({ ...p, current_address: v }));
+                        }}
+                      />
+                    )
                   ) : (
                     <p className="mt-1 text-sm font-medium break-words">{toVietnameseValue(value, String(label))}</p>
                   )}
@@ -431,42 +448,78 @@ export default function CustomerDetailPage() {
                     ? `${customer.approved_by}${customer.approved_at ? ` (${formatDateTimeVietnam(customer.approved_at, locale)})` : ''}`
                     : '-',
                 ],
-                ['Loại vay', customer.loan_type],
+                ['Loại vay', customer.loan_type ?? customer.product_type ?? customer.loanType ?? customer.productType],
                 ['Mục đích vay', customer.loan_purpose],
-                ['Khoản vay', customer.requested_loan_amount != null ? formatVnd(Number(customer.requested_loan_amount), locale === 'vi' ? 'vi' : 'en') : '-'],
-                ['Thời hạn vay', customer.requested_term_months != null ? `${customer.requested_term_months} tháng` : '-'],
-                ['Lãi suất', customer.annual_interest_rate != null ? `${customer.annual_interest_rate}%/năm` : '-'],
+                [
+                  'Khoản vay',
+                  (customer.requested_loan_amount ?? customer.loan_amount) != null
+                    ? formatVnd(Number(customer.requested_loan_amount ?? customer.loan_amount), locale === 'vi' ? 'vi' : 'en')
+                    : '-',
+                ],
+                [
+                  'Thời hạn vay',
+                  (customer.requested_term_months ?? customer.loan_term_months) != null
+                    ? `${customer.requested_term_months ?? customer.loan_term_months} tháng`
+                    : '-',
+                ],
+                [
+                  'Lãi suất',
+                  (customer.annual_interest_rate ?? customer.interest_rate) != null
+                    ? `${customer.annual_interest_rate ?? customer.interest_rate}%/năm`
+                    : '-',
+                ],
                 ['Mức rủi ro', <Badge key="risk-badge" variant="outline" className={riskBadgeClass}>{riskBadgeLabel}</Badge>],
                 ['Trạng thái hồ sơ', <Badge key="status-badge" variant="outline" className={statusBadgeClass}>{statusBadgeLabel}</Badge>],
                 ['Mã tài sản bảo đảm', customer.collateral_id],
-                ['Giá trị tài sản bảo đảm', customer.collateral_value != null ? formatVnd(Number(customer.collateral_value), locale === 'vi' ? 'vi' : 'en') : '-'],
+                [
+                  'Giá trị tài sản bảo đảm',
+                  (customer.collateral_value ?? customer.collateral_amount) != null
+                    ? formatVnd(Number(customer.collateral_value ?? customer.collateral_amount), locale === 'vi' ? 'vi' : 'en')
+                    : '-',
+                ],
               ].map(([label, value]) => (
                 <div key={String(label)} className="rounded-lg border p-3">
                   <p className="text-xs text-muted-foreground">{label}</p>
                   <div className="mt-1 text-sm font-medium break-words">
                     {isEditing && isPending && ['Loại vay', 'Mục đích vay', 'Khoản vay', 'Thời hạn vay', 'Lãi suất', 'Mã tài sản bảo đảm', 'Giá trị tài sản bảo đảm'].includes(String(label)) ? (
-                      <Input
-                        className="h-9"
-                        value={
-                          String(label) === 'Loại vay' ? editForm.loan_type
-                            : String(label) === 'Mục đích vay' ? editForm.loan_purpose
-                            : String(label) === 'Khoản vay' ? editForm.requested_loan_amount
-                            : String(label) === 'Thời hạn vay' ? editForm.requested_term_months
-                            : String(label) === 'Lãi suất' ? editForm.annual_interest_rate
-                            : String(label) === 'Mã tài sản bảo đảm' ? editForm.collateral_id
-                            : editForm.collateral_value
-                        }
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (String(label) === 'Loại vay') setEditForm((p) => ({ ...p, loan_type: v }));
-                          else if (String(label) === 'Mục đích vay') setEditForm((p) => ({ ...p, loan_purpose: v }));
-                          else if (String(label) === 'Khoản vay') setEditForm((p) => ({ ...p, requested_loan_amount: v.replace(/[^\d.]/g, '') }));
-                          else if (String(label) === 'Thời hạn vay') setEditForm((p) => ({ ...p, requested_term_months: v.replace(/[^\d]/g, '') }));
-                          else if (String(label) === 'Lãi suất') setEditForm((p) => ({ ...p, annual_interest_rate: v.replace(/[^\d.]/g, '') }));
-                          else if (String(label) === 'Mã tài sản bảo đảm') setEditForm((p) => ({ ...p, collateral_id: v }));
-                          else setEditForm((p) => ({ ...p, collateral_value: v.replace(/[^\d.]/g, '') }));
-                        }}
-                      />
+                      String(label) === 'Loại vay' ? (
+                        <Select
+                          value={editForm.loan_type || ''}
+                          onValueChange={(v) => setEditForm((p) => ({ ...p, loan_type: v }))}
+                        >
+                          <SelectTrigger className="h-9 w-full">
+                            <SelectValue placeholder={isVi ? 'Chọn loại vay' : 'Select loan type'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {LOAN_TYPE_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {isVi ? opt.labelVi : opt.labelEn}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          className="h-9"
+                          value={
+                            String(label) === 'Mục đích vay' ? editForm.loan_purpose
+                              : String(label) === 'Khoản vay' ? editForm.requested_loan_amount
+                              : String(label) === 'Thời hạn vay' ? editForm.requested_term_months
+                              : String(label) === 'Lãi suất' ? editForm.annual_interest_rate
+                              : String(label) === 'Mã tài sản bảo đảm' ? editForm.collateral_id
+                              : editForm.collateral_value
+                          }
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (String(label) === 'Mục đích vay') setEditForm((p) => ({ ...p, loan_purpose: v }));
+                            else if (String(label) === 'Khoản vay') setEditForm((p) => ({ ...p, requested_loan_amount: v.replace(/[^\d.]/g, '') }));
+                            else if (String(label) === 'Thời hạn vay') setEditForm((p) => ({ ...p, requested_term_months: v.replace(/[^\d]/g, '') }));
+                            else if (String(label) === 'Lãi suất') setEditForm((p) => ({ ...p, annual_interest_rate: v.replace(/[^\d.]/g, '') }));
+                            else if (String(label) === 'Mã tài sản bảo đảm') setEditForm((p) => ({ ...p, collateral_id: v }));
+                            else setEditForm((p) => ({ ...p, collateral_value: v.replace(/[^\d.]/g, '') }));
+                          }}
+                        />
+                      )
                     ) : typeof value === 'string' || typeof value === 'number' ? (
                       toVietnameseValue(value, String(label))
                     ) : (

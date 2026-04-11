@@ -20,6 +20,14 @@ export function isStrongPassword(value: string): boolean {
   return true;
 }
 
+export function sanitizeVietnamNationalId(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 12);
+}
+
+export function isValidVietnamNationalId(value: string): boolean {
+  return /^\d{12}$/.test(sanitizeVietnamNationalId(value));
+}
+
 export function passwordRuleMessage(isVi: boolean): string {
   return isVi
     ? 'Mật khẩu phải có ít nhất 6 ký tự, gồm chữ hoa, chữ thường, số và ít nhất 1 ký tự đặc biệt.'

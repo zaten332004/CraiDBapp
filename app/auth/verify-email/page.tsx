@@ -25,9 +25,10 @@ type PendingStatusResponse = {
   rejection_reason?: string | null;
 };
 
-function extractRejectionReason(value: unknown): string | null {
+function extractRejectionReason(value: unknown, allowRawString = false): string | null {
   if (!value) return null;
   if (typeof value === 'string') {
+    if (!allowRawString) return null;
     const normalized = value.trim();
     return normalized ? normalized : null;
   }
@@ -41,13 +42,16 @@ function extractRejectionReason(value: unknown): string | null {
   if (typeof value === 'object') {
     const obj = value as Record<string, unknown>;
     const direct =
-      extractRejectionReason(obj.rejection_reason) ||
-      extractRejectionReason(obj.rejectionReason) ||
-      extractRejectionReason(obj.reason) ||
-      extractRejectionReason(obj.reject_reason) ||
-      extractRejectionReason(obj.rejectReason);
+      extractRejectionReason(obj.rejection_reason, true) ||
+      extractRejectionReason(obj.rejectionReason, true) ||
+      extractRejectionReason(obj.reason, true) ||
+      extractRejectionReason(obj.reject_reason, true) ||
+      extractRejectionReason(obj.rejectReason, true) ||
+      extractRejectionReason(obj.rejected_reason, true) ||
+      extractRejectionReason(obj.rejectedReason, true);
     if (direct) return direct;
     for (const nested of Object.values(obj)) {
+      if (!nested || typeof nested !== 'object') continue;
       const found = extractRejectionReason(nested);
       if (found) return found;
     }
@@ -67,6 +71,13 @@ function normalizeRoleFromPayload(data: Record<string, unknown>): string {
 function isAuthErrorMessage(message: string): boolean {
   const normalized = message.trim().toLowerCase();
   return normalized.includes('not authenticated') || normalized.includes('unauthorized') || normalized.includes('401');
+}
+
+function usernameFromEmail(email: string): string {
+  const raw = String(email || '').trim();
+  if (!raw) return '';
+  const atIndex = raw.indexOf('@');
+  return atIndex > 0 ? raw.slice(0, atIndex).trim() : raw;
 }
 
 function VerifyEmailContent() {
@@ -144,6 +155,13 @@ function VerifyEmailContent() {
         has_pin: Boolean(normalizedHasPin),
         rejection_reason: extractRejectionReason(payload),
       };
+      if (
+        normalizedPayload.rejection_reason &&
+        normalizedEmail &&
+        normalizedPayload.rejection_reason.trim().toLowerCase() === normalizedEmail.trim().toLowerCase()
+      ) {
+        normalizedPayload.rejection_reason = null;
+      }
       if (String(normalizedStatus).trim().toLowerCase() === 'rejected' && !normalizedPayload.rejection_reason) {
         const fallbackReason = await fetchRegistrationReasonByUserId(normalizedPayload.user_id);
         if (fallbackReason) {
@@ -275,6 +293,7 @@ function VerifyEmailContent() {
   const resolvedRole = pendingInfo?.role || roleQuery || fallbackRole || 'analyst';
   const currentStatus = String(pendingInfo?.status || fallbackStatus || 'pending').toLowerCase();
   const resolvedHasPin = typeof pendingInfo?.has_pin === 'boolean' ? pendingInfo.has_pin : fallbackHasPin;
+  const resolvedUsername = usernameFromEmail(resolvedEmail);
   const rejectionReason = String(pendingInfo?.rejection_reason || '').trim();
   const isApproved = currentStatus === 'approved';
   const isRejected = currentStatus === 'rejected';
@@ -321,6 +340,7 @@ function VerifyEmailContent() {
               ) : (
                 <div className="space-y-2 rounded-xl border p-4">
                   <p><span className="text-muted-foreground">{isVi ? 'Email:' : 'Email:'}</span> <strong>{resolvedEmail || (isVi ? 'Chưa cập nhật' : 'Not available')}</strong></p>
+                  <p><span className="text-muted-foreground">{isVi ? 'Tên đăng nhập:' : 'Username:'}</span> <strong>{resolvedUsername || (isVi ? 'Chưa cập nhật' : 'Not available')}</strong></p>
                   <p><span className="text-muted-foreground">{isVi ? 'Vai trò:' : 'Role:'}</span> <strong>{resolvedRole || (isVi ? 'Chưa cập nhật' : 'Not available')}</strong></p>
                   <p><span className="text-muted-foreground">{isVi ? 'Trạng thái:' : 'Status:'}</span> <strong>{localizedStatus}</strong></p>
                   <p><span className="text-muted-foreground">{isVi ? 'Đã có PIN:' : 'PIN set:'}</span> <strong>{resolvedHasPin ? (isVi ? 'Có' : 'Yes') : (isVi ? 'Chưa' : 'No')}</strong></p>

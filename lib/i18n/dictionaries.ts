@@ -348,7 +348,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "customers.credit_history": "Lịch sử tín dụng (tháng)",
     "customers.credit_history_ph": "60",
 
-    "customers.new.title": "Thêm khách hàng mới",
+    "customers.new.title": "Thêm khách hàng",
     "customers.new.desc": "Đăng ký khách hàng mới trong hệ thống",
     "customers.new.viewer_notice_prefix": "Bạn đang đăng nhập với vai trò",
     "customers.new.viewer_notice_suffix": "Hành động này chỉ có quyền xem.",
@@ -356,8 +356,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "customers.new.card_desc": "Điền thông tin khách hàng bên dưới",
     "customers.new.income": "Thu nhập hàng tháng (VND)",
     "customers.new.income_ph": "20000000",
-    "customers.new.create": "Tạo khách hàng",
-    "customers.new.failed": "Tạo khách hàng thất bại",
+    "customers.new.create": "Thêm khách hàng",
+    "customers.new.failed": "Thêm khách hàng thất bại",
 
     "customers.detail.edit": "Sửa khách hàng",
     "customers.detail.risk_score": "Điểm rủi ro",
@@ -1160,7 +1160,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "customers.credit_history": "Credit History (months)",
     "customers.credit_history_ph": "60",
 
-    "customers.new.title": "Add New Customer",
+    "customers.new.title": "Add Customer",
     "customers.new.desc": "Register a new customer in the system",
     "customers.new.viewer_notice_prefix": "You are signed in as",
     "customers.new.viewer_notice_suffix": "This action is read-only.",
@@ -1168,7 +1168,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "customers.new.card_desc": "Fill in the customer details below",
     "customers.new.income": "Monthly Income (VND)",
     "customers.new.income_ph": "20000000",
-    "customers.new.create": "Create Customer",
+    "customers.new.create": "Add Customer",
     "customers.new.failed": "Failed to create customer",
 
     "customers.detail.edit": "Edit Customer",
