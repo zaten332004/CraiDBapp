@@ -214,10 +214,11 @@ export default function ForgotPasswordPage() {
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pr-10"
+                    className="pl-10 pr-10"
                     required
                     disabled={loading}
                   />
+                  <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
@@ -228,14 +229,9 @@ export default function ForgotPasswordPage() {
                   </button>
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Button type="button" variant="outline" onClick={() => setStep('request')} disabled={loading}>
-                  {isVi ? 'Gửi lại mã' : 'Request new code'}
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? (isVi ? 'Đang cập nhật...' : 'Updating...') : (isVi ? 'Đổi mật khẩu' : 'Reset password')}
-                </Button>
-              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (isVi ? 'Đang cập nhật...' : 'Updating...') : (isVi ? 'Đổi mật khẩu' : 'Reset password')}
+              </Button>
             </form>
           )}
 
