@@ -159,11 +159,15 @@ export default function RiskScorePage() {
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [isSyncingCustomer, setIsSyncingCustomer] = useState(false);
+  const [loadedCustomerId, setLoadedCustomerId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const lastFetchedLookupRef = useRef<string>('');
 
   const applyCustomer = useCallback((c: Record<string, unknown>) => {
     setFormData(customerToForm(c));
+    const resolvedCustomerId = Number(c.customer_id);
+    setLoadedCustomerId(Number.isFinite(resolvedCustomerId) && resolvedCustomerId > 0 ? resolvedCustomerId : null);
   }, []);
 
   const loadCustomerByLookup = useCallback(
@@ -223,6 +227,7 @@ export default function RiskScorePage() {
     const { name, value } = e.target;
     if (name === 'customerLookup') {
       lastFetchedLookupRef.current = '';
+      setLoadedCustomerId(null);
       setFormData((prev) => ({
         ...prev,
         customerLookup: value,
@@ -233,6 +238,50 @@ export default function RiskScorePage() {
     }
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
+  const syncCustomerAfterScoring = useCallback(
+    async (riskLabel: unknown) => {
+      if (!loadedCustomerId) return;
+      const normalizedLoanType = formData.loanType.trim();
+      const normalizedEmployment = formData.employmentStatus.trim() || formData.employmentDisplay.trim();
+      const payload: Record<string, unknown> = {
+        full_name: formData.name.trim() || null,
+        monthly_income: parseVndDigitsToNumber(formData.incomeDigits),
+        requested_loan_amount: parseVndDigitsToNumber(formData.loanDigits),
+        loan_amount: parseVndDigitsToNumber(formData.loanDigits),
+        age: Number.parseInt(formData.age, 10),
+        credit_score: formData.creditScore.trim() ? Number.parseInt(formData.creditScore, 10) : null,
+        loan_type: normalizedLoanType || null,
+        product_type: normalizedLoanType || null,
+        annual_interest_rate: formData.interestRate.trim() ? Number.parseFloat(formData.interestRate.replace(',', '.')) : null,
+        interest_rate: formData.interestRate.trim() ? Number.parseFloat(formData.interestRate.replace(',', '.')) : null,
+        requested_term_months: formData.loanTermMonths.trim() ? Number.parseInt(formData.loanTermMonths, 10) : null,
+        loan_term_months: formData.loanTermMonths.trim() ? Number.parseInt(formData.loanTermMonths, 10) : null,
+        collateral_value: parseVndDigitsToNumber(formData.collateralDigits) || null,
+        collateral_amount: parseVndDigitsToNumber(formData.collateralDigits) || null,
+        employment_status: normalizedEmployment || null,
+        notes: formData.notes.trim() || null,
+        risk_level: String(riskLabel ?? '').trim().toLowerCase() || null,
+      };
+      setIsSyncingCustomer(true);
+      try {
+        await browserApiFetchAuth(`/customers/${loadedCustomerId}`, {
+          method: 'PUT',
+          body: payload,
+        });
+      } catch (syncErr) {
+        notifyError(
+          locale === 'vi'
+            ? 'Đã chấm điểm nhưng chưa đồng bộ được hồ sơ khách hàng.'
+            : 'Scoring succeeded but customer profile sync failed.',
+          formatUserFacingApiError(syncErr),
+        );
+      } finally {
+        setIsSyncingCustomer(false);
+      }
+    },
+    [formData, loadedCustomerId, locale],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -305,6 +354,7 @@ export default function RiskScorePage() {
 
       const data = await response.json();
       setResult(data);
+      await syncCustomerAfterScoring(data?.risk_label);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');
       setError(message);
@@ -545,6 +595,9 @@ export default function RiskScorePage() {
                   </>
                 )}
               </Button>
+              {isSyncingCustomer ? (
+                <p className="text-xs text-muted-foreground">{locale === 'vi' ? 'Đang đồng bộ hồ sơ khách hàng...' : 'Syncing customer profile...'}</p>
+              ) : null}
             </form>
           </CardContent>
         </Card>
