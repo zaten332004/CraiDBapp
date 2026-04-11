@@ -2,32 +2,25 @@
 
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { browserApiFetchAuth } from '@/lib/api/browser';
-import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
-import { AlertCircle, Download, Loader2 } from 'lucide-react';
-
-function formatApiError(err: unknown) {
-  if (err instanceof ApiError) {
-    return `${err.message} — ${err.url}${err.bodyText ? `\n${err.bodyText}` : ''}`;
-  }
-  return err instanceof Error ? err.message : String(err);
-}
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
+import { notifyError, notifySuccess } from '@/lib/notify';
+import { Download, Loader2 } from 'lucide-react';
 
 export default function AdminExportPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [kind, setKind] = useState('users');
   const [format, setFormat] = useState<'json' | 'csv'>('csv');
   const [extraJson, setExtraJson] = useState('{\n  \n}');
   const [fileName, setFileName] = useState('');
   const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const parsedExtra = useMemo(() => {
@@ -40,11 +33,10 @@ export default function AdminExportPage() {
 
   const runExport = async () => {
     setIsLoading(true);
-    setError(null);
     setResult(null);
     try {
       if (parsedExtra === null) {
-        setError(t('admin.export.invalid_json'));
+        notifyError(t('toast.export_failed'), { description: t('admin.export.invalid_json') });
         return;
       }
 
@@ -58,8 +50,12 @@ export default function AdminExportPage() {
       };
       const res = await browserApiFetchAuth<any>('/admin/export', { method: 'POST', body });
       setResult(res);
+      const url = String(res?.url ?? res?.download_url ?? res?.downloadUrl ?? '').trim();
+      if (url) {
+        notifySuccess(t('toast.export_ready'), { description: url });
+      }
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(t('toast.export_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
       setIsLoading(false);
     }
@@ -73,13 +69,6 @@ export default function AdminExportPage() {
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('admin.export.title')}</h1>
         <p className="text-muted-foreground mt-2">{t('admin.export.desc')}</p>
       </div>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="whitespace-pre-wrap">{error}</AlertDescription>
-        </Alert>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1">
@@ -150,16 +139,14 @@ export default function AdminExportPage() {
             <CardDescription>{t('admin.export.result_desc')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 flex-1 min-h-0">
-            {downloadUrl && (
-              <Alert>
-                <AlertDescription>
-                  {t('admin.export.download_ready')}{' '}
-                  <a className="text-accent underline" href={downloadUrl} target="_blank" rel="noreferrer">
-                    {downloadUrl}
-                  </a>
-                </AlertDescription>
-              </Alert>
-            )}
+            {downloadUrl ? (
+              <p className="text-sm text-muted-foreground">
+                {t('admin.export.download_ready')}{' '}
+                <a className="text-accent underline" href={downloadUrl} target="_blank" rel="noreferrer">
+                  {downloadUrl}
+                </a>
+              </p>
+            ) : null}
 
             <div className="rounded-md border bg-secondary p-3 flex-1 min-h-0">
               <pre className="max-h-[60vh] overflow-auto text-xs text-muted-foreground whitespace-pre-wrap">

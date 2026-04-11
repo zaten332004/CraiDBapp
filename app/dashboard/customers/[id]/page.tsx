@@ -24,7 +24,7 @@ import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError, notifySuccess } from '@/lib/notify';
-import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 import { formatVnd } from '@/lib/money';
 import { getUserRole } from '@/lib/auth/token';
@@ -32,6 +32,7 @@ import { getUserRole } from '@/lib/auth/token';
 export default function CustomerDetailPage() {
   const { locale, t } = useI18n();
   const isVi = locale === 'vi';
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const router = useRouter();
   const params = useParams();
   const customerId = Number(params.id);
@@ -122,12 +123,7 @@ export default function CustomerDetailPage() {
         });
       } catch (err) {
         if (!cancelled) {
-          const message = formatUserFacingApiError(err);
-          notifyError(
-            isVi
-              ? `Không tải được hồ sơ khách hàng. ${message}`
-              : message,
-          );
+          notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
         }
       }
     };
@@ -135,7 +131,7 @@ export default function CustomerDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [customerId, locale]);
+  }, [customerId, msgLocale, t]);
 
   const riskBadgeClass = useMemo(() => {
     const level = String(customer?.risk_level || '').toLowerCase();
@@ -262,8 +258,7 @@ export default function CustomerDetailPage() {
       setIsEditing(false);
       notifySuccess(isVi ? 'Đã cập nhật hồ sơ.' : 'Profile updated.');
     } catch (err) {
-      const message = formatUserFacingApiError(err);
-      notifyError(isVi ? `Cập nhật hồ sơ thất bại. ${message}` : message);
+      notifyError(t('toast.action_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
       setIsSaving(false);
     }
@@ -283,8 +278,7 @@ export default function CustomerDetailPage() {
       setIsEditing(false);
       notifySuccess(nextStatus === 'approved' ? (isVi ? 'Đã duyệt hồ sơ.' : 'Application approved.') : (isVi ? 'Đã từ chối hồ sơ.' : 'Application rejected.'));
     } catch (err) {
-      const message = formatUserFacingApiError(err);
-      notifyError(isVi ? `Không thể xử lý hồ sơ. ${message}` : message);
+      notifyError(t('toast.action_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
       setIsSaving(false);
     }
@@ -316,8 +310,7 @@ export default function CustomerDetailPage() {
       setConfirmDeleteOpen(false);
       router.push('/dashboard/customers');
     } catch (err) {
-      const message = formatUserFacingApiError(err);
-      notifyError(isVi ? `Không thể xóa hồ sơ khách hàng. ${message}` : message);
+      notifyError(t('toast.action_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
       setIsDeleting(false);
     }

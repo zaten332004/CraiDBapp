@@ -13,30 +13,31 @@ import {
 } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { browserApiFetchAuth } from '@/lib/api/browser';
-import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
 import { getAccessToken, getUserRole, type UserRole } from '@/lib/auth/token';
 import { cn } from '@/lib/utils';
 import { notifyError } from '@/lib/notify';
-import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { ChatMarkdown } from '@/components/ai-chat/chat-markdown';
 import {
-  AlertCircle,
+  BarChart3,
   CircleX,
   FileText,
+  LayoutDashboard,
   Loader2,
   MessageSquarePlus,
   MoreHorizontal,
@@ -48,6 +49,8 @@ import {
   RefreshCw,
   Send,
   Trash2,
+  Upload,
+  Users,
   X,
 } from 'lucide-react';
 
@@ -103,6 +106,30 @@ type UploadedFileCtx = {
   extension?: string;
   [key: string]: unknown;
 };
+
+type AiDataSource = 'portfolio' | 'customer' | 'upload' | 'powerbi';
+
+function normalizeCustomerSearchResponse(data: unknown): Array<{ customer_id: number; label: string }> {
+  if (data == null || typeof data !== 'object') return [];
+  const d = data as Record<string, unknown>;
+  let items: unknown[] = [];
+  if (Array.isArray(d.items)) items = d.items;
+  else if (Array.isArray(d.customers)) items = d.customers;
+  else if (Array.isArray(d.data)) items = d.data;
+  else if (Array.isArray(d.results)) items = d.results;
+  const out: Array<{ customer_id: number; label: string }> = [];
+  for (const raw of items) {
+    if (!raw || typeof raw !== 'object') continue;
+    const o = raw as Record<string, unknown>;
+    const id = Number(o.customer_id ?? o.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    const full = String(o.full_name ?? o.name ?? '').trim();
+    const ref = String(o.external_customer_ref ?? o.national_id ?? '').trim();
+    const label = full ? (ref ? `${full} (${ref})` : full) : ref || `#${id}`;
+    out.push({ customer_id: id, label });
+  }
+  return out;
+}
 
 const PENDING_FILES_STORAGE_KEY = 'crs_ai_chat_pending_uploads_v1';
 const LAST_AI_CHAT_MODEL_STORAGE_KEY = 'crs_ai_chat_last_model_v1';
@@ -227,13 +254,6 @@ function roleRank(role: UserRole | null) {
   }
 }
 
-function formatApiError(err: unknown) {
-  if (err instanceof ApiError) {
-    return `${err.message} — ${err.url}${err.bodyText ? `\n${err.bodyText}` : ''}`;
-  }
-  return err instanceof Error ? err.message : String(err);
-}
-
 function normalizeMinRole(value: unknown): UserRole | null {
   const v = String(value ?? '').trim().toLowerCase();
   if (v === 'admin' || v === 'manager' || v === 'analyst' || v === 'viewer') return v;
@@ -350,7 +370,18 @@ function slimUploadedFilesForSend(files: UploadedFileCtx[]): Record<string, unkn
 }
 
 export default function AIChatPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
+  const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
+
+  const [aiDataSource, setAiDataSource] = useState<AiDataSource>('portfolio');
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
+  const [customerSearchResults, setCustomerSearchResults] = useState<Array<{ customer_id: number; label: string }>>(
+    [],
+  );
+  const [selectedCustomer, setSelectedCustomer] = useState<{ customer_id: number; label: string } | null>(null);
 
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -360,7 +391,6 @@ export default function AIChatPage() {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [pendingFiles, setPendingFiles] = useState<UploadedFileCtx[]>([]);
   const skipPendingPersistOnceRef = useRef(true);
@@ -395,6 +425,13 @@ export default function AIChatPage() {
     if (messages.some((m) => m.sender === 'assistant')) return true;
     return false;
   }, [messages]);
+
+  const canSubmitComposer = useMemo(() => {
+    if (!input.trim() && pendingFiles.length === 0) return false;
+    if (aiDataSource === 'upload') return pendingFiles.length > 0;
+    if (aiDataSource === 'customer') return Boolean(selectedCustomer);
+    return true;
+  }, [input, pendingFiles.length, aiDataSource, selectedCustomer]);
 
   const selectedModelOption = useMemo(
     () => (selectedModel ? modelOptions.find((o) => o.model === selectedModel) ?? null : null),
@@ -534,8 +571,11 @@ export default function AIChatPage() {
 
   useEffect(() => {
     const restored = loadPendingFilesFromStorage();
-    if (restored.length) setPendingFiles(restored);
-    else if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
+    if (restored.length) {
+      setPendingFiles(restored);
+      setAiDataSource('upload');
+      setSelectedCustomer(null);
+    } else if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
   }, []);
 
   useEffect(() => {
@@ -560,6 +600,41 @@ export default function AIChatPage() {
       // ignore quota / private mode
     }
   }, [pendingFiles]);
+
+  useEffect(() => {
+    if (!customerPickerOpen) return;
+    const q = customerSearchQuery.trim();
+    if (!q) {
+      setCustomerSearchResults([]);
+      setCustomerSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const tid = window.setTimeout(() => {
+      void (async () => {
+        setCustomerSearchLoading(true);
+        try {
+          const raw = await browserApiFetchAuth<Record<string, unknown>>(
+            `/customers?page=1&limit=20&search_name=${encodeURIComponent(q)}`,
+            { method: 'GET' },
+          );
+          if (cancelled) return;
+          setCustomerSearchResults(normalizeCustomerSearchResponse(raw));
+        } catch (err) {
+          if (!cancelled) {
+            setCustomerSearchResults([]);
+            notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
+          }
+        } finally {
+          if (!cancelled) setCustomerSearchLoading(false);
+        }
+      })();
+    }, 320);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(tid);
+    };
+  }, [customerPickerOpen, customerSearchQuery, t, msgLocale]);
 
   useEffect(() => {
     if (!sessionId || isLoading) return;
@@ -592,7 +667,6 @@ export default function AIChatPage() {
   };
 
   const loadModels = async () => {
-    setError(null);
     try {
       const data = await browserApiFetchAuth<any>('/ai-chat/models', { method: 'GET' });
       const defaultModelValue = String(data?.default_model ?? data?.defaultModel ?? '').trim() || null;
@@ -628,12 +702,11 @@ export default function AIChatPage() {
         return firstAllowed?.model ?? '';
       });
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(t('toast.load_failed'), { description: apiErr(err) });
     }
   };
 
   const loadSessions = async () => {
-    setError(null);
     try {
       const data = await browserApiFetchAuth<any>('/ai-chat/sessions', { method: 'GET' });
       const rawList = Array.isArray(data)
@@ -646,7 +719,7 @@ export default function AIChatPage() {
       const list = rawList.map(normalizeSession).filter(Boolean) as ChatSession[];
       setSessions(list);
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(t('toast.load_failed'), { description: apiErr(err) });
     }
   };
 
@@ -655,7 +728,11 @@ export default function AIChatPage() {
     setMessages([]);
     setInput('');
     setPendingFiles([]);
-    setError(null);
+    setAiDataSource('portfolio');
+    setSelectedCustomer(null);
+    setCustomerPickerOpen(false);
+    setCustomerSearchQuery('');
+    setCustomerSearchResults([]);
     setComposerSnapGeneration(0);
     setComposerSnapPlaying(false);
     setFirstSessionMessagesAnim(false);
@@ -681,14 +758,13 @@ export default function AIChatPage() {
   };
 
   const loadHistory = async (id: string) => {
-    setError(null);
     setMessages([]);
     setIsLoading(true);
     try {
       const list = await fetchHistoryMessages(id);
       setMessages(list);
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(t('toast.load_failed'), { description: apiErr(err) });
       setMessages([]);
     } finally {
       setIsLoading(false);
@@ -696,7 +772,6 @@ export default function AIChatPage() {
   };
 
   const closeSessionById = async (sid: string, opts?: { appendSummary?: boolean; clearIfActive?: boolean }) => {
-    setError(null);
     setIsLoading(true);
     try {
       const data = await browserApiFetchAuth<any>(`/ai-chat/close/${encodeURIComponent(sid)}`, { method: 'POST' });
@@ -719,14 +794,13 @@ export default function AIChatPage() {
       }
       await loadSessions();
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(t('toast.action_failed'), { description: apiErr(err) });
     } finally {
       setIsLoading(false);
     }
   };
 
   const setPinned = async (id: string, pinned: boolean) => {
-    setError(null);
     setIsLoading(true);
     try {
       const endpoint = pinned
@@ -735,7 +809,7 @@ export default function AIChatPage() {
       await browserApiFetchAuth<any>(endpoint, { method: 'POST' });
       await loadSessions();
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(t('toast.action_failed'), { description: apiErr(err) });
     } finally {
       setIsLoading(false);
     }
@@ -745,7 +819,6 @@ export default function AIChatPage() {
     const sid = (id ?? sessionId) ?? null;
     if (!sid) return;
     if (typeof window !== 'undefined' && !window.confirm(t('ai_chat.delete_confirm'))) return;
-    setError(null);
     setIsLoading(true);
     try {
       await browserApiFetchAuth<any>(`/ai-chat/sessions/${encodeURIComponent(sid)}`, { method: 'DELETE' });
@@ -755,7 +828,7 @@ export default function AIChatPage() {
       }
       await loadSessions();
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(t('toast.action_failed'), { description: apiErr(err) });
     } finally {
       setIsLoading(false);
     }
@@ -764,6 +837,25 @@ export default function AIChatPage() {
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
     if (!input.trim() && pendingFiles.length === 0) return;
+    if (aiDataSource === 'upload' && pendingFiles.length === 0) {
+      notifyError(t('ai_chat.error_upload_mode_no_files'));
+      return;
+    }
+    if (aiDataSource === 'customer' && !selectedCustomer) {
+      notifyError(t('ai_chat.error_customer_mode_no_customer'));
+      return;
+    }
+
+    const pickLowestAllowedModel = (): string => {
+      const allowed = modelOptions.filter((o) => isModelAllowed(o));
+      if (!allowed.length) return '';
+      const order = (tier: ModelTier) => (tier === 'fast' ? 0 : tier === 'thinking' ? 1 : tier === 'pro' ? 2 : 9);
+      return [...allowed].sort((a, b) => order(a.tier) - order(b.tier))[0]?.model ?? '';
+    };
+    const hadValidModelSelection =
+      Boolean(selectedModel) &&
+      modelOptions.some((o) => o.model === selectedModel && isModelAllowed(o));
+    const resolvedModel = hadValidModelSelection ? selectedModel : pickLowestAllowedModel();
 
     if (!hasConversation) {
       setComposerSnapGeneration((g) => g + 1);
@@ -779,29 +871,36 @@ export default function AIChatPage() {
       ...(attachForMsg?.length ? { attachments: attachForMsg } : {}),
     };
 
-    const customerContext =
-      pendingFiles.length > 0 ? { uploaded_files: slimUploadedFilesForSend(pendingFiles) } : undefined;
+    const customerContext: Record<string, unknown> = {
+      ai_data_source: aiDataSource,
+    };
+    if (aiDataSource === 'customer' && selectedCustomer) {
+      customerContext.customer_id = selectedCustomer.customer_id;
+    }
+    if (pendingFiles.length > 0) {
+      customerContext.uploaded_files = slimUploadedFilesForSend(pendingFiles);
+    }
 
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsSending(true);
-    setError(null);
 
     try {
-      const modelToSend =
-        selectedModel && modelOptions.some((o) => o.model === selectedModel && isModelAllowed(o))
-          ? selectedModel
-          : '';
       const body: Record<string, unknown> = {
         message: text,
         ...(sessionId ? { session_id: sessionId, sessionId } : {}),
-        ...(modelToSend ? { model: modelToSend } : {}),
-        ...(customerContext ? { customer_context: customerContext } : {}),
+        ...(resolvedModel ? { model: resolvedModel } : {}),
+        customer_context: customerContext,
       };
       const data = await browserApiFetchAuth<any>('/ai-chat/send', {
         method: 'POST',
         body,
       });
+
+      if (!hadValidModelSelection && resolvedModel) {
+        setSelectedModel(resolvedModel);
+        writeStoredLastAiChatModel(resolvedModel);
+      }
 
       const newSid = String(data?.session_id ?? data?.sessionId ?? '').trim();
       const created = Boolean(data?.created_session ?? data?.createdSession);
@@ -813,7 +912,7 @@ export default function AIChatPage() {
           const list = await fetchHistoryMessages(newSid);
           setMessages(list);
         } catch (histErr) {
-          setError(formatApiError(histErr));
+          notifyError(t('toast.load_failed'), { description: apiErr(histErr) });
           const reply =
             String(data?.response ?? data?.reply ?? data?.message ?? '').trim() || t('ai_chat.default_reply');
           setMessages((prev) => [
@@ -854,7 +953,7 @@ export default function AIChatPage() {
           timestamp: new Date(),
         },
       ]);
-      setError(formatApiError(err));
+      notifyError(t('ai_chat.send_failed'), { description: apiErr(err) });
     } finally {
       setIsSending(false);
     }
@@ -864,7 +963,7 @@ export default function AIChatPage() {
     if (e.key !== 'Enter' || e.shiftKey) return;
     e.preventDefault();
     if (isSending) return;
-    if (!input.trim() && pendingFiles.length === 0) return;
+    if (!canSubmitComposer) return;
     e.currentTarget.form?.requestSubmit();
   };
 
@@ -877,14 +976,18 @@ export default function AIChatPage() {
         const uploaded = await postAiChatUpload(file);
         next.push(...uploaded);
       }
-      if (next.length) setPendingFiles((prev) => [...prev, ...next]);
+      if (next.length) {
+        setAiDataSource('upload');
+        setSelectedCustomer(null);
+        setPendingFiles((prev) => [...prev, ...next]);
+      }
     } catch (err) {
-      notifyError(formatUserFacingApiError(err));
+      notifyError(t('toast.upload_import_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
       setIsUploadingFile(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  }, []);
+  }, [t, msgLocale]);
 
   const chatDropZoneProps = useMemo(() => {
     const disabled = isSending || isUploadingFile;
@@ -996,6 +1099,98 @@ export default function AIChatPage() {
         })}
       </SelectContent>
     </Select>
+  );
+
+  const renderDataSourcePlusMenu = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="shrink-0 rounded-full h-10 w-10"
+          disabled={isSending || isUploadingFile}
+          aria-label={t('ai_chat.data_source_menu')}
+        >
+          {isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-[min(calc(100vw-2rem),17rem)]">
+        <DropdownMenuItem
+          onClick={() => {
+            setAiDataSource('customer');
+            setPendingFiles([]);
+            setCustomerSearchQuery('');
+            setCustomerSearchResults([]);
+            setCustomerPickerOpen(true);
+          }}
+        >
+          <Users className="mr-2 h-4 w-4 shrink-0 opacity-80" />
+          {t('ai_chat.data_source_customer')}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            setAiDataSource('upload');
+            setSelectedCustomer(null);
+            window.setTimeout(() => fileInputRef.current?.click(), 0);
+          }}
+        >
+          <Upload className="mr-2 h-4 w-4 shrink-0 opacity-80" />
+          {t('ai_chat.data_source_upload')}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            setAiDataSource('powerbi');
+            setSelectedCustomer(null);
+            setPendingFiles([]);
+            if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
+          }}
+        >
+          <BarChart3 className="mr-2 h-4 w-4 shrink-0 opacity-80" />
+          {t('ai_chat.data_source_powerbi')}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => {
+            setAiDataSource('portfolio');
+            setSelectedCustomer(null);
+          }}
+        >
+          <LayoutDashboard className="mr-2 h-4 w-4 shrink-0 opacity-80" />
+          {t('ai_chat.data_source_portfolio')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const renderComposerSourceHint = () => (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
+      <span className="shrink-0">{t('ai_chat.data_source_active')}:</span>
+      <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">
+        {aiDataSource === 'customer'
+          ? selectedCustomer
+            ? `${t('ai_chat.data_source_customer')} — ${selectedCustomer.label}`
+            : t('ai_chat.data_source_customer')
+          : aiDataSource === 'portfolio'
+            ? t('ai_chat.data_source_portfolio')
+            : aiDataSource === 'upload'
+              ? t('ai_chat.data_source_upload')
+              : t('ai_chat.data_source_powerbi')}
+      </span>
+      {selectedCustomer ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs shrink-0"
+          onClick={() => setSelectedCustomer(null)}
+          disabled={isSending}
+        >
+          <X className="mr-1 h-3 w-3" />
+          {t('ai_chat.clear_customer')}
+        </Button>
+      ) : null}
+    </div>
   );
 
   return (
@@ -1170,13 +1365,6 @@ export default function AIChatPage() {
             hasConversation && 'pb-2 pt-0',
           )}
         >
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="whitespace-pre-wrap">{error}</AlertDescription>
-            </Alert>
-          )}
-
           {!hasConversation ? (
             <div
               className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-6 px-1"
@@ -1230,24 +1418,15 @@ export default function AIChatPage() {
                     style={{ maxHeight: CHAT_INPUT_MAX_PX, fieldSizing: 'fixed' }}
                     className="min-h-[48px] w-full resize-none overflow-y-auto border-0 bg-transparent px-1 py-2 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
                   />
+                  {renderComposerSourceHint()}
                   <div className="flex flex-wrap items-end justify-between gap-2 pt-1 border-t border-border/60">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0 rounded-full h-10 w-10"
-                      disabled={isSending || isUploadingFile}
-                      aria-label={t('ai_chat.attach_file')}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      {isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                    </Button>
+                    {renderDataSourcePlusMenu()}
                     <div className="flex flex-wrap items-center gap-2 ml-auto">
                       {renderModelSelect(true)}
                       <Button
                         type="submit"
                         size="icon"
-                        disabled={isSending || (!input.trim() && pendingFiles.length === 0)}
+                        disabled={isSending || !canSubmitComposer}
                         className="shrink-0 rounded-full h-10 w-10"
                       >
                         {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -1396,24 +1575,15 @@ export default function AIChatPage() {
                   style={{ maxHeight: CHAT_INPUT_MAX_PX, fieldSizing: 'fixed' }}
                   className="min-h-[48px] w-full resize-none overflow-y-auto border-0 bg-transparent px-1 py-2 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
                 />
+                {renderComposerSourceHint()}
                 <div className="flex flex-wrap items-end justify-between gap-2 pt-1 border-t border-border/60">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0 rounded-full h-10 w-10"
-                    disabled={isSending || isUploadingFile}
-                    aria-label={t('ai_chat.attach_file')}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    {isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  </Button>
+                  {renderDataSourcePlusMenu()}
                   <div className="flex flex-wrap items-center gap-2 ml-auto">
                     {renderModelSelect(false)}
                     <Button
                       type="submit"
                       size="icon"
-                      disabled={isSending || (!input.trim() && pendingFiles.length === 0)}
+                      disabled={isSending || !canSubmitComposer}
                       className="shrink-0 rounded-full h-10 w-10"
                     >
                       {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -1426,6 +1596,58 @@ export default function AIChatPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={customerPickerOpen}
+        onOpenChange={(open) => {
+          setCustomerPickerOpen(open);
+          if (!open) {
+            setCustomerSearchQuery('');
+            setCustomerSearchResults([]);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('ai_chat.customer_picker_title')}</DialogTitle>
+            <DialogDescription>{t('ai_chat.customer_picker_desc')}</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={customerSearchQuery}
+            onChange={(e) => setCustomerSearchQuery(e.target.value)}
+            placeholder={t('ai_chat.customer_picker_search_placeholder')}
+            autoFocus
+          />
+          <ScrollArea className="mt-2 h-64 rounded-md border p-2">
+            {!customerSearchQuery.trim() ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">{t('ai_chat.customer_picker_hint')}</p>
+            ) : customerSearchLoading ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">{t('ai_chat.customer_picker_loading')}</p>
+            ) : customerSearchResults.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">{t('ai_chat.customer_picker_empty')}</p>
+            ) : (
+              <div className="space-y-1 pr-2">
+                {customerSearchResults.map((row) => (
+                  <Button
+                    key={row.customer_id}
+                    type="button"
+                    variant="ghost"
+                    className="flex h-auto w-full items-center justify-start gap-2 px-2 py-2 text-left font-normal"
+                    onClick={() => {
+                      setSelectedCustomer({ customer_id: row.customer_id, label: row.label });
+                      setAiDataSource('customer');
+                      setCustomerPickerOpen(false);
+                    }}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{row.label}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">#{row.customer_id}</span>
+                  </Button>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={!!previewAttachment}

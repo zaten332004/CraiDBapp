@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -13,7 +12,7 @@ import { getUserRole } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { ApiError } from '@/lib/api/shared';
-import { formatUserFacingFetchError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, formatUserFacingFetchError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { CRAIDB_UPLOAD_COMPLETED_EVENT } from '@/lib/profile-sync-event';
 import { formatDateTimeVietnam } from '@/lib/datetime';
@@ -42,6 +41,8 @@ function normalizeJobErrorRow(item: any) {
 
 export default function UploadPage() {
   const { t, locale } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
+  const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
   const role = getUserRole();
   const isViewer = role === 'viewer';
   const [file, setFile] = useState<File | null>(null);
@@ -49,7 +50,6 @@ export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<any>(null);
-  const [jobError, setJobError] = useState<string | null>(null);
   const [importErrors, setImportErrors] = useState<Array<Record<string, any>>>([]);
   const [isLoadingErrors, setIsLoadingErrors] = useState(false);
   const [uploadHistory, setUploadHistory] = useState<Array<{
@@ -72,13 +72,6 @@ export default function UploadPage() {
   const [isFileDetailOpen, setIsFileDetailOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const formatApiError = (err: unknown) => {
-    if (err instanceof ApiError) {
-      return `${err.message} — ${err.url}${err.bodyText ? `\n${err.bodyText}` : ''}`;
-    }
-    return err instanceof Error ? err.message : String(err);
-  };
-
   const getJsonWithAuthFallback = async <T,>(path: string): Promise<T> => {
     try {
       return await browserApiFetchAuth<T>(path, { method: 'GET' });
@@ -94,7 +87,7 @@ export default function UploadPage() {
       });
       if (!response.ok) {
         const bodyText = await response.text();
-        throw new Error(formatUserFacingFetchError(response.status, bodyText));
+        throw new Error(formatUserFacingFetchError(response.status, bodyText, msgLocale));
       }
       return (await response.json()) as T;
     }
@@ -137,8 +130,6 @@ export default function UploadPage() {
 
     setIsUploading(true);
     setUploadProgress(0);
-    setJobError(null);
-
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -151,7 +142,7 @@ export default function UploadPage() {
 
       if (!response.ok) {
         const bodyText = await response.text();
-        throw new Error(formatUserFacingFetchError(response.status, bodyText));
+        throw new Error(formatUserFacingFetchError(response.status, bodyText, msgLocale));
       }
 
       const data = await response.json();
@@ -159,11 +150,17 @@ export default function UploadPage() {
       setFile(null);
       setUploadProgress(100);
       window.dispatchEvent(new Event(CRAIDB_UPLOAD_COMPLETED_EVENT));
+      const proc = Number(data?.processed_count ?? data?.import_summary?.processed_count ?? 0);
+      const okc = Number(data?.success_count ?? data?.import_summary?.success_count ?? 0);
+      const badc = Number(data?.error_count ?? data?.import_summary?.error_count ?? 0);
       notifySuccess(t('upload.upload_file'), {
         details: [
           `File: ${file.name}`,
           `Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
           String(data?.job_id ?? data?.jobId ?? '').trim() ? `Job ID: ${String(data?.job_id ?? data?.jobId ?? '').trim()}` : '',
+          proc ? `${t('common.processed')}: ${proc}` : '',
+          `${t('common.successful')}: ${okc}`,
+          `${t('common.failed')}: ${badc}`,
         ].filter(Boolean),
       });
 
@@ -174,8 +171,8 @@ export default function UploadPage() {
       }, 2000);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setJobError(message);
-      notifyError(message, {
+      notifyError(t('toast.upload_import_failed'), {
+        description: message,
         details: [
           `File: ${file?.name || '-'}`,
           `Size: ${file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : '-'}`,
@@ -221,7 +218,7 @@ export default function UploadPage() {
       }
       setImportErrors(merged);
     } catch (err) {
-      setJobError(formatApiError(err));
+      notifyError(t('toast.load_failed'), { description: apiErr(err) });
     } finally {
       setIsLoadingErrors(false);
     }
@@ -292,7 +289,6 @@ export default function UploadPage() {
     const clean = String(jobIdValue || '').trim();
     if (!clean) return;
     setIsLoadingFileDetail(true);
-    setJobError(null);
     try {
       const first = await getJsonWithAuthFallback<any>(`/jobs/${encodeURIComponent(clean)}/content?offset=0&limit=500`);
       const columns = Array.isArray(first?.columns) ? first.columns : [];
@@ -329,7 +325,7 @@ export default function UploadPage() {
       });
     } catch (err) {
       setHistoryFileDetail(null);
-      setJobError(formatApiError(err));
+      notifyError(t('toast.load_failed'), { description: apiErr(err) });
     } finally {
       setIsLoadingFileDetail(false);
     }
@@ -356,13 +352,10 @@ export default function UploadPage() {
         {/* Upload Area */}
         <div className="lg:col-span-2 space-y-6">
           {isViewer && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                {t('upload.viewer_notice_prefix')}{' '}
-                <span className="font-medium">{t('role.viewer')}</span>. {t('upload.viewer_notice_suffix')}
-              </AlertDescription>
-            </Alert>
+            <div className="rounded-lg border border-border/80 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+              {t('upload.viewer_notice_prefix')}{' '}
+              <span className="font-medium text-foreground">{t('role.viewer')}</span>. {t('upload.viewer_notice_suffix')}
+            </div>
           )}
           <Card>
             <CardHeader>
@@ -444,14 +437,6 @@ export default function UploadPage() {
                 </div>
               )}
 
-              {uploadResult && (
-                <Alert className="mt-6">
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    {t('upload.success_prefix')} {uploadResult.records_processed || 0} {t('upload.success_suffix')}
-                  </AlertDescription>
-                </Alert>
-              )}
             </CardContent>
           </Card>
 
@@ -466,12 +451,6 @@ export default function UploadPage() {
                 <p>Dòng import thành công: <span className="font-semibold text-emerald-700">{summary.successRows}</span></p>
                 <p>Dòng import thất bại: <span className="font-semibold text-rose-700">{summary.failedRows}</span></p>
               </div>
-              {jobError && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="whitespace-pre-wrap">{jobError}</AlertDescription>
-                </Alert>
-              )}
               <div className="rounded-md border bg-secondary p-3 text-sm">
                 <p>Thất bại do trùng ID: <span className="font-semibold text-rose-700">{duplicateCounts.duplicateId}</span></p>
                 <p>Thất bại do trùng email: <span className="font-semibold text-rose-700">{duplicateCounts.duplicateEmail}</span></p>
@@ -489,13 +468,11 @@ export default function UploadPage() {
               ) : null}
 
               {!isLoadingErrors && summary.failedRows > 0 && importErrors.length === 0 && derivedJobId ? (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Có {summary.failedRows} dòng lỗi nhưng không lấy được danh sách từ API{' '}
-                    <code className="text-xs">/jobs/{derivedJobId}/errors</code>. Kiểm tra backend hoặc quyền truy cập.
-                  </AlertDescription>
-                </Alert>
+                <p className="text-sm text-muted-foreground">
+                  {locale === 'vi'
+                    ? `Có ${summary.failedRows} dòng lỗi nhưng không lấy được danh sách từ API /jobs/${derivedJobId}/errors. Kiểm tra backend hoặc quyền truy cập.`
+                    : `${summary.failedRows} row(s) failed but the error list could not be loaded from /jobs/${derivedJobId}/errors. Check the backend or your permissions.`}
+                </p>
               ) : null}
 
               {importErrors.length > 0 ? (

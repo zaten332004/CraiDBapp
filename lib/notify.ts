@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 
 /** Một kiểu toast duy nhất (thẻ + icon trái): hiển thị vài giây rồi mờ dần (Sonner + globals.css). */
 const DEFAULT_MS = 4200;
+/** Lỗi có mô tả chi tiết (API) — đọc lâu hơn một chút */
+export const TOAST_ERROR_DETAIL_MS = 6800;
 
 /** Tránh lặp cùng một thông báo (Strict Mode, gọi kép, v.v.) */
 const DEDUPE_MS = 2800;
@@ -81,10 +83,18 @@ export function notifySuccess(message: string, descriptionOrOptions?: string | {
 
 export function notifyError(message: string, descriptionOrOptions?: string | { description?: string; details?: NotifyDetails; duration?: number }) {
   if (typeof descriptionOrOptions === 'string' || descriptionOrOptions == null) {
-    notify(message, { variant: 'error', description: descriptionOrOptions });
+    const d = descriptionOrOptions;
+    notify(message, {
+      variant: 'error',
+      description: d,
+      duration: d?.trim() ? TOAST_ERROR_DETAIL_MS : DEFAULT_MS,
+    });
     return;
   }
-  notify(message, { variant: 'error', ...descriptionOrOptions });
+  const duration =
+    descriptionOrOptions.duration ??
+    (descriptionOrOptions.description || descriptionOrOptions.details ? TOAST_ERROR_DETAIL_MS : DEFAULT_MS);
+  notify(message, { variant: 'error', ...descriptionOrOptions, duration });
 }
 
 /** Cùng khung với success/error; chỉ khác màu chữ/icon trung tính. */

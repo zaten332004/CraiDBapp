@@ -12,8 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { CheckCircle, XCircle, Loader2, RefreshCw, MoreHorizontal } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
-import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { ListPagination } from '@/components/list-pagination';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -57,13 +57,6 @@ function normalizeRegistration(item: any, fallbackType: RegistrationType = 'anal
   return { id, name, email, type, requestedAt, raw: item };
 }
 
-function formatApiError(err: unknown) {
-  if (err instanceof ApiError) {
-    return `${err.message} — ${err.url}${err.bodyText ? `\n${err.bodyText}` : ''}`;
-  }
-  return err instanceof Error ? err.message : String(err);
-}
-
 function formatDateTime(value: unknown, locale: string) {
   const raw = String(value ?? '').trim();
   if (!raw) return locale === 'vi' ? 'Không có' : 'N/A';
@@ -89,6 +82,7 @@ function statusBadgeClass(status: string) {
 export default function AdminRegistrationsPage() {
   const PAGE_SIZE = 15;
   const { t, locale } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [registrations, setRegistrations] = useState<RegistrationRow[]>([]);
   const [roleFilter, setRoleFilter] = useState<'all' | RegistrationType>('all');
   const [statusFilter, setStatusFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
@@ -130,7 +124,9 @@ export default function AdminRegistrationsPage() {
         });
       setRegistrations(sorted);
     } catch (err) {
-      notifyError(locale === 'vi' ? 'Không tải được danh sách đăng ký.' : 'Could not load registration list.', formatApiError(err));
+      notifyError(locale === 'vi' ? 'Không tải được danh sách đăng ký.' : 'Could not load registration list.', {
+        description: formatUserFacingApiError(err, msgLocale),
+      });
       setRegistrations([]);
     } finally {
       setIsLoading(false);
@@ -149,7 +145,9 @@ export default function AdminRegistrationsPage() {
       setDetails(data);
       setIsDetailsOpen(true);
     } catch (err) {
-      notifyError(locale === 'vi' ? 'Không tải được chi tiết hồ sơ.' : 'Could not load registration details.', formatApiError(err));
+      notifyError(locale === 'vi' ? 'Không tải được chi tiết hồ sơ.' : 'Could not load registration details.', {
+        description: formatUserFacingApiError(err, msgLocale),
+      });
     } finally {
       setIsLoading(false);
     }
@@ -199,7 +197,9 @@ export default function AdminRegistrationsPage() {
           : (locale === 'vi' ? 'Đã từ chối hồ sơ.' : 'Registration rejected.'),
       );
     } catch (err) {
-      notifyError(locale === 'vi' ? 'Không thể cập nhật trạng thái hồ sơ.' : 'Could not update registration status.', formatApiError(err));
+      notifyError(locale === 'vi' ? 'Không thể cập nhật trạng thái hồ sơ.' : 'Could not update registration status.', {
+        description: formatUserFacingApiError(err, msgLocale),
+      });
     } finally {
       setIsLoading(false);
     }

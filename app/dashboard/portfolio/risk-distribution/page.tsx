@@ -6,7 +6,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError } from '@/lib/notify';
-import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 
 type RiskDistributionResponse = {
   chart_data: Array<{ bucket: string; value: number; count?: number }>;
@@ -23,7 +23,8 @@ const DEFAULT_SCORE_BINS: Array<{ range: string; count: number }> = [
 ];
 
 export default function RiskDistributionPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [riskData, setRiskData] = useState<Array<{ level: string; value: number; fill: string }>>([]);
   const [scoreDistribution, setScoreDistribution] = useState<Array<{ range: string; count: number }>>(DEFAULT_SCORE_BINS);
   const [scoreStats, setScoreStats] = useState<{ mean: number; median: number; std_dev: number }>({
@@ -64,14 +65,14 @@ export default function RiskDistributionPage() {
           std_dev: Number(ss?.std_dev ?? 0),
         });
       } catch (err) {
-        if (!cancelled) notifyError(formatUserFacingApiError(err));
+        if (!cancelled) notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
       }
     };
     void load();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [msgLocale, t]);
 
   const riskDataLocalized = riskData.map((x) => ({ ...x, name: t(`risk.level.${x.level}`) }));
   const totalCustomers = useMemo(() => riskData.reduce((sum, item) => sum + Number(item.value || 0), 0), [riskData]);

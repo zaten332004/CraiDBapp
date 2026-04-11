@@ -17,6 +17,19 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/components/i18n-provider';
 import { isStrongPassword, isValidEmail, passwordRuleMessage } from '@/lib/validation/account';
 import { notifyError } from '@/lib/notify';
+import { formatUserFacingFetchError, type UserFacingLocale } from '@/lib/api/format-api-error';
+
+async function readJsonOrThrowAuthError(response: Response, locale: UserFacingLocale): Promise<Record<string, unknown>> {
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(formatUserFacingFetchError(response.status, text, locale));
+  }
+  try {
+    return text.trim() ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    throw new Error(locale === 'en' ? 'Invalid response from server.' : 'Phản hồi từ máy chủ không hợp lệ.');
+  }
+}
 
 type Mode = 'login' | 'register';
 
@@ -62,6 +75,7 @@ export function AuthSplitCard() {
   const searchParams = useSearchParams();
   const { t, locale } = useI18n();
   const isVi = locale === 'vi';
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
 
   const googleClientId = (process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID || '').trim();
   const googleBtnDivRef = useRef<HTMLDivElement | null>(null);
@@ -200,29 +214,7 @@ export function AuthSplitCard() {
           body: JSON.stringify({ token: credential }),
         });
 
-        if (!response.ok) {
-          let message = 'Login failed';
-          try {
-            const contentType = response.headers.get('content-type') ?? '';
-            if (contentType.includes('application/json')) {
-              const data = await response.json();
-              message =
-                data?.message ||
-                data?.detail ||
-                data?.error ||
-                data?.errors?.[0]?.message ||
-                message;
-            } else {
-              const text = await response.text();
-              if (text) message = text;
-            }
-          } catch {
-            // ignore parse errors
-          }
-          throw new Error(message);
-        }
-
-        const data = (await response.json()) as Record<string, unknown>;
+        const data = await readJsonOrThrowAuthError(response, msgLocale);
         const accessToken = typeof data.access_token === 'string' ? data.access_token : '';
         const normalized = normalizeAuthPayload(data);
         if (!accessToken) {
@@ -241,7 +233,7 @@ export function AuthSplitCard() {
         setLoginLoading(false);
       }
     },
-    [isVi, router, safeNext, t],
+    [isVi, msgLocale, router, safeNext, t],
   );
 
   useEffect(() => {
@@ -261,29 +253,7 @@ export function AuthSplitCard() {
         body: JSON.stringify({ username_or_email: login, password }),
       });
 
-      if (!response.ok) {
-        let message = 'Login failed';
-        try {
-          const contentType = response.headers.get('content-type') ?? '';
-          if (contentType.includes('application/json')) {
-            const data = await response.json();
-            message =
-              data?.message ||
-              data?.detail ||
-              data?.error ||
-              data?.errors?.[0]?.message ||
-              message;
-          } else {
-            const text = await response.text();
-            if (text) message = text;
-          }
-        } catch {
-          // ignore parse errors
-        }
-        throw new Error(message);
-      }
-
-      const data = (await response.json()) as Record<string, unknown>;
+      const data = await readJsonOrThrowAuthError(response, msgLocale);
       const accessToken = typeof data.access_token === 'string' ? data.access_token : '';
       const normalized = normalizeAuthPayload(data);
       if (!accessToken) {
@@ -336,12 +306,7 @@ export function AuthSplitCard() {
         }),
       });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data?.detail || data?.message || t('auth.register_failed'));
-      }
-
-      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      const data = await readJsonOrThrowAuthError(response, msgLocale);
       const accessToken = typeof data.access_token === 'string' ? data.access_token : '';
       const normalized = normalizeAuthPayload(data);
       const normalizedRole = String(normalized.role || regData.registrationType || '').trim().toLowerCase();

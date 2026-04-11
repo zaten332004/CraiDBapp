@@ -8,7 +8,7 @@ import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { ApiError } from '@/lib/api/shared';
 import { notifyError } from '@/lib/notify';
-import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatCompactVnd } from '@/lib/money';
 
 type DistResp = { chart_data: Array<{ bucket: string; count?: number }> };
@@ -63,6 +63,7 @@ function FactorYAxisTick(props: { x?: number; y?: number; payload?: { value?: nu
 
 export default function RiskAnalyzePage() {
   const { locale, t } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [factorImpactItems, setFactorImpactItems] = useState<Array<{ factor_key: string; impact: number }>>([]);
   const [usedFactorFallback, setUsedFactorFallback] = useState(false);
   const factorApiWarnedRef = useRef(false);
@@ -131,7 +132,9 @@ export default function RiskAnalyzePage() {
                     ? ' Backend có thể chưa có endpoint /portfolio/risk-factor-impact (cần deploy bản mới).'
                     : ' Backend may be missing /portfolio/risk-factor-impact (deploy latest server).')
                 : '';
-            notifyError(`${formatUserFacingApiError(reason)}${hint}`);
+            notifyError(t('toast.load_failed'), {
+              description: [formatUserFacingApiError(reason, msgLocale), hint.trim()].filter(Boolean).join('\n'),
+            });
           }
           const fb = fallbackFactorImpactFromCustomers(customers, highCount, totalDist);
           setFactorImpactItems(fb);
@@ -172,7 +175,7 @@ export default function RiskAnalyzePage() {
 
         setLastUpdatedAt(new Date());
       } catch (err) {
-        if (!cancelled) notifyError(formatUserFacingApiError(err));
+        if (!cancelled) notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
       } finally {
         if (!cancelled) setIsRefreshing(false);
       }
@@ -194,7 +197,7 @@ export default function RiskAnalyzePage() {
       window.removeEventListener('focus', refresh);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [locale]);
+  }, [locale, msgLocale, t]);
 
   const riskFactorDataLocalized = useMemo(
     () =>

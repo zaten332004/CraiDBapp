@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, RefreshCw, Unplug, PlugZap } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
-import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 import { notifyError, notifyInfo, notifySuccess } from '@/lib/notify';
 
@@ -51,6 +51,7 @@ function isGlobalPowerBiEnvMissingMessage(text: string): boolean {
 
 export default function PowerBIConfigPage() {
   const { t, locale } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
@@ -77,13 +78,6 @@ export default function PowerBIConfigPage() {
     () => datasets.find((d) => d.id === selectedDatasetId) ?? null,
     [datasets, selectedDatasetId],
   );
-
-  const formatApiError = (err: unknown) => {
-    if (err instanceof ApiError) {
-      return `${err.message} — ${err.url}${err.bodyText ? `\n${err.bodyText}` : ''}`;
-    }
-    return err instanceof Error ? err.message : String(err);
-  };
 
   const loadWorkspaces = async () => {
     const data = await browserApiFetchAuth<any>('/powerbi/workspaces', { method: 'GET' });
@@ -174,7 +168,7 @@ export default function PowerBIConfigPage() {
       }
       return { ok: true, detail: msg || undefined };
     } catch (err) {
-      const text = formatApiError(err);
+      const text = formatUserFacingApiError(err, msgLocale);
       setIsConnected(false);
       setLastCheckedAt(new Date());
       const suppress = isGlobalPowerBiEnvMissingMessage(text);
@@ -243,7 +237,7 @@ export default function PowerBIConfigPage() {
       await loadAccountPowerBiStatus();
     } catch (err) {
       setIsConnected(false);
-      const detail = formatApiError(err);
+      const detail = formatUserFacingApiError(err, msgLocale);
       notifyError(t('powerbi.toast.connect_fail_title'), { description: detail, duration: 6500 });
     } finally {
       setIsLoading(false);
@@ -318,7 +312,7 @@ export default function PowerBIConfigPage() {
       });
       await loadAccountPowerBiStatus();
     } catch (err) {
-      const detail = formatApiError(err);
+      const detail = formatUserFacingApiError(err, msgLocale);
       notifyError(t('powerbi.toast.disconnect_fail_title'), { description: detail, duration: 6500 });
     } finally {
       setIsLoading(false);
@@ -337,7 +331,7 @@ export default function PowerBIConfigPage() {
       setRefreshResult(res);
       await loadAccountPowerBiStatus();
     } catch (err) {
-      notifyError(t('powerbi.refresh_dataset'), { description: formatApiError(err), duration: 6500 });
+      notifyError(t('powerbi.refresh_dataset'), { description: formatUserFacingApiError(err, msgLocale), duration: 6500 });
     } finally {
       setIsLoading(false);
     }
@@ -480,7 +474,7 @@ export default function PowerBIConfigPage() {
                         try {
                           await loadWorkspaces();
                         } catch (err) {
-                          notifyError(t('powerbi.view_workspaces'), { description: formatApiError(err), duration: 6500 });
+                          notifyError(t('powerbi.view_workspaces'), { description: formatUserFacingApiError(err, msgLocale), duration: 6500 });
                         } finally {
                           setIsLoading(false);
                         }
@@ -530,7 +524,7 @@ export default function PowerBIConfigPage() {
                         try {
                           await loadDatasets();
                         } catch (err) {
-                          notifyError(t('powerbi.view_datasets'), { description: formatApiError(err), duration: 6500 });
+                          notifyError(t('powerbi.view_datasets'), { description: formatUserFacingApiError(err, msgLocale), duration: 6500 });
                         } finally {
                           setIsLoading(false);
                         }

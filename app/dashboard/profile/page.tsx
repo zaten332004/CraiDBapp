@@ -7,13 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Camera, Loader2 } from 'lucide-react';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
-import { formatUserFacingApiError, formatUserFacingFetchError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, formatUserFacingFetchError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { CRAIDB_PROFILE_CHANGED_EVENT } from '@/lib/profile-sync-event';
 import { getAccessToken, setSession } from '@/lib/auth/token';
@@ -34,6 +33,8 @@ type ProfileMe = {
 export default function ProfilePage() {
   const { t, locale } = useI18n();
   const isVi = locale === 'vi';
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
+  const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileMe | null>(null);
   const [profileForm, setProfileForm] = useState({ full_name: '', phone: '' });
@@ -44,7 +45,6 @@ export default function ProfilePage() {
   const [emailCode, setEmailCode] = useState('');
   const [pendingEmail, setPendingEmail] = useState('');
   const [expiresInSeconds, setExpiresInSeconds] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [sendingEmailCode, setSendingEmailCode] = useState(false);
@@ -64,7 +64,6 @@ export default function ProfilePage() {
 
   const loadProfile = async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const me = await browserApiFetchAuth<ProfileMe>('/profile/me', { method: 'GET' });
       setProfile(me);
@@ -73,7 +72,7 @@ export default function ProfilePage() {
         phone: me.phone ?? '',
       });
     } catch (err) {
-      setError(formatUserFacingApiError(err));
+      notifyError(t('toast.load_failed'), { description: apiErr(err) });
     } finally {
       setIsLoading(false);
     }
@@ -89,12 +88,11 @@ export default function ProfilePage() {
       const msg = isVi
         ? 'Số điện thoại phải bắt đầu bằng số 0 và gồm đúng 10 chữ số.'
         : 'Phone number must start with 0 and contain exactly 10 digits.';
-      setError(msg);
+      notifyError(isVi ? 'Không thể lưu hồ sơ.' : 'Could not save profile.', msg);
       return;
     }
 
     setSavingProfile(true);
-    setError(null);
     try {
       const updated = await browserApiFetchAuth<ProfileMe>('/profile/me', {
         method: 'PATCH',
@@ -111,8 +109,7 @@ export default function ProfilePage() {
       window.dispatchEvent(new Event(CRAIDB_PROFILE_CHANGED_EVENT));
       notifySuccess(isVi ? 'Đã lưu hồ sơ.' : 'Profile saved.');
     } catch (err) {
-      const msg = formatUserFacingApiError(err);
-      setError(msg);
+      const msg = apiErr(err);
       notifyError(isVi ? 'Không thể lưu hồ sơ.' : 'Could not save profile.', msg);
     } finally {
       setSavingProfile(false);
@@ -120,15 +117,14 @@ export default function ProfilePage() {
   };
 
   const changePassword = async () => {
-    setError(null);
     if (!isStrongPassword(newPassword)) {
       const msg = passwordRuleMessage(isVi);
-      setError(msg);
+      notifyError(isVi ? 'Đổi mật khẩu thất bại.' : 'Failed to change password.', msg);
       return;
     }
     if (newPassword !== confirmPassword) {
       const msg = isVi ? 'Mật khẩu xác nhận không khớp.' : 'Password confirmation does not match.';
-      setError(msg);
+      notifyError(isVi ? 'Đổi mật khẩu thất bại.' : 'Failed to change password.', msg);
       return;
     }
     setSavingPassword(true);
@@ -145,8 +141,7 @@ export default function ProfilePage() {
       setConfirmPassword('');
       notifySuccess(isVi ? 'Đổi mật khẩu thành công.' : 'Password changed successfully.');
     } catch (err) {
-      const msg = formatUserFacingApiError(err);
-      setError(msg);
+      const msg = apiErr(err);
       notifyError(isVi ? 'Đổi mật khẩu thất bại.' : 'Failed to change password.', msg);
     } finally {
       setSavingPassword(false);
@@ -157,10 +152,9 @@ export default function ProfilePage() {
     if (!newEmail.trim()) return;
     if (!isValidEmail(newEmail)) {
       const msg = isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.';
-      setError(msg);
+      notifyError(isVi ? 'Không thể gửi mã xác minh.' : 'Failed to send verification code.', msg);
       return;
     }
-    setError(null);
     setSendingEmailCode(true);
     try {
       const res = await browserApiFetchAuth<{ message: string; pending_email: string; expires_in_seconds: number }>(
@@ -174,8 +168,7 @@ export default function ProfilePage() {
       setExpiresInSeconds(res.expires_in_seconds);
       notifySuccess(isVi ? 'Đã gửi mã xác minh tới email mới.' : 'Verification code sent to new email.');
     } catch (err) {
-      const msg = formatUserFacingApiError(err);
-      setError(msg);
+      const msg = apiErr(err);
       notifyError(isVi ? 'Không thể gửi mã xác minh.' : 'Failed to send verification code.', msg);
     } finally {
       setSendingEmailCode(false);
@@ -184,7 +177,6 @@ export default function ProfilePage() {
 
   const confirmEmailChange = async () => {
     if (!emailCode.trim()) return;
-    setError(null);
     setConfirmingEmailCode(true);
     try {
       const res = await browserApiFetchAuth<{ message: string; email: string; access_token: string; role: string }>(
@@ -202,8 +194,7 @@ export default function ProfilePage() {
       setExpiresInSeconds(null);
       notifySuccess(isVi ? 'Cập nhật email thành công.' : 'Email updated successfully.');
     } catch (err) {
-      const msg = formatUserFacingApiError(err);
-      setError(msg);
+      const msg = apiErr(err);
       notifyError(isVi ? 'Xác minh mã thất bại.' : 'Failed to verify code.', msg);
     } finally {
       setConfirmingEmailCode(false);
@@ -211,7 +202,6 @@ export default function ProfilePage() {
   };
 
   const uploadAvatar = async (file: File) => {
-    setError(null);
     setUploadingAvatar(true);
     try {
       const token = getAccessToken();
@@ -224,15 +214,14 @@ export default function ProfilePage() {
       });
       if (!response.ok) {
         const bodyText = await response.text().catch(() => '');
-        throw new Error(formatUserFacingFetchError(response.status, bodyText));
+        throw new Error(formatUserFacingFetchError(response.status, bodyText, msgLocale));
       }
       const updated = (await response.json()) as ProfileMe;
       setProfile(updated);
       window.dispatchEvent(new Event(CRAIDB_PROFILE_CHANGED_EVENT));
       notifySuccess(isVi ? 'Đã cập nhật ảnh đại diện.' : 'Avatar updated.');
     } catch (err) {
-      const msg = formatUserFacingApiError(err);
-      setError(msg);
+      const msg = apiErr(err);
       notifyError(isVi ? 'Không thể cập nhật ảnh đại diện.' : 'Failed to update avatar.', msg);
     } finally {
       setUploadingAvatar(false);
@@ -321,8 +310,7 @@ export default function ProfilePage() {
       setCropOpen(false);
       await uploadAvatar(file);
     } catch (err) {
-      const msg = formatUserFacingApiError(err);
-      setError(msg);
+      const msg = apiErr(err);
       notifyError(isVi ? 'Không thể cắt ảnh.' : 'Could not crop image.', msg);
     }
   };
@@ -378,12 +366,6 @@ export default function ProfilePage() {
           {t('profile.desc')}
         </p>
       </div>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       {isLoading ? (
         <Card className="border-border/80 bg-card shadow-sm">

@@ -12,7 +12,7 @@ import { Zap } from 'lucide-react';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError } from '@/lib/notify';
-import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatVnd } from '@/lib/money';
 import { riskBadgeOutlineClass } from '@/components/risk-score-explanation';
 import { cn } from '@/lib/utils';
@@ -74,6 +74,7 @@ function formatPctDraftFromNumber(n: number): string {
 
 export default function RiskSimulationPage() {
   const { locale, t } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [customerId, setCustomerId] = useState('');
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -150,7 +151,7 @@ export default function RiskSimulationPage() {
       }));
       setPctDraft({ income: '0', debt: '0', rate: '0' });
     } catch (err) {
-      notifyError(formatUserFacingApiError(err));
+      notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
       setIsLoadingCustomer(false);
     }
@@ -207,7 +208,7 @@ export default function RiskSimulationPage() {
       }));
       if (rows.length > 0) setScenarioData(rows);
     } catch (err) {
-      notifyError(formatUserFacingApiError(err));
+      notifyError(t('toast.risk_score_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
       setIsSimulating(false);
     }

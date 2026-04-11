@@ -7,13 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2, TrendingUp } from 'lucide-react';
 import { authJsonHeaders } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
-import { formatUserFacingApiError, formatUserFacingFetchError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, formatUserFacingFetchError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { notifyError } from '@/lib/notify';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { formatVndDigits, sanitizeVndDigitString, parseVndDigitsToNumber } from '@/lib/money';
@@ -157,6 +156,8 @@ function VndDigitField(props: {
 
 export default function RiskScorePage() {
   const { t, locale } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
+  const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
   const [formData, setFormData] = useState<ScoreForm>(initialForm);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -164,7 +165,6 @@ export default function RiskScorePage() {
   const [isSyncingCustomer, setIsSyncingCustomer] = useState(false);
   const [loadedCustomerId, setLoadedCustomerId] = useState<number | null>(null);
   const [isExplanationOpen, setIsExplanationOpen] = useState(false);
-  const [error, setError] = useState('');
   const lastFetchedLookupRef = useRef<string>('');
   /** Khách đã có điểm nội bộ trên DB khi load hồ sơ — không ghi đè bằng kết quả CIC lần sau. */
   const hadCreditScoreWhenLoadedRef = useRef(false);
@@ -220,12 +220,12 @@ export default function RiskScorePage() {
       } catch (e) {
         lastFetchedLookupRef.current = '';
         setLoadedCustomerId(null);
-        notifyError(formatUserFacingApiError(e));
+        notifyError(t('toast.load_failed'), { description: apiErr(e) });
       } finally {
         setProfileLoading(false);
       }
     },
-    [applyCustomer, t],
+    [applyCustomer, t, msgLocale],
   );
 
   useEffect(() => {
@@ -297,26 +297,24 @@ export default function RiskScorePage() {
           cicCreditPersistedThisLoadRef.current = true;
         }
       } catch (err) {
-        notifyError(formatUserFacingApiError(err));
+        notifyError(t('toast.action_failed'), { description: apiErr(err) });
       } finally {
         setIsSyncingCustomer(false);
       }
     },
-    [formData, loadedCustomerId],
+    [formData, loadedCustomerId, t, msgLocale],
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
 
     if (!loadedCustomerId) {
       const msg = locale === 'vi'
         ? 'Vui lòng nhập mã khách hàng hợp lệ để tải hồ sơ trước khi chấm điểm.'
         : 'Please enter a valid customer ID to load profile data before scoring.';
-      setError(msg);
       setIsLoading(false);
-      notifyError(msg);
+      notifyError(t('toast.risk_score_failed'), { description: msg });
       return;
     }
 
@@ -326,21 +324,18 @@ export default function RiskScorePage() {
     const creditHistory = parseInt(formData.creditHistory, 10) || 60;
 
     if (!Number.isFinite(income) || income <= 0) {
-      setError(t('risk.score.validation_income'));
       setIsLoading(false);
-      notifyError(t('risk.score.validation_income'));
+      notifyError(t('toast.risk_score_failed'), { description: t('risk.score.validation_income') });
       return;
     }
     if (!Number.isFinite(debt) || debt < 0) {
-      setError(t('risk.score.validation_loan'));
       setIsLoading(false);
-      notifyError(t('risk.score.validation_loan'));
+      notifyError(t('toast.risk_score_failed'), { description: t('risk.score.validation_loan') });
       return;
     }
     if (!Number.isFinite(age) || age < 18 || age > 120) {
-      setError(t('risk.score.validation_age'));
       setIsLoading(false);
-      notifyError(t('risk.score.validation_age'));
+      notifyError(t('toast.risk_score_failed'), { description: t('risk.score.validation_age') });
       return;
     }
 
@@ -381,7 +376,7 @@ export default function RiskScorePage() {
 
       if (!response.ok) {
         const bodyText = await response.text();
-        throw new Error(formatUserFacingFetchError(response.status, bodyText));
+        throw new Error(formatUserFacingFetchError(response.status, bodyText, msgLocale));
       }
 
       const data = await response.json();
@@ -389,9 +384,8 @@ export default function RiskScorePage() {
       setIsExplanationOpen(false);
       await syncCustomerAfterScoring(data?.risk_label, data?.risk_score, data?.cic_score);
     } catch (err) {
-      const message = err instanceof Error ? err.message : t('common.error');
-      setError(message);
-      notifyError(message);
+      const message = err instanceof Error ? err.message : apiErr(err);
+      notifyError(t('toast.risk_score_failed'), { description: message });
     } finally {
       setIsLoading(false);
     }
@@ -637,12 +631,6 @@ export default function RiskScorePage() {
         </Card>
 
         <div className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
           {result && (
             <Card>
               <CardHeader>
@@ -697,7 +685,7 @@ export default function RiskScorePage() {
             </Card>
           )}
 
-          {!result && !error && (
+          {!result && (
             <Card>
               <CardContent className="pt-12 pb-12 text-center">
                 <p className="text-muted-foreground">{t('risk.score.empty')}</p>

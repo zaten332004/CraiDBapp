@@ -7,7 +7,7 @@ import { TrendingUp, Users, AlertCircle, PieChart } from 'lucide-react';
 import { getUserRole, type UserRole } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
-import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { notifyError } from '@/lib/notify';
 import { formatDateTimeVietnam, formatDateVietnam } from '@/lib/datetime';
 import { formatCompactVnd } from '@/lib/money';
@@ -56,6 +56,7 @@ export default function DashboardPage() {
   const [role, setRole] = useState<UserRole | null>(null);
   const [roleReady, setRoleReady] = useState(false);
   const { locale, t } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [kpi, setKpi] = useState<PortfolioKPI | null>(null);
   const [trendData, setTrendData] = useState<Array<{ month: string; value: number; score: number }>>([]);
   const [recentAlerts, setRecentAlerts] = useState<AlertItem[]>([]);
@@ -106,12 +107,12 @@ export default function DashboardPage() {
         const customers = await browserApiFetchAuth<{ total: number }>('/customers?page=1', { method: 'GET' });
         if (!cancelled) setCustomerCount(Number(customers?.total || 0));
       } catch (err) {
-        if (!cancelled) notifyError(formatUserFacingApiError(err));
+        if (!cancelled) notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
       }
     };
     void load();
     return () => { cancelled = true; };
-  }, [locale]);
+  }, [locale, msgLocale, t]);
 
   const cards = useMemo(() => {
     const portfolioScore = Math.round((1 - Number(kpi?.avg_pd || 0)) * 100);

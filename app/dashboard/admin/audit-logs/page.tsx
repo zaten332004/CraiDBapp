@@ -2,16 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { browserApiFetchAuth } from '@/lib/api/browser';
-import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
-import { AlertCircle, Clock3, Download, Hash, Loader2, RefreshCw, ShieldCheck, User } from 'lucide-react';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
+import { notifyError } from '@/lib/notify';
+import { Clock3, Download, Hash, Loader2, RefreshCw, ShieldCheck, User } from 'lucide-react';
 import { ListPagination } from '@/components/list-pagination';
 import { downloadCsvFile } from '@/lib/export/csv';
 import { formatDateTimeVietnam, formatDateVietnam } from '@/lib/datetime';
@@ -25,13 +25,6 @@ type AuditLogRow = {
   target: string;
   raw: unknown;
 };
-
-function formatApiError(err: unknown) {
-  if (err instanceof ApiError) {
-    return `${err.message} — ${err.url}${err.bodyText ? `\n${err.bodyText}` : ''}`;
-  }
-  return err instanceof Error ? err.message : String(err);
-}
 
 function normalizeAuditLog(item: any, idx: number): AuditLogRow {
   const id = String(item?.id ?? item?.log_id ?? item?.logId ?? idx);
@@ -308,17 +301,16 @@ function formatFieldValue(value: any, locale: string) {
 export default function AdminAuditLogsPage() {
   const PAGE_SIZE = 15;
   const { t, locale } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [rows, setRows] = useState<AuditLogRow[]>([]);
   const [actorNameMap, setActorNameMap] = useState<Record<string, string>>({});
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<AuditLogRow | null>(null);
 
   const load = async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const [auditData, usersData] = await Promise.all([
         browserApiFetchAuth<any>('/admin/audit-logs', { method: 'GET' }),
@@ -352,7 +344,7 @@ export default function AdminAuditLogsPage() {
     } catch (err) {
       setRows([]);
       setActorNameMap({});
-      setError(formatApiError(err));
+      notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
       setIsLoading(false);
     }
@@ -426,13 +418,6 @@ export default function AdminAuditLogsPage() {
           {t('common.refresh')}
         </Button>
       </div>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="whitespace-pre-wrap">{error}</AlertDescription>
-        </Alert>
-      )}
 
       <Card className="flex-1 border-border/80 bg-card shadow-sm">
         <CardHeader className="space-y-2 pb-3">

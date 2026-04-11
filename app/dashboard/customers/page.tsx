@@ -28,7 +28,7 @@ import { getUserRole } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError, notifySuccess } from '@/lib/notify';
-import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { ListPagination } from '@/components/list-pagination';
 import { getAccessToken } from '@/lib/auth/token';
 import { formatVnd } from '@/lib/money';
@@ -85,6 +85,7 @@ function normalizeCustomerListResponse(data: unknown): { items: any[]; total: nu
 export default function CustomersPage() {
   const PAGE_SIZE = 15;
   const { t, locale } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const router = useRouter();
   const role = getUserRole();
   const isViewer = role === 'viewer';
@@ -143,11 +144,11 @@ export default function CustomersPage() {
       setCustomers(filtered);
       setTotalCount(total);
     } catch (err) {
-      notifyError(formatUserFacingApiError(err));
+      notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
       setIsLoading(false);
     }
-  }, [page, search, riskFilter]);
+  }, [page, search, riskFilter, t, msgLocale]);
 
   useEffect(() => {
     void loadCustomers();
@@ -234,7 +235,7 @@ export default function CustomersPage() {
 
       notifySuccess(locale === 'vi' ? 'Đang tải file export.' : 'Downloading export file.');
     } catch (err) {
-      notifyError(formatUserFacingApiError(err));
+      notifyError(t('toast.export_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
       setIsExporting(false);
     }

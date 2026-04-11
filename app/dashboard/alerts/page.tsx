@@ -25,7 +25,7 @@ import { AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError, notifySuccess } from '@/lib/notify';
-import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { ListPagination } from '@/components/list-pagination';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 
@@ -132,6 +132,7 @@ const getStatusIcon = (status: string) => {
 export default function AlertsPage() {
   const PAGE_SIZE = 7;
   const { locale, t } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
@@ -154,7 +155,7 @@ export default function AlertsPage() {
       }));
       setAlerts(normalized);
     } catch (err) {
-      notifyError(formatUserFacingApiError(err));
+      notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
       setAlerts([]);
     } finally {
       setIsLoading(false);
@@ -218,7 +219,7 @@ export default function AlertsPage() {
       );
       await loadAlerts();
     } catch (err) {
-      notifyError(formatUserFacingApiError(err));
+      notifyError(t('toast.action_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     }
   };
 

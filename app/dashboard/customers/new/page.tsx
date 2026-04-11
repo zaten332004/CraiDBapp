@@ -9,12 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { authJsonHeaders } from '@/lib/auth/token';
 import { getUserRole } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
-import { formatUserFacingFetchError } from '@/lib/api/format-api-error';
+import { formatUserFacingFetchError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import {
   isValidEmail,
@@ -51,8 +50,8 @@ export default function NewCustomerPage() {
   const role = getUserRole();
   const isViewer = role === 'viewer';
   const isVi = locale === 'vi';
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     full_name: '',
     external_customer_ref: '',
@@ -147,7 +146,6 @@ export default function NewCustomerPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
 
     try {
@@ -247,7 +245,7 @@ export default function NewCustomerPage() {
 
       if (!response.ok) {
         const bodyText = await response.text();
-        throw new Error(formatUserFacingFetchError(response.status, bodyText));
+        throw new Error(formatUserFacingFetchError(response.status, bodyText, msgLocale));
       }
 
       notifySuccess(t('customers.new.create'), {
@@ -260,8 +258,8 @@ export default function NewCustomerPage() {
       router.push('/dashboard/customers');
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');
-      setError(message);
-      notifyError(message, {
+      notifyError(t('toast.customer_create_failed'), {
+        description: message,
         details: [
           `${t('common.full_name')}: ${formData.full_name || '-'}`,
           `${t('common.email')}: ${formData.email || '-'}`,
@@ -291,12 +289,10 @@ export default function NewCustomerPage() {
       </div>
 
       {isViewer && (
-        <Alert>
-          <AlertDescription>
-            {t('customers.new.viewer_notice_prefix')}{' '}
-            <span className="font-medium">{t('role.viewer')}</span>. {t('customers.new.viewer_notice_suffix')}
-          </AlertDescription>
-        </Alert>
+        <div className="rounded-lg border border-border/80 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          {t('customers.new.viewer_notice_prefix')}{' '}
+          <span className="font-medium text-foreground">{t('role.viewer')}</span>. {t('customers.new.viewer_notice_suffix')}
+        </div>
       )}
 
       <div className="grid max-w-6xl grid-cols-1 gap-6 xl:grid-cols-2">
@@ -309,12 +305,6 @@ export default function NewCustomerPage() {
           </CardHeader>
 
           <CardContent>
-            {error && (
-              <Alert variant="destructive" className="mb-6">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
             <form id="new-customer-form" onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

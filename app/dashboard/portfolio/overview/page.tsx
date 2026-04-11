@@ -7,7 +7,7 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError } from '@/lib/notify';
-import { formatUserFacingApiError } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatDateVietnam } from '@/lib/datetime';
 import { formatCompactVnd } from '@/lib/money';
 
@@ -51,6 +51,7 @@ function truncateLabel(value: string, maxLength = 16) {
 export default function PortfolioOverviewPage() {
   const { t, locale } = useI18n();
   const moneyLocale = locale === 'vi' ? 'vi' : 'en';
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [kpi, setKpi] = useState<PortfolioKPI | null>(null);
   const [trendData, setTrendData] = useState<Array<{ month: string; value: number; score: number }>>([]);
   const [riskDistribution, setRiskDistribution] = useState<Array<{ level: string; value: number; count: number; fill: string }>>([]);
@@ -89,12 +90,12 @@ export default function PortfolioOverviewPage() {
           Number(countMap.low || 0) + Number(countMap.medium || 0) + Number(countMap.high || 0),
         );
       } catch (err) {
-        if (!cancelled) notifyError(formatUserFacingApiError(err));
+        if (!cancelled) notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
       }
     };
     void load();
     return () => { cancelled = true; };
-  }, []);
+  }, [msgLocale, t]);
 
   const riskDistributionLocalized = riskDistribution.map((x) => ({ ...x, name: t(`risk.level.${x.level}`) }));
   const { sectorBreakdownLocalized, sectorOthersSummary } = useMemo(() => {

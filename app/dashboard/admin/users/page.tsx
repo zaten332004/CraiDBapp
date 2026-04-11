@@ -5,16 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Search, MoreHorizontal, Loader2, RefreshCw, AlertCircle, Download, Trash2, UserCheck, UserX } from 'lucide-react';
+import { Search, MoreHorizontal, Loader2, RefreshCw, Download, Trash2, UserCheck, UserX } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
-import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
+import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { ListPagination } from '@/components/list-pagination';
 import { downloadCsvFile } from '@/lib/export/csv';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -43,13 +42,6 @@ function normalizeUser(item: any): AdminUser | null {
   return { id, name, email, role, isActive, raw: item };
 }
 
-function formatApiError(err: unknown) {
-  if (err instanceof ApiError) {
-    return `${err.message} — ${err.url}${err.bodyText ? `\n${err.bodyText}` : ''}`;
-  }
-  return err instanceof Error ? err.message : String(err);
-}
-
 function getRoleBadgeClass(role: string) {
   const normalized = String(role || '').toLowerCase();
   if (normalized === 'admin') return 'border-violet-300 bg-violet-50 text-violet-700';
@@ -68,11 +60,12 @@ function getStatusBadgeClass(isActive: boolean) {
 export default function AdminUsersPage() {
   const PAGE_SIZE = 15;
   const { t, locale } = useI18n();
+  const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
+  const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<'all' | 'active' | 'inactive'>('all');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>('');
@@ -80,14 +73,13 @@ export default function AdminUsersPage() {
 
   const loadUsers = async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const data = await browserApiFetchAuth<any>('/admin/users', { method: 'GET' });
       const rawList = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : Array.isArray(data?.value) ? data.value : [];
       const rows = rawList.map(normalizeUser).filter(Boolean) as AdminUser[];
       setUsers(rows);
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(t('toast.load_failed'), { description: apiErr(err) });
       setUsers([]);
     } finally {
       setIsLoading(false);
@@ -99,7 +91,6 @@ export default function AdminUsersPage() {
     if (!q) return loadUsers();
 
     setIsLoading(true);
-    setError(null);
     try {
       const params = new URLSearchParams();
       if (q.includes('@')) params.set('name_contains', q); // best-effort; backend may ignore
@@ -110,7 +101,7 @@ export default function AdminUsersPage() {
       const rows = rawList.map(normalizeUser).filter(Boolean) as AdminUser[];
       setUsers(rows);
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(t('toast.load_failed'), { description: apiErr(err) });
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +109,6 @@ export default function AdminUsersPage() {
 
   const setUserActive = async (userId: string, isActive: boolean) => {
     setIsLoading(true);
-    setError(null);
     try {
       await browserApiFetchAuth(`/admin/users/${encodeURIComponent(userId)}/status?is_active=${isActive ? 'true' : 'false'}`, {
         method: 'PATCH',
@@ -131,9 +121,10 @@ export default function AdminUsersPage() {
           : (locale === 'vi' ? 'Đã vô hiệu hóa người dùng.' : 'User has been deactivated.'),
       );
     } catch (err) {
-      const message = formatApiError(err);
-      setError(message);
-      notifyError(locale === 'vi' ? 'Không thể cập nhật trạng thái người dùng.' : 'Could not update user status.', message);
+      const message = apiErr(err);
+      notifyError(locale === 'vi' ? 'Không thể cập nhật trạng thái người dùng.' : 'Could not update user status.', {
+        description: message,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -141,7 +132,6 @@ export default function AdminUsersPage() {
 
   const setUserRole = async (userId: string, role: string) => {
     setIsLoading(true);
-    setError(null);
     try {
       const response = await browserApiFetchAuth<{ role?: string }>(`/admin/users/${encodeURIComponent(userId)}/role`, {
         method: 'PATCH',
@@ -153,9 +143,10 @@ export default function AdminUsersPage() {
       setSelectedRole(updatedRole);
       notifySuccess(locale === 'vi' ? 'Đã cập nhật vai trò người dùng.' : 'User role updated successfully.');
     } catch (err) {
-      const message = formatApiError(err);
-      setError(message);
-      notifyError(locale === 'vi' ? 'Không thể cập nhật vai trò người dùng.' : 'Could not update user role.', message);
+      const message = apiErr(err);
+      notifyError(locale === 'vi' ? 'Không thể cập nhật vai trò người dùng.' : 'Could not update user role.', {
+        description: message,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -163,7 +154,6 @@ export default function AdminUsersPage() {
 
   const deleteUser = async (user: AdminUser) => {
     setIsLoading(true);
-    setError(null);
     try {
       const response = await browserApiFetchAuth<{ message?: string }>(`/admin/users/${encodeURIComponent(user.id)}`, {
         method: 'DELETE',
@@ -176,9 +166,8 @@ export default function AdminUsersPage() {
           (locale === 'vi' ? `Đã xóa người dùng ${user.name}.` : `User ${user.name} was deleted successfully.`),
       );
     } catch (err) {
-      const message = formatApiError(err);
-      setError(message);
-      notifyError(locale === 'vi' ? 'Không thể xóa người dùng.' : 'Could not delete user.', message);
+      const message = apiErr(err);
+      notifyError(locale === 'vi' ? 'Không thể xóa người dùng.' : 'Could not delete user.', { description: message });
     } finally {
       setIsLoading(false);
     }
@@ -285,13 +274,6 @@ export default function AdminUsersPage() {
           </Button>
         </div>
       </div>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="whitespace-pre-wrap">{error}</AlertDescription>
-        </Alert>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
