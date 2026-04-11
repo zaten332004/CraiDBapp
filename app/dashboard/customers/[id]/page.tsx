@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,13 +29,32 @@ import { formatDateTimeVietnam } from '@/lib/datetime';
 import { formatVnd } from '@/lib/money';
 import { getUserRole } from '@/lib/auth/token';
 
+function sanitizeDashboardReturnTo(raw: string | null): string | null {
+  if (!raw) return null;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+  if (decoded.length > 256) return null;
+  if (!decoded.startsWith('/dashboard')) return null;
+  if (decoded.includes('//') || decoded.includes('\\')) return null;
+  return decoded;
+}
+
 export default function CustomerDetailPage() {
   const { locale, t } = useI18n();
   const isVi = locale === 'vi';
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams();
   const customerId = Number(params.id);
+  const returnToParam = searchParams.get('returnTo');
+  const backHref = useMemo(() => {
+    return sanitizeDashboardReturnTo(returnToParam) ?? '/dashboard/customers';
+  }, [returnToParam]);
   const role = getUserRole();
   const canManageProfile = role !== 'viewer';
   const [customer, setCustomer] = useState<any | null>(null);
@@ -325,7 +344,7 @@ export default function CustomerDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/customers">
+          <Link href={backHref}>
             <Button variant="ghost" size="sm">
               <ArrowLeft className="mr-2 h-4 w-4" />
               {t('common.back')}

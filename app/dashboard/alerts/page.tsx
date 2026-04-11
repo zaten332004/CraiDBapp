@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,13 +22,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { AlertCircle, CheckCircle, Clock, MoreHorizontal, UserRound } from 'lucide-react';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { ListPagination } from '@/components/list-pagination';
 import { formatDateTimeVietnam } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
+
+const ALERTS_LIST_PATH = '/dashboard/alerts';
+
+function customerDetailHrefFromAlerts(customerId: number) {
+  return `/dashboard/customers/${customerId}?returnTo=${encodeURIComponent(ALERTS_LIST_PATH)}`;
+}
 
 type AlertRow = {
   alert_id: number;
@@ -131,6 +145,7 @@ const getStatusIcon = (status: string) => {
 
 export default function AlertsPage() {
   const PAGE_SIZE = 7;
+  const router = useRouter();
   const { locale, t } = useI18n();
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [filter, setFilter] = useState<string>('all');
@@ -315,8 +330,23 @@ export default function AlertsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pagedAlerts.map((alert) => (
-                      <TableRow key={alert.alert_id} className="border-b border-black/15 hover:bg-muted/30">
+                    {pagedAlerts.map((alert) => {
+                      const cid =
+                        alert.customer_id != null && Number(alert.customer_id) > 0
+                          ? Number(alert.customer_id)
+                          : null;
+                      const rowOpensProfile = cid != null;
+                      return (
+                      <TableRow
+                        key={alert.alert_id}
+                        className={cn(
+                          'border-b border-black/15 hover:bg-muted/30',
+                          rowOpensProfile && 'cursor-pointer',
+                        )}
+                        onClick={() => {
+                          if (cid != null) router.push(customerDetailHrefFromAlerts(cid));
+                        }}
+                      >
                         <TableCell className="py-2">{getStatusIcon(alert.status)}</TableCell>
                         <TableCell className="max-w-0 py-2">
                           <div className="min-w-0 pr-1">
@@ -345,27 +375,53 @@ export default function AlertsPage() {
                         <TableCell className="py-2 text-[13px] text-muted-foreground whitespace-nowrap">
                           {formatDateTimeVietnam(alert.created_at, locale)}
                         </TableCell>
-                        <TableCell className="py-2 text-right align-top">
-                          <div className="flex flex-col items-end gap-1">
-                            {alert.customer_id != null && Number(alert.customer_id) > 0 ? (
-                              <Button variant="ghost" size="sm" className="h-8 px-2 text-[13px]" asChild>
-                                <Link href={`/dashboard/customers/${alert.customer_id}`}>{t('alerts.view_customer')}</Link>
-                              </Button>
-                            ) : null}
-                            {alert.status === 'open' ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-[13px] text-accent hover:text-accent"
-                                onClick={() => void resolveAlert(alert.alert_id)}
-                              >
-                                {t('alerts.resolve')}
-                              </Button>
-                            ) : null}
+                        <TableCell
+                          className="py-2 text-right align-middle"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex justify-end">
+                            {cid != null || alert.status === 'open' ? (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0"
+                                    aria-label={t('common.actions')}
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  {cid != null ? (
+                                    <DropdownMenuItem asChild>
+                                      <Link href={customerDetailHrefFromAlerts(cid)}>
+                                        <UserRound className="mr-2 h-4 w-4 opacity-80" />
+                                        {t('alerts.view_customer')}
+                                      </Link>
+                                    </DropdownMenuItem>
+                                  ) : null}
+                                  {alert.status === 'open' ? (
+                                    <DropdownMenuItem
+                                      onClick={() => void resolveAlert(alert.alert_id)}
+                                      className="text-accent focus:text-accent"
+                                    >
+                                      <CheckCircle className="mr-2 h-4 w-4 opacity-80" />
+                                      {t('alerts.resolve')}
+                                    </DropdownMenuItem>
+                                  ) : null}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    );
+                    })}
                   </TableBody>
                 </Table>
               </div>

@@ -1787,15 +1787,18 @@ export default function AIChatPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={(e) => {
-                e.preventDefault();
-                void confirmDeleteSession();
-              }}
-              disabled={isLoading}
-            >
-              {t('ai_chat.delete_session_confirm')}
+            <AlertDialogAction asChild>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={isLoading}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void confirmDeleteSession();
+                }}
+              >
+                {t('ai_chat.delete_session_confirm')}
+              </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
