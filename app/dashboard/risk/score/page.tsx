@@ -684,7 +684,7 @@ export default function RiskScorePage() {
       </div>
 
       <Dialog open={isExplanationOpen} onOpenChange={setIsExplanationOpen}>
-        <DialogContent className="w-[98vw] max-w-none sm:max-w-[min(98vw,1536px)] max-h-[92vh] overflow-y-auto">
+        <DialogContent className="w-[90vw] max-w-none sm:max-w-[min(90vw,1280px)] max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('risk.score.explanation')}</DialogTitle>
           </DialogHeader>
