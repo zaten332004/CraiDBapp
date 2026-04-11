@@ -4,17 +4,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, XCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, RefreshCw } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
 import { ListPagination } from '@/components/list-pagination';
 import { formatDateTimeVietnam } from '@/lib/datetime';
+import { notifyError, notifySuccess } from '@/lib/notify';
 
 type RegistrationType = 'manager' | 'analyst';
 
@@ -72,29 +72,46 @@ export default function AdminRegistrationsPage() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [page, setPage] = useState(1);
 
+  const extractList = (data: any) =>
+    Array.isArray(data)
+      ? data
+      : Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.value)
+          ? data.value
+          : [];
+
   const loadPending = async (status: 'pending' | 'approved' | 'rejected' = statusFilter) => {
     setIsLoading(true);
-    setError(null);
     try {
-      const data = await browserApiFetchAuth<any>(`/auth/register/list?reg_type=manager&status_filter=${status}`, {
-        method: 'GET',
-      });
-      const rawList = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.items)
-          ? data.items
-          : Array.isArray(data?.value)
-            ? data.value
-            : [];
-      const rows = rawList.map((x: any) => normalizeRegistration(x, 'manager')).filter(Boolean) as RegistrationRow[];
+      const roles: RegistrationType[] = ['manager', 'analyst'];
+      const settled = await Promise.allSettled(
+        roles.map(async (role) => {
+          const data = await browserApiFetchAuth<any>(`/auth/register/list?reg_type=${role}&status_filter=${status}`, {
+            method: 'GET',
+          });
+          return extractList(data).map((x: any) => normalizeRegistration(x, role)).filter(Boolean) as RegistrationRow[];
+        }),
+      );
+
+      const rows = settled
+        .filter((r): r is PromiseFulfilledResult<RegistrationRow[]> => r.status === 'fulfilled')
+        .flatMap((r) => r.value)
+        .sort((a, b) => {
+          const ta = Date.parse(String(a.requestedAt || ''));
+          const tb = Date.parse(String(b.requestedAt || ''));
+          return (Number.isNaN(tb) ? 0 : tb) - (Number.isNaN(ta) ? 0 : ta);
+        });
       setRegistrations(rows);
+      if (settled.some((r) => r.status === 'rejected')) {
+        notifyError(locale === 'vi' ? 'Một phần danh sách không tải được.' : 'Part of the registration list could not be loaded.');
+      }
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(locale === 'vi' ? 'Không tải được danh sách đăng ký.' : 'Could not load registration list.', formatApiError(err));
       setRegistrations([]);
     } finally {
       setIsLoading(false);
@@ -103,7 +120,6 @@ export default function AdminRegistrationsPage() {
 
   const openRegistrationDetails = async (regId: string) => {
     setIsLoading(true);
-    setError(null);
     setDetails(null);
     try {
       const data = await browserApiFetchAuth<any>(
@@ -113,7 +129,7 @@ export default function AdminRegistrationsPage() {
       setDetails(data);
       setIsDetailsOpen(true);
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(locale === 'vi' ? 'Không tải được chi tiết hồ sơ.' : 'Could not load registration details.', formatApiError(err));
     } finally {
       setIsLoading(false);
     }
@@ -130,11 +146,10 @@ export default function AdminRegistrationsPage() {
     if (!selectedId || !action) return;
 
     setIsLoading(true);
-    setError(null);
     try {
       const approved = action === 'approve';
       if (!approved && !rejectionReason.trim()) {
-        setError(locale === 'vi' ? 'Vui lòng nhập lý do từ chối.' : 'Please provide a rejection reason.');
+        notifyError(locale === 'vi' ? 'Vui lòng nhập lý do từ chối.' : 'Please provide a rejection reason.');
         setIsLoading(false);
         return;
       }
@@ -158,8 +173,13 @@ export default function AdminRegistrationsPage() {
       setIsDialogOpen(false);
       setSelectedId(null);
       setAction(null);
+      notifySuccess(
+        approved
+          ? (locale === 'vi' ? 'Đã duyệt hồ sơ thành công.' : 'Registration approved successfully.')
+          : (locale === 'vi' ? 'Đã từ chối hồ sơ.' : 'Registration rejected.'),
+      );
     } catch (err) {
-      setError(formatApiError(err));
+      notifyError(locale === 'vi' ? 'Không thể cập nhật trạng thái hồ sơ.' : 'Could not update registration status.', formatApiError(err));
     } finally {
       setIsLoading(false);
     }
@@ -196,22 +216,6 @@ export default function AdminRegistrationsPage() {
         <p className="text-muted-foreground mt-2">{t('admin.reg.desc')}</p>
       </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="whitespace-pre-wrap">{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {registrations.length > 0 && !error && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {t('admin.reg.pending_prefix')} {registrations.length} {t('admin.reg.pending_suffix')}
-          </AlertDescription>
-        </Alert>
-      )}
-
       <Card className="border-border/80 bg-card shadow-sm">
         <CardHeader className="space-y-2 pb-3">
           <div className="flex items-start justify-between gap-4">
@@ -230,6 +234,7 @@ export default function AdminRegistrationsPage() {
           <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="w-fit">{t('role.manager')}</Badge>
+              <Badge variant="outline" className="w-fit">{t('role.analyst')}</Badge>
               <Button
                 size="sm"
                 variant={statusFilter === 'pending' ? 'default' : 'outline'}

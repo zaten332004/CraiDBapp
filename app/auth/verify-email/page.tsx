@@ -22,6 +22,7 @@ type PendingStatusResponse = {
   role: string;
   status: 'pending' | 'approved' | 'rejected' | string;
   has_pin: boolean;
+  rejection_reason?: string | null;
 };
 
 function normalizeRoleFromPayload(data: Record<string, unknown>): string {
@@ -99,6 +100,10 @@ function VerifyEmailContent() {
         role: normalizedRole,
         status: normalizedStatus,
         has_pin: Boolean(normalizedHasPin),
+        rejection_reason:
+          (typeof payload.rejection_reason === 'string' && payload.rejection_reason.trim()) ||
+          (typeof payload.rejectionReason === 'string' && payload.rejectionReason.trim()) ||
+          null,
       };
       setPendingInfo(normalizedPayload);
       if (normalizedRole === 'admin' || normalizedRole === 'manager' || normalizedRole === 'analyst' || normalizedRole === 'viewer') {
@@ -229,7 +234,9 @@ function VerifyEmailContent() {
   const resolvedRole = pendingInfo?.role || roleQuery || fallbackRole || 'analyst';
   const currentStatus = String(pendingInfo?.status || fallbackStatus || 'pending').toLowerCase();
   const resolvedHasPin = typeof pendingInfo?.has_pin === 'boolean' ? pendingInfo.has_pin : fallbackHasPin;
+  const rejectionReason = String(pendingInfo?.rejection_reason || '').trim();
   const isApproved = currentStatus === 'approved';
+  const isRejected = currentStatus === 'rejected';
   const pendingHomeRoute = dashboardRouteByRole(resolvedRole);
   const localizedStatus =
     currentStatus === 'approved'
@@ -296,14 +303,29 @@ function VerifyEmailContent() {
 
           <Card className="border border-border">
             <CardHeader>
-              <CardTitle className="text-3xl tracking-tight">
-                {pendingInfo?.has_pin ? (isVi ? 'Đổi mã PIN bảo mật' : 'Change security PIN') : (isVi ? 'Thiết lập mã PIN bảo mật' : 'Set security PIN')}
-              </CardTitle>
-              <CardDescription>
-                {isVi
-                  ? 'Mã PIN 6 số dùng để xác nhận khi quên mật khẩu hoặc đổi email.'
-                  : 'Your 6-digit PIN is required for password reset and email change verification.'}
-              </CardDescription>
+              {isRejected ? (
+                <>
+                  <CardTitle className="text-3xl tracking-tight">
+                    {isVi ? 'Lý do từ chối hồ sơ' : 'Rejection reason'}
+                  </CardTitle>
+                  <CardDescription>
+                    {isVi
+                      ? 'Tài khoản của bạn đã bị từ chối. Vui lòng xem lý do bên dưới và liên hệ quản trị viên để được hỗ trợ.'
+                      : 'Your account request was rejected. Please review the reason below and contact an administrator.'}
+                  </CardDescription>
+                </>
+              ) : (
+                <>
+                  <CardTitle className="text-3xl tracking-tight">
+                    {pendingInfo?.has_pin ? (isVi ? 'Đổi mã PIN bảo mật' : 'Change security PIN') : (isVi ? 'Thiết lập mã PIN bảo mật' : 'Set security PIN')}
+                  </CardTitle>
+                  <CardDescription>
+                    {isVi
+                      ? 'Mã PIN 6 số dùng để xác nhận khi quên mật khẩu hoặc đổi email.'
+                      : 'Your 6-digit PIN is required for password reset and email change verification.'}
+                  </CardDescription>
+                </>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               {error && (
@@ -319,49 +341,67 @@ function VerifyEmailContent() {
                 </Alert>
               )}
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
-                <p className="font-semibold">{isVi ? 'Lưu ý bảo mật PIN' : 'PIN security note'}</p>
-                <p className="mt-1">
-                  {isVi
-                    ? 'Hãy ghi nhớ mã PIN và không chia sẻ cho người khác. Bạn sẽ cần PIN khi quên mật khẩu hoặc đổi email.'
-                    : 'Please remember your PIN and never share it. You will need it for password reset and email change.'}
-                </p>
-              </div>
-
-              {resolvedHasPin ? (
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="old-pin">{isVi ? 'PIN cũ' : 'Current PIN'}</Label>
-                    <Input id="old-pin" value={oldPin} onChange={(e) => setOldPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN cũ' : 'Enter current PIN'} />
+              {isRejected ? (
+                <>
+                  <div className="rounded-xl border border-red-200 bg-red-50/60 p-4">
+                    <p className="text-sm font-semibold text-red-800">{isVi ? 'Chi tiết từ chối' : 'Rejection details'}</p>
+                    <p className="mt-2 text-sm text-red-900">
+                      {rejectionReason || (isVi ? 'Quản trị viên chưa cung cấp lý do cụ thể.' : 'No specific reason was provided by the administrator.')}
+                    </p>
                   </div>
-                  <div>
-                    <Label htmlFor="new-pin">{isVi ? 'PIN mới' : 'New PIN'}</Label>
-                    <Input id="new-pin" value={newPin} onChange={(e) => setNewPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN mới 6 số' : 'Enter new 6-digit PIN'} />
+                  <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+                    {isVi
+                      ? 'Bạn có thể cập nhật lại thông tin hồ sơ hoặc liên hệ quản trị viên để được xét duyệt lại.'
+                      : 'You can update your profile information or contact an administrator for re-review.'}
                   </div>
-                  <div>
-                    <Label htmlFor="confirm-new-pin">{isVi ? 'Xác nhận PIN mới' : 'Confirm new PIN'}</Label>
-                    <Input id="confirm-new-pin" value={newPinConfirm} onChange={(e) => setNewPinConfirm(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập lại PIN mới' : 'Re-enter new PIN'} />
-                  </div>
-                  <Button className="w-full" onClick={submitChangePin} disabled={pinLoading}>
-                    {pinLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {isVi ? 'Đổi PIN' : 'Change PIN'}
-                  </Button>
-                </div>
+                </>
               ) : (
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="pin">{isVi ? 'PIN 6 chữ số' : '6-digit PIN'}</Label>
-                    <Input id="pin" value={pin} onChange={(e) => setPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN 6 số' : 'Enter 6-digit PIN'} />
+                <>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
+                    <p className="font-semibold">{isVi ? 'Lưu ý bảo mật PIN' : 'PIN security note'}</p>
+                    <p className="mt-1">
+                      {isVi
+                        ? 'Hãy ghi nhớ mã PIN và không chia sẻ cho người khác. Bạn sẽ cần PIN khi quên mật khẩu hoặc đổi email.'
+                        : 'Please remember your PIN and never share it. You will need it for password reset and email change.'}
+                    </p>
                   </div>
-                  <div>
-                    <Label htmlFor="confirm-pin">{isVi ? 'Xác nhận PIN' : 'Confirm PIN'}</Label>
-                    <Input id="confirm-pin" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập lại PIN 6 số' : 'Re-enter 6-digit PIN'} />
-                  </div>
-                  <Button className="w-full" onClick={submitSetPin} disabled={pinLoading}>
-                    {pinLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {isVi ? 'Lưu PIN' : 'Save PIN'}
-                  </Button>
-                </div>
+
+                  {resolvedHasPin ? (
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="old-pin">{isVi ? 'PIN cũ' : 'Current PIN'}</Label>
+                        <Input id="old-pin" value={oldPin} onChange={(e) => setOldPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN cũ' : 'Enter current PIN'} />
+                      </div>
+                      <div>
+                        <Label htmlFor="new-pin">{isVi ? 'PIN mới' : 'New PIN'}</Label>
+                        <Input id="new-pin" value={newPin} onChange={(e) => setNewPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN mới 6 số' : 'Enter new 6-digit PIN'} />
+                      </div>
+                      <div>
+                        <Label htmlFor="confirm-new-pin">{isVi ? 'Xác nhận PIN mới' : 'Confirm new PIN'}</Label>
+                        <Input id="confirm-new-pin" value={newPinConfirm} onChange={(e) => setNewPinConfirm(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập lại PIN mới' : 'Re-enter new PIN'} />
+                      </div>
+                      <Button className="w-full" onClick={submitChangePin} disabled={pinLoading}>
+                        {pinLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isVi ? 'Đổi PIN' : 'Change PIN'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="pin">{isVi ? 'PIN 6 chữ số' : '6-digit PIN'}</Label>
+                        <Input id="pin" value={pin} onChange={(e) => setPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN 6 số' : 'Enter 6-digit PIN'} />
+                      </div>
+                      <div>
+                        <Label htmlFor="confirm-pin">{isVi ? 'Xác nhận PIN' : 'Confirm PIN'}</Label>
+                        <Input id="confirm-pin" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập lại PIN 6 số' : 'Re-enter 6-digit PIN'} />
+                      </div>
+                      <Button className="w-full" onClick={submitSetPin} disabled={pinLoading}>
+                        {pinLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isVi ? 'Lưu PIN' : 'Save PIN'}
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

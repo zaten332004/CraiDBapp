@@ -646,7 +646,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "admin.reg.dialog_approve_mid": "với vai trò",
     "admin.reg.dialog_reject_prefix": "Bạn có chắc muốn từ chối đăng ký của",
     "admin.reg.details_title": "Chi tiết đăng ký",
-    "admin.reg.details_desc": "Dữ liệu trả về từ /auth/register/registration/{user_id}.",
+    "admin.reg.details_desc": "Xem thông tin chi tiết hồ sơ đăng ký của người dùng.",
 
     "admin.audit.title": "Audit logs",
     "admin.audit.desc": "Theo dõi sự kiện hệ thống và thao tác quản trị.",
@@ -670,7 +670,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "admin.export.extra": "Tham số bổ sung (JSON)",
     "admin.export.invalid_json": "JSON không hợp lệ.",
     "admin.export.run": "Chạy export",
-    "admin.export.result_desc": "Response trả về từ POST /admin/export.",
+    "admin.export.result_desc": "Kết quả tạo file export.",
     "admin.export.download_ready": "Download URL:",
 
     "session.expired_idle": "Phiên đã hết hạn do không hoạt động trong thời gian cho phép. Vui lòng đăng nhập lại.",
@@ -1458,7 +1458,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "admin.reg.dialog_approve_mid": "as a",
     "admin.reg.dialog_reject_prefix": "Are you sure you want to reject",
     "admin.reg.details_title": "Registration details",
-    "admin.reg.details_desc": "Response from /auth/register/registration/{user_id}.",
+    "admin.reg.details_desc": "View detailed information for the selected registration.",
 
     "admin.audit.title": "Audit Logs",
     "admin.audit.desc": "Track system events and admin actions.",
@@ -1482,7 +1482,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "admin.export.extra": "Extra params (JSON)",
     "admin.export.invalid_json": "Invalid JSON.",
     "admin.export.run": "Run export",
-    "admin.export.result_desc": "Response from POST /admin/export.",
+    "admin.export.result_desc": "Export generation result.",
     "admin.export.download_ready": "Download URL:",
 
     "session.expired_idle": "Your session expired due to inactivity. Please sign in again.",
