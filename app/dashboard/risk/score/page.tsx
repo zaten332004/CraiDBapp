@@ -245,12 +245,13 @@ export default function RiskScorePage() {
   };
 
   const syncCustomerAfterScoring = useCallback(
-    async (riskLabel: unknown, riskScore: unknown) => {
+    async (riskLabel: unknown, riskScore: unknown, cicScore: unknown) => {
       if (!loadedCustomerId) return;
       setIsSyncingCustomer(true);
       try {
         const normalizedRiskLabel = String(riskLabel || '').trim().toLowerCase();
         const scoreValue = Number(riskScore);
+        const cicScoreValue = Number(cicScore);
         await browserApiFetchAuth(`/customers/${loadedCustomerId}`, {
           method: 'PUT',
           body: {
@@ -258,7 +259,9 @@ export default function RiskScorePage() {
             monthly_income: parseVndDigitsToNumber(formData.incomeDigits),
             requested_loan_amount: parseVndDigitsToNumber(formData.loanDigits),
             age: Number(formData.age),
-            credit_score: formData.creditScore ? Number(formData.creditScore) : undefined,
+            credit_score: Number.isFinite(cicScoreValue)
+              ? Math.round(cicScoreValue)
+              : (formData.creditScore ? Number(formData.creditScore) : undefined),
             loan_type: formData.loanType.trim() || undefined,
             requested_term_months: formData.loanTermMonths ? Number(formData.loanTermMonths) : undefined,
             annual_interest_rate: formData.interestRate ? Number(formData.interestRate.replace(',', '.')) : undefined,
@@ -360,7 +363,7 @@ export default function RiskScorePage() {
       const data = await response.json();
       setResult(data);
       setIsExplanationOpen(false);
-      await syncCustomerAfterScoring(data?.risk_label, data?.risk_score);
+      await syncCustomerAfterScoring(data?.risk_label, data?.risk_score, data?.cic_score);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');
       setError(message);
