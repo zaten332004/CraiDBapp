@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Eye, EyeOff, KeyRound, Mail, ShieldCheck } from 'lucide-react';
@@ -13,6 +13,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useI18n } from '@/components/i18n-provider';
 import { isNumericPin, isStrongPassword, isValidEmail, passwordRuleMessage } from '@/lib/validation/account';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { clearAccessToken } from '@/lib/auth/token';
 
 type Step = 'request' | 'confirm';
 
@@ -33,6 +34,12 @@ export default function ForgotPasswordPage() {
     () => (isVi ? 'Quên mật khẩu' : 'Forgot Password'),
     [isVi],
   );
+
+  /** Full navigation after clearing cookies so middleware does not send logged-in users away from /auth. */
+  const goToLogin = useCallback(() => {
+    clearAccessToken();
+    window.location.assign('/auth?mode=login');
+  }, []);
 
   const requestCode = async (e: FormEvent) => {
     e.preventDefault();
@@ -94,6 +101,7 @@ export default function ForgotPasswordPage() {
         throw new Error(data?.detail || data?.message || (isVi ? 'Không thể đặt lại mật khẩu.' : 'Failed to reset password.'));
       }
       notifySuccess(data?.message || (isVi ? 'Đổi mật khẩu thành công.' : 'Password reset successfully.'));
+      clearAccessToken();
       setCode('');
       setNewPassword('');
       setConfirmPassword('');
@@ -236,9 +244,13 @@ export default function ForgotPasswordPage() {
           )}
 
           <div className="pt-2 text-center text-sm text-muted-foreground">
-            <Link href="/auth?mode=login" className="font-medium text-accent hover:underline">
+            <button
+              type="button"
+              onClick={goToLogin}
+              className="font-medium text-accent hover:underline underline-offset-2"
+            >
               {isVi ? 'Quay lại đăng nhập' : 'Back to sign in'}
-            </Link>
+            </button>
           </div>
         </CardContent>
       </Card>
