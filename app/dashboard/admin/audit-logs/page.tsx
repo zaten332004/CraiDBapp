@@ -14,7 +14,7 @@ import { useI18n } from '@/components/i18n-provider';
 import { AlertCircle, Clock3, Download, Hash, Loader2, RefreshCw, ShieldCheck, User } from 'lucide-react';
 import { ListPagination } from '@/components/list-pagination';
 import { downloadCsvFile } from '@/lib/export/csv';
-import { formatDateTimeVietnam } from '@/lib/datetime';
+import { formatDateTimeVietnam, formatDateVietnam } from '@/lib/datetime';
 
 type AuditLogRow = {
   id: string;
@@ -74,6 +74,36 @@ function formatAuditTs(ts: string, locale: string) {
   const value = new Date(ts);
   if (Number.isNaN(value.getTime())) return ts;
   return formatDateTimeVietnam(value, locale);
+}
+
+function parseAuditDate(ts: string): Date | null {
+  if (!ts || ts === '—') return null;
+  const raw = ts.trim();
+  if (!raw) return null;
+  if (/^\d+$/.test(raw)) {
+    const numeric = Number(raw);
+    const ms = raw.length <= 10 ? numeric * 1000 : numeric;
+    const fromEpoch = new Date(ms);
+    return Number.isNaN(fromEpoch.getTime()) ? null : fromEpoch;
+  }
+  const value = new Date(raw);
+  return Number.isNaN(value.getTime()) ? null : value;
+}
+
+function formatAuditDateOnly(ts: string, locale: string) {
+  const value = parseAuditDate(ts);
+  if (!value) return locale === 'vi' ? 'Không có' : 'N/A';
+  return formatDateVietnam(value, locale);
+}
+
+function formatAuditTimeOnly(ts: string, locale: string) {
+  const value = parseAuditDate(ts);
+  if (!value) return '--:--:--';
+  const language = locale === 'vi' ? 'vi-VN' : 'en-GB';
+  return value.toLocaleTimeString(language, {
+    hour12: false,
+    timeZone: 'Asia/Ho_Chi_Minh',
+  });
 }
 
 function getActionLabel(action: string, locale: string) {
@@ -432,14 +462,16 @@ export default function AdminAuditLogsPage() {
           <div className="overflow-x-auto rounded-xl border border-black/70 bg-white min-h-[620px]">
             <Table className="w-full table-fixed">
               <colgroup>
-                <col className="w-[22%]" />
-                <col className="w-[20%]" />
+                <col className="w-[16%]" />
+                <col className="w-[12%]" />
+                <col className="w-[18%]" />
                 <col className="w-[20%]" />
                 <col />
               </colgroup>
               <TableHeader>
                 <TableRow className="bg-muted/35 hover:bg-muted/35">
                   <TableHead className="py-2.5 text-[13px] font-semibold">{t('common.date')}</TableHead>
+                  <TableHead className="py-2.5 text-[13px] font-semibold">{locale === 'vi' ? 'Giờ' : 'Time'}</TableHead>
                   <TableHead className="py-2.5 text-[13px] font-semibold">{t('admin.audit.actor')}</TableHead>
                   <TableHead className="py-2.5 text-[13px] font-semibold">{t('admin.audit.action')}</TableHead>
                   <TableHead className="py-2.5 pr-3 text-[13px] font-semibold">{locale === 'vi' ? 'Mô tả ngắn' : 'Short description'}</TableHead>
@@ -452,7 +484,8 @@ export default function AdminAuditLogsPage() {
                     className="cursor-pointer border-b border-black/15 hover:bg-muted/30"
                     onClick={() => setSelected(r)}
                   >
-                    <TableCell className="py-2 whitespace-nowrap text-[13px]">{formatAuditTs(r.ts, locale)}</TableCell>
+                    <TableCell className="py-2 whitespace-nowrap text-[13px]">{formatAuditDateOnly(r.ts, locale)}</TableCell>
+                    <TableCell className="py-2 whitespace-nowrap text-[13px]">{formatAuditTimeOnly(r.ts, locale)}</TableCell>
                     <TableCell className="py-2 text-[13px] font-medium">
                       {resolveActorDisplay(r)}
                     </TableCell>
@@ -468,7 +501,7 @@ export default function AdminAuditLogsPage() {
                 ))}
                 {paged.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
                       {isLoading ? t('common.loading') : t('common.no_results')}
                     </TableCell>
                   </TableRow>

@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Search, MoreHorizontal, Loader2, RefreshCw, AlertCircle, Download, Trash2 } from 'lucide-react';
+import { Search, MoreHorizontal, Loader2, RefreshCw, AlertCircle, Download, Trash2, UserCheck, UserX } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
@@ -407,6 +407,11 @@ export default function AdminUsersPage() {
                             }}
                             className={!user.isActive ? 'text-green-700' : 'text-red-600'}
                           >
+                            {user.isActive ? (
+                              <UserX className="mr-2 h-4 w-4" />
+                            ) : (
+                              <UserCheck className="mr-2 h-4 w-4" />
+                            )}
                             {user.isActive ? t('admin.users.deactivate') : t('admin.users.activate')}
                           </DropdownMenuItem>
                           <DropdownMenuItem
