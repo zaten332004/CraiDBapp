@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronUp, Loader2, TrendingUp } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Loader2, TrendingUp } from 'lucide-react';
 import { authJsonHeaders } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
 import { formatUserFacingApiError, formatUserFacingFetchError } from '@/lib/api/format-api-error';
@@ -393,6 +394,7 @@ export default function RiskScorePage() {
   }
 
   const structuredExplanation = result ? parseExplanationDetail(result.explanation_detail) : null;
+  const hasExplanation = Boolean(structuredExplanation || explanationText);
 
   return (
     <div className="flex flex-col gap-8 p-8">
@@ -646,45 +648,15 @@ export default function RiskScorePage() {
                   </div>
                 )}
 
-                {structuredExplanation ? (
-                  <div className="space-y-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsExplanationOpen((prev) => !prev)}
-                      className="w-full justify-between"
-                    >
-                      {locale === 'vi' ? 'Xem chi tiết' : 'View details'}
-                      {isExplanationOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </Button>
-                    {isExplanationOpen ? (
-                      <RiskScoreExplanationPanel
-                        d={structuredExplanation}
-                        locale={locale}
-                        t={t}
-                        riskLevelLabel={riskLevelLabel(getRiskLevel())}
-                        riskLevel={getRiskLevel()}
-                      />
-                    ) : null}
-                  </div>
-                ) : explanationText ? (
-                  <div className="space-y-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsExplanationOpen((prev) => !prev)}
-                      className="w-full justify-between"
-                    >
-                      {locale === 'vi' ? 'Xem chi tiết' : 'View details'}
-                      {isExplanationOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </Button>
-                    {isExplanationOpen ? (
-                      <div className={riskExplanationFrameClass(getRiskLevel())}>
-                        <p className="text-xs font-medium text-muted-foreground mb-2">{t('risk.score.explanation')}</p>
-                        <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">{explanationText}</div>
-                      </div>
-                    ) : null}
-                  </div>
+                {hasExplanation ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsExplanationOpen(true)}
+                    className="w-full justify-start"
+                  >
+                    {locale === 'vi' ? 'Xem chi tiết' : 'View details'}
+                  </Button>
                 ) : null}
               </CardContent>
             </Card>
@@ -699,6 +671,28 @@ export default function RiskScorePage() {
           )}
         </div>
       </div>
+
+      <Dialog open={isExplanationOpen} onOpenChange={setIsExplanationOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('risk.score.explanation')}</DialogTitle>
+          </DialogHeader>
+          {structuredExplanation ? (
+            <RiskScoreExplanationPanel
+              d={structuredExplanation}
+              locale={locale}
+              t={t}
+              riskLevelLabel={riskLevelLabel(getRiskLevel())}
+              riskLevel={getRiskLevel()}
+            />
+          ) : explanationText ? (
+            <div className={riskExplanationFrameClass(getRiskLevel())}>
+              <p className="text-xs font-medium text-muted-foreground mb-2">{t('risk.score.explanation')}</p>
+              <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">{explanationText}</div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

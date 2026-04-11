@@ -66,67 +66,36 @@ function formatAuditTs(ts: string, locale: string) {
   return `${dateOnly} ${timeOnly}`;
 }
 
-function hasTimezoneOffset(raw: string) {
-  return /(?:z|[+-]\d{2}:\d{2})$/i.test(raw);
-}
-
-function parseNaiveAuditParts(raw: string) {
-  const match = raw.match(
-    /^(\d{4})-(\d{2})-(\d{2})[t\s](\d{2}):(\d{2})(?::(\d{2}))?/i,
-  );
-  if (!match) return null;
-  const [, year, month, day, hour, minute, second] = match;
-  return {
-    year,
-    month,
-    day,
-    hour,
-    minute,
-    second: second ?? '00',
-  };
-}
-
-function parseAuditDate(ts: string): { date: Date | null; naiveParts: ReturnType<typeof parseNaiveAuditParts> } {
-  if (!ts || ts === '—') return { date: null, naiveParts: null };
+function parseAuditDate(ts: string): Date | null {
+  if (!ts || ts === '—') return null;
   const raw = ts.trim();
-  if (!raw) return { date: null, naiveParts: null };
-
-  const naiveParts = !hasTimezoneOffset(raw) ? parseNaiveAuditParts(raw) : null;
-  if (naiveParts) {
-    return { date: null, naiveParts };
-  }
+  if (!raw) return null;
 
   if (/^\d+$/.test(raw)) {
     const numeric = Number(raw);
     const ms = raw.length <= 10 ? numeric * 1000 : numeric;
     const fromEpoch = new Date(ms);
-    return { date: Number.isNaN(fromEpoch.getTime()) ? null : fromEpoch, naiveParts: null };
+    return Number.isNaN(fromEpoch.getTime()) ? null : fromEpoch;
   }
-  const value = new Date(raw);
-  return { date: Number.isNaN(value.getTime()) ? null : value, naiveParts: null };
+
+  // Backend frequently sends naive timestamps; treat them as UTC.
+  const hasTimezone = /(?:z|[+-]\d{2}:\d{2})$/i.test(raw);
+  const normalized = hasTimezone ? raw : `${raw.replace(' ', 'T')}Z`;
+  const value = new Date(normalized);
+  return Number.isNaN(value.getTime()) ? null : value;
 }
 
 function formatAuditDateOnly(ts: string, locale: string) {
   const parsed = parseAuditDate(ts);
   if (!parsed) return locale === 'vi' ? 'Không có' : 'N/A';
-  if (parsed.naiveParts) {
-    const { day, month, year } = parsed.naiveParts;
-    return locale === 'vi' ? `${day}/${month}/${year}` : `${year}-${month}-${day}`;
-  }
-  if (!parsed.date) return locale === 'vi' ? 'Không có' : 'N/A';
-  return formatDateVietnam(parsed.date, locale);
+  return formatDateVietnam(parsed, locale);
 }
 
 function formatAuditTimeOnly(ts: string, locale: string) {
   const parsed = parseAuditDate(ts);
   if (!parsed) return '--:--:--';
-  if (parsed.naiveParts) {
-    const { hour, minute, second } = parsed.naiveParts;
-    return `${hour}:${minute}:${second}`;
-  }
-  if (!parsed.date) return '--:--:--';
   const language = locale === 'vi' ? 'vi-VN' : 'en-GB';
-  return parsed.date.toLocaleTimeString(language, {
+  return parsed.toLocaleTimeString(language, {
     hour12: false,
     timeZone: 'Asia/Ho_Chi_Minh',
   });
@@ -331,10 +300,7 @@ function formatFieldValue(value: any, locale: string) {
   if (lowered === 'enabled' || lowered === 'active') return locale === 'vi' ? 'Đang kích hoạt' : 'Enabled';
   if (lowered === 'resolved from dashboard') return locale === 'vi' ? 'Đã xử lý từ dashboard' : 'Resolved from dashboard';
   if (/^\d{4}-\d{2}-\d{2}t/i.test(raw) || /^\d{4}-\d{2}-\d{2}/.test(raw)) {
-    const d = new Date(raw);
-    if (!Number.isNaN(d.getTime())) {
-      return formatDateTimeVietnam(d, locale);
-    }
+    return formatDateTimeVietnam(raw, locale);
   }
   return raw;
 }
