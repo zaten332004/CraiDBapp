@@ -283,6 +283,16 @@ export default function RiskScorePage() {
     setError('');
     setIsLoading(true);
 
+    if (!loadedCustomerId) {
+      const msg = locale === 'vi'
+        ? 'Vui lòng nhập mã khách hàng hợp lệ để tải hồ sơ trước khi chấm điểm.'
+        : 'Please enter a valid customer ID to load profile data before scoring.';
+      setError(msg);
+      setIsLoading(false);
+      notifyError(msg);
+      return;
+    }
+
     const income = parseVndDigitsToNumber(formData.incomeDigits);
     const debt = parseVndDigitsToNumber(formData.loanDigits);
     const age = parseInt(formData.age, 10);
@@ -434,7 +444,7 @@ export default function RiskScorePage() {
                   placeholder={t('customers.customer_name_ph')}
                   value={formData.name}
                   onChange={handleChange}
-                  disabled={isLoading}
+                  disabled
                 />
               </div>
 
@@ -444,7 +454,7 @@ export default function RiskScorePage() {
                   label={t('risk.score.monthly_income')}
                   valueDigits={formData.incomeDigits}
                   onDigitsChange={(d) => setFormData((p) => ({ ...p, incomeDigits: d }))}
-                  disabled={isLoading}
+                  disabled
                   placeholderDigits="20000000"
                 />
                 <VndDigitField
@@ -452,7 +462,7 @@ export default function RiskScorePage() {
                   label={t('risk.score.loan_amount')}
                   valueDigits={formData.loanDigits}
                   onDigitsChange={(d) => setFormData((p) => ({ ...p, loanDigits: d }))}
-                  disabled={isLoading}
+                  disabled
                   placeholderDigits="500000000"
                 />
               </div>
@@ -469,7 +479,7 @@ export default function RiskScorePage() {
                     placeholder="30"
                     value={formData.age}
                     onChange={handleChange}
-                    disabled={isLoading}
+                    disabled
                   />
                 </div>
                 <div className="space-y-2">
@@ -482,7 +492,7 @@ export default function RiskScorePage() {
                     placeholder={t('customers.credit_history_ph')}
                     value={formData.creditHistory}
                     onChange={handleChange}
-                    disabled={isLoading}
+                    disabled
                   />
                 </div>
               </div>
@@ -498,7 +508,7 @@ export default function RiskScorePage() {
                   placeholder={t('risk.score.credit_score_ph')}
                   value={formData.creditScore}
                   onChange={handleChange}
-                  disabled={isLoading}
+                  disabled
                 />
               </div>
 
@@ -508,7 +518,7 @@ export default function RiskScorePage() {
                   <Select
                     value={formData.loanType || '__none__'}
                     onValueChange={(v) => setFormData((p) => ({ ...p, loanType: v === '__none__' ? '' : v }))}
-                    disabled={isLoading}
+                    disabled
                   >
                     <SelectTrigger>
                       <SelectValue placeholder={t('risk.score.loan_type_opt.unspecified')} />
@@ -531,7 +541,7 @@ export default function RiskScorePage() {
                     placeholder="12"
                     value={formData.interestRate}
                     onChange={handleChange}
-                    disabled={isLoading}
+                    disabled
                   />
                 </div>
               </div>
@@ -547,7 +557,7 @@ export default function RiskScorePage() {
                     placeholder="36"
                     value={formData.loanTermMonths}
                     onChange={handleChange}
-                    disabled={isLoading}
+                    disabled
                   />
                 </div>
                 <VndDigitField
@@ -555,7 +565,7 @@ export default function RiskScorePage() {
                   label={t('risk.score.collateral_value')}
                   valueDigits={formData.collateralDigits}
                   onDigitsChange={(d) => setFormData((p) => ({ ...p, collateralDigits: d }))}
-                  disabled={isLoading}
+                  disabled
                 />
               </div>
 
@@ -671,7 +681,7 @@ export default function RiskScorePage() {
       </div>
 
       <Dialog open={isExplanationOpen} onOpenChange={setIsExplanationOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[96vw] max-w-6xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('risk.score.explanation')}</DialogTitle>
           </DialogHeader>
