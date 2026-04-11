@@ -30,6 +30,12 @@ function defaultDashboardAfterLogin(role: string | null | undefined) {
   return String(role || '').trim().toLowerCase() === 'analyst' ? '/dashboard/customers' : '/dashboard';
 }
 
+function postLoginRoute(args: { role?: string | null; status?: string | null }) {
+  const status = String(args.status || '').trim().toLowerCase();
+  if (status && status !== 'approved') return '/auth/verify-email?mode=pending';
+  return defaultDashboardAfterLogin(args.role);
+}
+
 export function AuthSplitCard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -188,9 +194,19 @@ export function AuthSplitCard() {
           throw new Error(message);
         }
 
-        const data = (await response.json()) as { access_token: string; role?: string };
-        setSession({ accessToken: data.access_token, role: data.role });
-        router.push(safeNext ?? defaultDashboardAfterLogin(data.role));
+        const data = (await response.json()) as {
+          access_token: string;
+          role?: string;
+          status?: string;
+          has_pin?: boolean;
+        };
+        setSession({
+          accessToken: data.access_token,
+          role: data.role,
+          status: data.status,
+          hasPin: data.has_pin,
+        });
+        router.push(safeNext ?? postLoginRoute({ role: data.role, status: data.status }));
       } catch (err) {
         setLoginError(err instanceof Error ? err.message : t('common.error'));
       } finally {
@@ -240,9 +256,19 @@ export function AuthSplitCard() {
         throw new Error(message);
       }
 
-      const data = (await response.json()) as { access_token: string; role?: string };
-      setSession({ accessToken: data.access_token, role: data.role });
-      router.push(safeNext ?? defaultDashboardAfterLogin(data.role));
+      const data = (await response.json()) as {
+        access_token: string;
+        role?: string;
+        status?: string;
+        has_pin?: boolean;
+      };
+      setSession({
+        accessToken: data.access_token,
+        role: data.role,
+        status: data.status,
+        hasPin: data.has_pin,
+      });
+      router.push(safeNext ?? postLoginRoute({ role: data.role, status: data.status }));
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : t('common.error'));
     } finally {
@@ -281,7 +307,7 @@ export function AuthSplitCard() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data?.message || t('auth.register_failed'));
+        throw new Error(data?.detail || data?.message || t('auth.register_failed'));
       }
 
       router.push(`/auth/verify-email?email=${encodeURIComponent(regData.email)}`);

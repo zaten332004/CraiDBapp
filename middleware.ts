@@ -9,6 +9,10 @@ export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const token = request.cookies.get("access_token")?.value;
   const role = request.cookies.get("user_role")?.value?.toLowerCase();
+  const status = request.cookies.get("user_status")?.value?.toLowerCase();
+
+  const isApproved = status === "approved";
+  const isPendingLike = status === "pending" || status === "rejected";
 
   if (pathname.startsWith("/dashboard")) {
     if (!token) {
@@ -16,6 +20,10 @@ export function middleware(request: NextRequest) {
       const next = `${pathname}${search}`;
       if (isSafeNextPath(next)) loginUrl.searchParams.set("next", next);
       return NextResponse.redirect(loginUrl);
+    }
+
+    if (isPendingLike) {
+      return NextResponse.redirect(new URL("/auth/verify-email?mode=pending", request.url));
     }
 
     // UX-only route gating (backend must still enforce permissions).
@@ -41,6 +49,12 @@ export function middleware(request: NextRequest) {
 
   if (pathname.startsWith("/auth")) {
     if (token) {
+      if (!isApproved) {
+        if (pathname.startsWith("/auth/verify-email")) {
+          return NextResponse.next();
+        }
+        return NextResponse.redirect(new URL("/auth/verify-email?mode=pending", request.url));
+      }
       const home = role === "analyst" ? "/dashboard/customers" : "/dashboard";
       return NextResponse.redirect(new URL(home, request.url));
     }

@@ -48,9 +48,9 @@ export default function ForgotPasswordPage() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data?.detail || data?.message || (isVi ? 'Không thể gửi mã xác minh.' : 'Failed to send verification code.'));
+        throw new Error(data?.detail || data?.message || (isVi ? 'Không thể bắt đầu quy trình đổi mật khẩu bằng PIN.' : 'Could not start PIN reset flow.'));
       }
-      setMessage(data?.message || (isVi ? 'Mã xác minh đã được gửi tới email của bạn.' : 'Verification code was sent to your email.'));
+      setMessage(data?.message || (isVi ? 'Tiếp tục bằng cách nhập mã PIN 6 số của tài khoản.' : 'Continue by entering your account 6-digit PIN.'));
       setStep('confirm');
     } catch (err) {
       setError(err instanceof Error ? err.message : (isVi ? 'Đã có lỗi xảy ra.' : 'Something went wrong.'));
@@ -113,8 +113,8 @@ export default function ForgotPasswordPage() {
           <CardTitle className="text-3xl tracking-tight">{pageTitle}</CardTitle>
           <CardDescription>
             {isVi
-              ? 'Nhập email để nhận mã xác minh, sau đó đổi mật khẩu mới.'
-              : 'Enter your email to receive a verification code, then set a new password.'}
+              ? 'Nhập email, sau đó xác nhận bằng mã PIN 6 số để đổi mật khẩu.'
+              : 'Enter your email, then use your 6-digit PIN to reset password.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -148,7 +148,7 @@ export default function ForgotPasswordPage() {
                 </div>
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (isVi ? 'Đang gửi...' : 'Sending...') : (isVi ? 'Nhận mã xác minh' : 'Get verification code')}
+                {loading ? (isVi ? 'Đang xử lý...' : 'Processing...') : (isVi ? 'Tiếp tục với PIN' : 'Continue with PIN')}
               </Button>
             </form>
           ) : (
@@ -169,13 +169,13 @@ export default function ForgotPasswordPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="code">{isVi ? 'Mã xác minh' : 'Verification code'}</Label>
+                <Label htmlFor="code">{isVi ? 'Mã PIN 6 số' : '6-digit PIN'}</Label>
                 <div className="relative">
                   <Input
                     id="code"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    placeholder={isVi ? 'Nhập mã 6 số' : 'Enter 6-digit code'}
+                    placeholder={isVi ? 'Nhập mã PIN 6 số' : 'Enter 6-digit PIN'}
                     className="pl-10"
                     required
                     disabled={loading}
