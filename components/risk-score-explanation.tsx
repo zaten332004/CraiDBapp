@@ -71,7 +71,7 @@ const FACTOR_TITLE: Record<string, { vi: string; en: string }> = {
 
 export function riskExplanationFrameClass(level: string) {
   return cn(
-    'rounded-xl border-2 bg-background/90 p-4 shadow-sm',
+    'rounded-xl border-2 bg-background/90 shadow-sm',
     level === 'low' && 'border-emerald-600',
     level === 'medium' && 'border-amber-500',
     level === 'high' && 'border-rose-600',
@@ -160,9 +160,13 @@ export function RiskScoreExplanationPanel(props: {
         : 'No collateral → default factor 0.8.';
 
   return (
-    <div className={cn('space-y-5 text-sm', riskExplanationFrameClass(riskLevel))}>
+    <div
+      className={cn(
+        'mx-auto w-full max-w-[min(100%,52rem)] max-h-[min(75vh,640px)] space-y-5 overflow-y-auto overscroll-y-contain p-4 text-sm',
+        riskExplanationFrameClass(riskLevel),
+      )}
+    >
       <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">{t('risk.score.explanation')}</p>
         <p className="text-base leading-relaxed">
           <span className="font-semibold text-foreground">{t('risk.score.explain.intro')}</span>{' '}
           <span className="font-bold text-foreground">R ∈ [0, 1]</span>

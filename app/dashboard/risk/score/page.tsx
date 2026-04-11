@@ -17,6 +17,7 @@ import { formatUserFacingApiError, formatUserFacingFetchError } from '@/lib/api/
 import { notifyError } from '@/lib/notify';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { formatVndDigits, sanitizeVndDigitString, parseVndDigitsToNumber } from '@/lib/money';
+import { cn } from '@/lib/utils';
 import {
   RiskScoreExplanationPanel,
   parseExplanationDetail,
@@ -707,24 +708,30 @@ export default function RiskScorePage() {
       </div>
 
       <Dialog open={isExplanationOpen} onOpenChange={setIsExplanationOpen}>
-        <DialogContent className="w-[90vw] max-w-none sm:max-w-[min(90vw,1280px)] max-h-[92vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[92vh] w-[90vw] max-w-none flex-col gap-4 overflow-hidden sm:max-w-[min(90vw,1280px)]">
+          <DialogHeader className="shrink-0">
             <DialogTitle>{t('risk.score.explanation')}</DialogTitle>
           </DialogHeader>
-          {structuredExplanation ? (
-            <RiskScoreExplanationPanel
-              d={structuredExplanation}
-              locale={locale}
-              t={t}
-              riskLevelLabel={riskLevelLabel(getRiskLevel())}
-              riskLevel={getRiskLevel()}
-            />
-          ) : explanationText ? (
-            <div className={riskExplanationFrameClass(getRiskLevel())}>
-              <p className="text-xs font-medium text-muted-foreground mb-2">{t('risk.score.explanation')}</p>
-              <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">{explanationText}</div>
-            </div>
-          ) : null}
+          <div className="flex min-h-0 flex-1 flex-col items-stretch">
+            {structuredExplanation ? (
+              <RiskScoreExplanationPanel
+                d={structuredExplanation}
+                locale={locale}
+                t={t}
+                riskLevelLabel={riskLevelLabel(getRiskLevel())}
+                riskLevel={getRiskLevel()}
+              />
+            ) : explanationText ? (
+              <div
+                className={cn(
+                  'mx-auto max-h-[min(75vh,640px)] w-full max-w-[min(100%,52rem)] overflow-y-auto overscroll-y-contain p-4',
+                  riskExplanationFrameClass(getRiskLevel()),
+                )}
+              >
+                <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">{explanationText}</div>
+              </div>
+            ) : null}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
