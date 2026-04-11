@@ -2,26 +2,45 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { formatUserFacingApiError } from '@/lib/api/format-api-error';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 import { formatVnd } from '@/lib/money';
+import { getUserRole } from '@/lib/auth/token';
 
 export default function CustomerDetailPage() {
   const { locale, t } = useI18n();
+  const isVi = locale === 'vi';
+  const router = useRouter();
   const params = useParams();
   const customerId = Number(params.id);
+  const role = getUserRole();
+  const canManageProfile = role !== 'viewer';
   const [customer, setCustomer] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [statusDraft, setStatusDraft] = useState('pending');
   const [editForm, setEditForm] = useState({
     phone_number: '',
     email: '',
@@ -46,6 +65,7 @@ export default function CustomerDetailPage() {
         const customerData = await browserApiFetchAuth<any>(`/customers/${customerId}`, { method: 'GET' });
         if (cancelled) return;
         setCustomer(customerData);
+        setStatusDraft(String(customerData.application_status || 'pending').toLowerCase());
         setEditForm({
           phone_number: String(customerData.phone_number ?? customerData.phone ?? ''),
           email: String(customerData.email ?? ''),
@@ -63,7 +83,14 @@ export default function CustomerDetailPage() {
           collateral_value: customerData.collateral_value != null ? String(customerData.collateral_value) : '',
         });
       } catch (err) {
-        if (!cancelled) notifyError(formatUserFacingApiError(err));
+        if (!cancelled) {
+          const message = formatUserFacingApiError(err);
+          notifyError(
+            isVi
+              ? `Không tải được hồ sơ khách hàng. ${message}`
+              : message,
+          );
+        }
       }
     };
     if (Number.isFinite(customerId) && customerId > 0) void load();
@@ -90,6 +117,7 @@ export default function CustomerDetailPage() {
 
   const statusBadgeClass = useMemo(() => {
     const status = String(customer?.application_status || '').toLowerCase();
+    if (status === 'disbursed') return 'border-blue-200 bg-blue-50 text-blue-700';
     if (status === 'approved') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
     if (status === 'rejected') return 'border-rose-200 bg-rose-50 text-rose-700';
     if (status === 'pending') return 'border-slate-200 bg-slate-50 text-slate-700';
@@ -98,6 +126,7 @@ export default function CustomerDetailPage() {
 
   const statusBadgeLabel = useMemo(() => {
     const status = String(customer?.application_status || '').toLowerCase();
+    if (status === 'disbursed') return isVi ? 'Đã giải ngân' : 'Disbursed';
     if (status === 'approved') return t('status.approved');
     if (status === 'rejected') return t('status.rejected');
     if (status === 'pending') return t('status.pending');
@@ -188,34 +217,74 @@ export default function CustomerDetailPage() {
       });
       setCustomer(updated);
       setIsEditing(false);
-      notifySuccess(locale === 'vi' ? 'Đã cập nhật hồ sơ.' : 'Profile updated.');
+      notifySuccess(isVi ? 'Đã cập nhật hồ sơ.' : 'Profile updated.');
     } catch (err) {
-      notifyError(formatUserFacingApiError(err));
+      const message = formatUserFacingApiError(err);
+      notifyError(isVi ? `Cập nhật hồ sơ thất bại. ${message}` : message);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleReview = async (nextStatus: 'approved' | 'rejected') => {
-    if (!customer) return;
+    if (!customer || !canManageProfile) return;
     setIsSaving(true);
     try {
-      const updated = await browserApiFetchAuth<any>(`/customers/${customerId}`, {
-        method: 'PUT',
+      const updated = await browserApiFetchAuth<any>(`/customers/${customerId}/status`, {
+        method: 'PATCH',
         body: { application_status: nextStatus },
       });
       setCustomer(updated);
+      setStatusDraft(String(updated.application_status || nextStatus).toLowerCase());
       setIsEditing(false);
-      notifySuccess(nextStatus === 'approved' ? (locale === 'vi' ? 'Đã duyệt hồ sơ.' : 'Application approved.') : (locale === 'vi' ? 'Đã từ chối hồ sơ.' : 'Application rejected.'));
+      notifySuccess(nextStatus === 'approved' ? (isVi ? 'Đã duyệt hồ sơ.' : 'Application approved.') : (isVi ? 'Đã từ chối hồ sơ.' : 'Application rejected.'));
     } catch (err) {
-      notifyError(formatUserFacingApiError(err));
+      const message = formatUserFacingApiError(err);
+      notifyError(isVi ? `Không thể xử lý hồ sơ. ${message}` : message);
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleUpdateStatus = async () => {
+    if (!customer || !canManageProfile) return;
+    setIsSaving(true);
+    try {
+      const updated = await browserApiFetchAuth<any>(`/customers/${customerId}/status`, {
+        method: 'PATCH',
+        body: { application_status: statusDraft },
+      });
+      setCustomer(updated);
+      setStatusDraft(String(updated.application_status || statusDraft).toLowerCase());
+      notifySuccess(isVi ? 'Đã cập nhật trạng thái hồ sơ.' : 'Application status updated.');
+    } catch (err) {
+      const message = formatUserFacingApiError(err);
+      notifyError(isVi ? `Không thể cập nhật trạng thái hồ sơ. ${message}` : message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!customer || !canManageProfile) return;
+    setIsDeleting(true);
+    try {
+      const response = await browserApiFetchAuth<{ message?: string }>(`/customers/${customerId}`, {
+        method: 'DELETE',
+      });
+      notifySuccess(response?.message || (isVi ? 'Đã xóa hồ sơ khách hàng.' : 'Customer profile deleted.'));
+      setConfirmDeleteOpen(false);
+      router.push('/dashboard/customers');
+    } catch (err) {
+      const message = formatUserFacingApiError(err);
+      notifyError(isVi ? `Không thể xóa hồ sơ khách hàng. ${message}` : message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (!customer) {
-    return <div className="p-8 text-sm text-muted-foreground">{locale === 'vi' ? 'Đang tải dữ liệu khách hàng...' : 'Loading customer data...'}</div>;
+    return <div className="p-8 text-sm text-muted-foreground">{isVi ? 'Đang tải dữ liệu khách hàng...' : 'Loading customer data...'}</div>;
   }
 
   return (
@@ -235,25 +304,51 @@ export default function CustomerDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isPending ? (
+          {isPending && canManageProfile ? (
             <>
               <Button variant="outline" onClick={() => void handleReview('rejected')} disabled={isSaving}>
-                {locale === 'vi' ? 'Từ chối' : 'Reject'}
+                {isVi ? 'Từ chối' : 'Reject'}
               </Button>
               <Button onClick={() => void handleReview('approved')} disabled={isSaving}>
-                {locale === 'vi' ? 'Duyệt' : 'Approve'}
+                {isVi ? 'Duyệt' : 'Approve'}
               </Button>
             </>
           ) : null}
-          <Button variant="secondary" onClick={() => setIsEditing((prev) => !prev)} disabled={!isPending || isSaving}>
-            <Edit className="mr-2 h-4 w-4" />
-            {isEditing ? (locale === 'vi' ? 'Hủy sửa' : 'Cancel') : t('customers.detail.edit')}
+          <Select value={statusDraft} onValueChange={setStatusDraft} disabled={!canManageProfile || isSaving || isDeleting}>
+            <SelectTrigger className="w-[170px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">{isVi ? 'Đang chờ' : 'Pending'}</SelectItem>
+              <SelectItem value="approved">{isVi ? 'Đã duyệt' : 'Approved'}</SelectItem>
+              <SelectItem value="rejected">{isVi ? 'Từ chối' : 'Rejected'}</SelectItem>
+              <SelectItem value="disbursed">{isVi ? 'Đã giải ngân' : 'Disbursed'}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            onClick={() => void handleUpdateStatus()}
+            disabled={!canManageProfile || isSaving || isDeleting || statusDraft === String(customer?.application_status || 'pending').toLowerCase()}
+          >
+            {isVi ? 'Cập nhật trạng thái' : 'Update status'}
           </Button>
-          {isEditing && isPending ? (
-            <Button onClick={() => void handleUpdateProfile()} disabled={isSaving}>
-              {locale === 'vi' ? 'Cập nhật hồ sơ' : 'Update profile'}
+          <Button variant="secondary" onClick={() => setIsEditing((prev) => !prev)} disabled={!isPending || isSaving || !canManageProfile}>
+            <Edit className="mr-2 h-4 w-4" />
+            {isEditing ? (isVi ? 'Hủy sửa' : 'Cancel') : t('customers.detail.edit')}
+          </Button>
+          {isEditing && isPending && canManageProfile ? (
+            <Button onClick={() => void handleUpdateProfile()} disabled={isSaving || isDeleting}>
+              {isVi ? 'Cập nhật hồ sơ' : 'Update profile'}
             </Button>
           ) : null}
+          <Button
+            variant="destructive"
+            onClick={() => setConfirmDeleteOpen(true)}
+            disabled={!canManageProfile || isSaving || isDeleting}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {isVi ? 'Xóa hồ sơ' : 'Delete profile'}
+          </Button>
         </div>
       </div>
 
@@ -384,6 +479,34 @@ export default function CustomerDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isVi ? 'Xóa hồ sơ khách hàng?' : 'Delete customer profile?'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isVi
+                ? 'Thao tác này sẽ xóa toàn bộ dữ liệu hồ sơ vay liên quan. Bạn có chắc chắn muốn tiếp tục?'
+                : 'This action deletes the profile and related loan records. Are you sure you want to continue?'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>
+              {isVi ? 'Hủy' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeleteCustomer();
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (isVi ? 'Đang xóa...' : 'Deleting...') : (isVi ? 'Xóa hồ sơ' : 'Delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

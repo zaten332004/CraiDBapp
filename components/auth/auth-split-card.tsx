@@ -323,12 +323,7 @@ export function AuthSplitCard() {
 
     setRegLoading(true);
     try {
-      const normalizedName = regData.name.trim();
-      const usernameCandidate =
-        normalizedName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '.')
-          .replace(/^\.+|\.+$/g, '') || regData.email.split('@')[0].toLowerCase();
+      const usernameCandidate = String(regData.email || '').split('@')[0].trim().toLowerCase() || 'user';
       const response = await fetch('/api/v1/auth/register/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
