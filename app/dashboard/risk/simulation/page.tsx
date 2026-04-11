@@ -123,11 +123,12 @@ export default function RiskSimulationPage() {
         notifyError(locale === 'vi' ? 'Không tìm thấy khách hàng theo mã/ID đã nhập.' : 'Customer not found by the provided ID/reference.');
         return;
       }
+      const historyMonths = Number(customer?.credit_history_months);
       const preparedBaseData = {
         income: Number(customer?.monthly_income || 0),
         debt: Number(customer?.requested_loan_amount || 0),
         age: Number(customer?.age || 30),
-        credit_history_months: Number(customer?.requested_term_months || 12),
+        credit_history_months: Number.isFinite(historyMonths) && historyMonths >= 0 ? Math.round(historyMonths) : 60,
         credit_score: customer?.credit_score != null ? Number(customer.credit_score) : undefined,
         loan_type: customer?.loan_type || undefined,
         interest_rate: customer?.annual_interest_rate != null ? Number(customer.annual_interest_rate) : undefined,
@@ -162,11 +163,16 @@ export default function RiskSimulationPage() {
     }
     setIsSimulating(true);
     try {
+      const baseRate = baseData.interest_rate != null ? Number(baseData.interest_rate) : null;
       const adjustedPayload: Record<string, any> = {
         ...baseData,
         income: Math.max(0, Number(baseData.income || 0) * (1 + scenario.incomeChange / 100)),
         debt: Math.max(0, Number(baseData.debt || 0) * (1 + scenario.debtChange / 100)),
-        interest_rate: baseData.interest_rate != null ? Math.max(0, Number(baseData.interest_rate) * (1 + scenario.interestRateChange / 100)) : undefined,
+        /* Thay đổi lãi suất: điểm phần trăm tuyệt đối (+2.8 → 4.5% + 2.8% = 7.3%), không nhân (1+r%). */
+        interest_rate:
+          baseRate != null && Number.isFinite(baseRate)
+            ? clamp(baseRate + scenario.interestRateChange, 0, 100)
+            : undefined,
       };
       const adjustedScoreResp = await browserApiFetchAuth<any>('/risk/score', { method: 'POST', body: adjustedPayload });
       const adjustedScore = apiRiskToUiScore(adjustedScoreResp?.risk_score);

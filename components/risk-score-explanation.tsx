@@ -187,7 +187,7 @@ export function RiskScoreExplanationPanel(props: {
                 <span className="font-medium text-foreground/90">
                   f<sub>DTI</sub>
                 </span>
-                <Fraction num={<span className="tabular-nums">min(DTI, 2)</span>} den="2" compact />
+                <Fraction num={<span className="tabular-nums">min(DTI, 4)</span>} den="4" compact />
                 <span>
                   {t('risk.score.explain.equals')} {d.dti_factor.toFixed(4)}
                 </span>
