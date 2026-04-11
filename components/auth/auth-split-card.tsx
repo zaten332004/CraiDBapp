@@ -16,6 +16,7 @@ import { AlertCircle, CheckCircle, Chrome, Eye, EyeOff, Loader2 } from 'lucide-r
 import { setSession } from '@/lib/auth/token';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/components/i18n-provider';
+import { isStrongPassword, isValidEmail, passwordRuleMessage } from '@/lib/validation/account';
 
 type Mode = 'login' | 'register';
 
@@ -279,6 +280,17 @@ export function AuthSplitCard() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
+    const isVi = locale === 'vi';
+
+    if (!isValidEmail(regData.email)) {
+      setRegError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
+      return;
+    }
+
+    if (!isStrongPassword(regData.password)) {
+      setRegError(passwordRuleMessage(isVi));
+      return;
+    }
 
     if (regData.password !== regData.confirmPassword) {
       setRegError(t('auth.passwords_no_match'));

@@ -17,6 +17,7 @@ import { formatUserFacingApiError, formatUserFacingFetchError } from '@/lib/api/
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { CRAIDB_PROFILE_CHANGED_EVENT } from '@/lib/profile-sync-event';
 import { getAccessToken, setSession } from '@/lib/auth/token';
+import { isStrongPassword, isValidEmail, isValidVietnamPhone, passwordRuleMessage } from '@/lib/validation/account';
 
 type ProfileMe = {
   user_id: number;
@@ -83,6 +84,15 @@ export default function ProfilePage() {
   }, []);
 
   const saveProfile = async () => {
+    const normalizedPhone = profileForm.phone.trim();
+    if (normalizedPhone && !isValidVietnamPhone(normalizedPhone)) {
+      const msg = isVi
+        ? 'Số điện thoại phải bắt đầu bằng số 0 và gồm đúng 10 chữ số.'
+        : 'Phone number must start with 0 and contain exactly 10 digits.';
+      setError(msg);
+      return;
+    }
+
     setSavingProfile(true);
     setError(null);
     try {
@@ -90,7 +100,7 @@ export default function ProfilePage() {
         method: 'PATCH',
         body: {
           full_name: profileForm.full_name.trim() || null,
-          phone: profileForm.phone.trim() || null,
+          phone: normalizedPhone || null,
         },
       });
       setProfile(updated);
@@ -111,6 +121,11 @@ export default function ProfilePage() {
 
   const changePassword = async () => {
     setError(null);
+    if (!isStrongPassword(newPassword)) {
+      const msg = passwordRuleMessage(isVi);
+      setError(msg);
+      return;
+    }
     if (newPassword !== confirmPassword) {
       const msg = isVi ? 'Mật khẩu xác nhận không khớp.' : 'Password confirmation does not match.';
       setError(msg);
@@ -140,6 +155,11 @@ export default function ProfilePage() {
 
   const requestEmailChange = async () => {
     if (!newEmail.trim()) return;
+    if (!isValidEmail(newEmail)) {
+      const msg = isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.';
+      setError(msg);
+      return;
+    }
     setError(null);
     setSendingEmailCode(true);
     try {

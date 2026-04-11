@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LanguageToggle } from '@/components/language-toggle';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useI18n } from '@/components/i18n-provider';
+import { isNumericPin, isStrongPassword, isValidEmail, passwordRuleMessage } from '@/lib/validation/account';
 
 type Step = 'request' | 'confirm';
 
@@ -39,6 +40,10 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError('');
     setMessage('');
+    if (!isValidEmail(email)) {
+      setError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
+      return;
+    }
     setLoading(true);
     try {
       const response = await fetch('/api/v1/auth/forgot-password/request', {
@@ -63,6 +68,18 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError('');
     setMessage('');
+    if (!isValidEmail(email)) {
+      setError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
+      return;
+    }
+    if (!isNumericPin(code, 6)) {
+      setError(isVi ? 'Mã PIN chỉ được chứa chữ số và gồm đúng 6 số.' : 'PIN must contain digits only and be exactly 6 digits.');
+      return;
+    }
+    if (!isStrongPassword(newPassword)) {
+      setError(passwordRuleMessage(isVi));
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setError(isVi ? 'Mật khẩu xác nhận không khớp.' : 'Password confirmation does not match.');
       return;

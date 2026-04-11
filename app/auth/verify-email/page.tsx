@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +13,8 @@ import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
 import { useI18n } from '@/components/i18n-provider';
-import { authHeaders, getAccessToken, setUserHasPin, setUserStatus } from '@/lib/auth/token';
+import { authHeaders, getUserHasPin, getUserRole, getUserStatus, setUserHasPin, setUserStatus } from '@/lib/auth/token';
+import { isNumericPin } from '@/lib/validation/account';
 
 type PendingStatusResponse = {
   user_id: number;
@@ -23,6 +25,8 @@ type PendingStatusResponse = {
 };
 
 function VerifyEmailContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { locale } = useI18n();
   const isVi = locale === 'vi';
   const [error, setError] = useState('');
@@ -35,12 +39,9 @@ function VerifyEmailContent() {
   const [newPinConfirm, setNewPinConfirm] = useState('');
   const [pinMessage, setPinMessage] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
+  const emailQuery = (searchParams.get('email') || '').trim();
 
   useEffect(() => {
-    if (!getAccessToken()) {
-      setError(isVi ? 'Bạn cần đăng nhập để xem trạng thái xét duyệt và thiết lập PIN.' : 'Please sign in to view approval status and manage PIN.');
-      return;
-    }
     void fetchPendingStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -61,18 +62,32 @@ function VerifyEmailContent() {
       setPendingInfo(payload);
       setUserStatus((payload.status || 'pending') as 'pending' | 'approved' | 'rejected');
       setUserHasPin(Boolean(payload.has_pin));
+      return payload;
     } catch (err) {
-      setError(err instanceof Error ? err.message : (isVi ? 'Có lỗi xảy ra.' : 'Something went wrong.'));
+      setError(err instanceof Error ? err.message : (isVi ? 'Không thể tải trạng thái tài khoản.' : 'Could not load account status.'));
+      return null;
     } finally {
       setLoadingPending(false);
+    }
+  };
+
+  function dashboardRouteByRole(role?: string | null) {
+    return String(role || '').trim().toLowerCase() === 'analyst' ? '/dashboard/customers' : '/dashboard';
+  }
+
+  const handleRefreshStatus = async () => {
+    const payload = await fetchPendingStatus();
+    const status = String(payload?.status || '').trim().toLowerCase();
+    if (status === 'approved' || (!payload && currentStatus === 'approved')) {
+      router.push(payload ? dashboardRouteByRole(payload?.role) : pendingHomeRoute);
     }
   };
 
   const submitSetPin = async () => {
     setPinMessage('');
     setError('');
-    if (!/^\d{6}$/.test(pin) || !/^\d{6}$/.test(confirmPin)) {
-      setError(isVi ? 'PIN phải gồm đúng 6 chữ số.' : 'PIN must be exactly 6 digits.');
+    if (!isNumericPin(pin, 6) || !isNumericPin(confirmPin, 6)) {
+      setError(isVi ? 'PIN chỉ được chứa chữ số và gồm đúng 6 số.' : 'PIN must contain digits only and be exactly 6 digits.');
       return;
     }
     if (pin !== confirmPin) {
@@ -108,8 +123,8 @@ function VerifyEmailContent() {
   const submitChangePin = async () => {
     setPinMessage('');
     setError('');
-    if (!/^\d{6}$/.test(oldPin) || !/^\d{6}$/.test(newPin) || !/^\d{6}$/.test(newPinConfirm)) {
-      setError(isVi ? 'Mỗi PIN phải gồm đúng 6 chữ số.' : 'Each PIN must be exactly 6 digits.');
+    if (!isNumericPin(oldPin, 6) || !isNumericPin(newPin, 6) || !isNumericPin(newPinConfirm, 6)) {
+      setError(isVi ? 'Mỗi PIN chỉ được chứa chữ số và gồm đúng 6 số.' : 'Each PIN must contain digits only and be exactly 6 digits.');
       return;
     }
     if (newPin !== newPinConfirm) {
@@ -145,9 +160,15 @@ function VerifyEmailContent() {
     }
   };
 
-  const currentStatus = String(pendingInfo?.status || '').toLowerCase();
+  const fallbackRole = getUserRole();
+  const fallbackStatus = getUserStatus();
+  const fallbackHasPin = getUserHasPin();
+  const resolvedEmail = pendingInfo?.email || emailQuery || '';
+  const resolvedRole = pendingInfo?.role || fallbackRole || '';
+  const currentStatus = String(pendingInfo?.status || fallbackStatus || 'pending').toLowerCase();
+  const resolvedHasPin = typeof pendingInfo?.has_pin === 'boolean' ? pendingInfo.has_pin : fallbackHasPin;
   const isApproved = currentStatus === 'approved';
-  const pendingHomeRoute = String(pendingInfo?.role || '').toLowerCase() === 'analyst' ? '/dashboard/customers' : '/dashboard';
+  const pendingHomeRoute = dashboardRouteByRole(resolvedRole);
   const localizedStatus =
     currentStatus === 'approved'
       ? (isVi ? 'Đã duyệt' : 'Approved')
@@ -177,8 +198,8 @@ function VerifyEmailContent() {
               <CardTitle className="text-3xl tracking-tight">{isVi ? 'Xét duyệt tài khoản' : 'Account approval'}</CardTitle>
               <CardDescription>
                 {isVi
-                  ? 'Hệ thống đã bỏ xác minh email. Tài khoản của bạn cần chờ Admin phê duyệt trước khi vào Dashboard.'
-                  : 'Email verification is no longer required. Your account must be approved by Admin before dashboard access.'}
+                  ? 'Bạn cần chờ quản trị viên xem xét và phê duyệt tài khoản trước khi vào Dashboard.'
+                  : 'Please wait for administrator review and approval before dashboard access.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -189,13 +210,13 @@ function VerifyEmailContent() {
                 </div>
               ) : (
                 <div className="space-y-2 rounded-xl border p-4">
-                  <p><span className="text-muted-foreground">{isVi ? 'Email:' : 'Email:'}</span> <strong>{pendingInfo?.email || '-'}</strong></p>
-                  <p><span className="text-muted-foreground">{isVi ? 'Vai trò:' : 'Role:'}</span> <strong>{pendingInfo?.role || '-'}</strong></p>
+                  <p><span className="text-muted-foreground">{isVi ? 'Email:' : 'Email:'}</span> <strong>{resolvedEmail || (isVi ? 'Chưa cập nhật' : 'Not available')}</strong></p>
+                  <p><span className="text-muted-foreground">{isVi ? 'Vai trò:' : 'Role:'}</span> <strong>{resolvedRole || (isVi ? 'Chưa cập nhật' : 'Not available')}</strong></p>
                   <p><span className="text-muted-foreground">{isVi ? 'Trạng thái:' : 'Status:'}</span> <strong>{localizedStatus}</strong></p>
-                  <p><span className="text-muted-foreground">{isVi ? 'Đã có PIN:' : 'PIN set:'}</span> <strong>{pendingInfo?.has_pin ? (isVi ? 'Có' : 'Yes') : (isVi ? 'Chưa' : 'No')}</strong></p>
+                  <p><span className="text-muted-foreground">{isVi ? 'Đã có PIN:' : 'PIN set:'}</span> <strong>{resolvedHasPin ? (isVi ? 'Có' : 'Yes') : (isVi ? 'Chưa' : 'No')}</strong></p>
                 </div>
               )}
-              <Button type="button" variant="outline" onClick={fetchPendingStatus} disabled={loadingPending}>
+              <Button type="button" variant="outline" onClick={handleRefreshStatus} disabled={loadingPending}>
                 {isVi ? 'Kiểm tra lại trạng thái' : 'Refresh status'}
               </Button>
               {isApproved && (
@@ -203,13 +224,11 @@ function VerifyEmailContent() {
                   <Button className="w-full">{isVi ? 'Vào hệ thống' : 'Go to dashboard'}</Button>
                 </Link>
               )}
-              {!getAccessToken() && (
-                <Link href="/auth?mode=login" className="block">
-                  <Button type="button" className="w-full">
-                    {isVi ? 'Đăng nhập để tiếp tục' : 'Sign in to continue'}
-                  </Button>
-                </Link>
-              )}
+              <Link href="/auth?mode=login" className="block">
+                <Button type="button" className="w-full">
+                  {isVi ? 'Quay lại trang đăng nhập' : 'Back to login'}
+                </Button>
+              </Link>
             </CardContent>
           </Card>
 
@@ -246,12 +265,8 @@ function VerifyEmailContent() {
                     : 'Please remember your PIN and never share it. You will need it for password reset and email change.'}
                 </p>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="border border-border lg:col-span-2">
-            <CardContent className="pt-6">
-              {pendingInfo?.has_pin ? (
+              {resolvedHasPin ? (
                 <div className="space-y-3">
                   <div>
                     <Label htmlFor="old-pin">{isVi ? 'PIN cũ' : 'Current PIN'}</Label>
