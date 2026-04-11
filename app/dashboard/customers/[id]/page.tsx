@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
@@ -40,6 +42,8 @@ export default function CustomerDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
   const [editForm, setEditForm] = useState({
     phone_number: '',
     email: '',
@@ -265,13 +269,15 @@ export default function CustomerDetailPage() {
     }
   };
 
-  const handleReview = async (nextStatus: 'approved' | 'rejected') => {
+  const handleReview = async (nextStatus: 'approved' | 'rejected', reason?: string) => {
     if (!customer || !canManageProfile) return;
     setIsSaving(true);
     try {
+      const payload: Record<string, unknown> = { application_status: nextStatus };
+      if (nextStatus === 'rejected') payload.rejection_reason = String(reason || '').trim();
       const updated = await browserApiFetchAuth<any>(`/customers/${customerId}/status`, {
         method: 'PATCH',
-        body: { application_status: nextStatus },
+        body: payload,
       });
       setCustomer(updated);
       setIsEditing(false);
@@ -282,6 +288,21 @@ export default function CustomerDetailPage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleOpenRejectDialog = () => {
+    setRejectReason('');
+    setRejectDialogOpen(true);
+  };
+
+  const handleConfirmReject = async () => {
+    const trimmed = rejectReason.trim();
+    if (!trimmed) {
+      notifyError(isVi ? 'Vui lòng nhập lý do từ chối hồ sơ.' : 'Please provide a rejection reason.');
+      return;
+    }
+    await handleReview('rejected', trimmed);
+    setRejectDialogOpen(false);
   };
 
   const handleDeleteCustomer = async () => {
@@ -325,7 +346,7 @@ export default function CustomerDetailPage() {
         <div className="flex items-center gap-2">
           {isPending && canManageProfile ? (
             <>
-              <Button variant="outline" onClick={() => void handleReview('rejected')} disabled={isSaving}>
+              <Button variant="outline" onClick={handleOpenRejectDialog} disabled={isSaving}>
                 {isVi ? 'Từ chối' : 'Reject'}
               </Button>
               <Button onClick={() => void handleReview('approved')} disabled={isSaving}>
@@ -560,6 +581,34 @@ export default function CustomerDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isVi ? 'Lý do từ chối hồ sơ' : 'Rejection reason'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              {isVi ? 'Vui lòng nhập lý do cụ thể trước khi từ chối hồ sơ.' : 'Please provide a specific reason before rejecting this dossier.'}
+            </p>
+            <Textarea
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              placeholder={isVi ? 'Nhập lý do từ chối...' : 'Enter rejection reason...'}
+              rows={4}
+              disabled={isSaving}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialogOpen(false)} disabled={isSaving}>
+              {isVi ? 'Hủy' : 'Cancel'}
+            </Button>
+            <Button variant="destructive" onClick={() => void handleConfirmReject()} disabled={isSaving}>
+              {isVi ? 'Xác nhận từ chối' : 'Confirm reject'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, TrendingUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, TrendingUp } from 'lucide-react';
 import { authJsonHeaders } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
 import { formatUserFacingApiError, formatUserFacingFetchError } from '@/lib/api/format-api-error';
@@ -160,6 +160,7 @@ export default function RiskScorePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [isSyncingCustomer, setIsSyncingCustomer] = useState(false);
+  const [isExplanationOpen, setIsExplanationOpen] = useState(false);
   const [loadedCustomerId, setLoadedCustomerId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const lastFetchedLookupRef = useRef<string>('');
@@ -354,6 +355,7 @@ export default function RiskScorePage() {
 
       const data = await response.json();
       setResult(data);
+      setIsExplanationOpen(false);
       await syncCustomerAfterScoring(data?.risk_label);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');
@@ -645,17 +647,43 @@ export default function RiskScorePage() {
                 )}
 
                 {structuredExplanation ? (
-                  <RiskScoreExplanationPanel
-                    d={structuredExplanation}
-                    locale={locale}
-                    t={t}
-                    riskLevelLabel={riskLevelLabel(getRiskLevel())}
-                    riskLevel={getRiskLevel()}
-                  />
+                  <div className="space-y-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsExplanationOpen((prev) => !prev)}
+                      className="w-full justify-between"
+                    >
+                      {locale === 'vi' ? 'Xem chi tiết' : 'View details'}
+                      {isExplanationOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                    {isExplanationOpen ? (
+                      <RiskScoreExplanationPanel
+                        d={structuredExplanation}
+                        locale={locale}
+                        t={t}
+                        riskLevelLabel={riskLevelLabel(getRiskLevel())}
+                        riskLevel={getRiskLevel()}
+                      />
+                    ) : null}
+                  </div>
                 ) : explanationText ? (
-                  <div className={riskExplanationFrameClass(getRiskLevel())}>
-                    <p className="text-xs font-medium text-muted-foreground mb-2">{t('risk.score.explanation')}</p>
-                    <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">{explanationText}</div>
+                  <div className="space-y-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsExplanationOpen((prev) => !prev)}
+                      className="w-full justify-between"
+                    >
+                      {locale === 'vi' ? 'Xem chi tiết' : 'View details'}
+                      {isExplanationOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                    {isExplanationOpen ? (
+                      <div className={riskExplanationFrameClass(getRiskLevel())}>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">{t('risk.score.explanation')}</p>
+                        <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">{explanationText}</div>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </CardContent>
