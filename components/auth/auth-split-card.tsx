@@ -32,7 +32,7 @@ function defaultDashboardAfterLogin(role: string | null | undefined) {
 
 function postLoginRoute(args: { role?: string | null; status?: string | null }) {
   const status = String(args.status || '').trim().toLowerCase();
-  if (status && status !== 'approved') return '/auth/verify-email?mode=pending';
+  if (status !== 'approved') return '/auth/verify-email?mode=pending';
   return defaultDashboardAfterLogin(args.role);
 }
 

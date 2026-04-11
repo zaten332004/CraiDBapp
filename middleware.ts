@@ -12,7 +12,6 @@ export function middleware(request: NextRequest) {
   const status = request.cookies.get("user_status")?.value?.toLowerCase();
 
   const isApproved = status === "approved";
-  const isPendingLike = status === "pending" || status === "rejected";
 
   if (pathname.startsWith("/dashboard")) {
     if (!token) {
@@ -22,7 +21,7 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    if (isPendingLike) {
+    if (!isApproved) {
       return NextResponse.redirect(new URL("/auth/verify-email?mode=pending", request.url));
     }
 

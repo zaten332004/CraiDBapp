@@ -210,6 +210,13 @@ function VerifyEmailContent() {
   if (isPendingMode) {
     const currentStatus = String(pendingInfo?.status || '').toLowerCase();
     const isApproved = currentStatus === 'approved';
+    const pendingHomeRoute = String(pendingInfo?.role || '').toLowerCase() === 'analyst' ? '/dashboard/customers' : '/dashboard';
+    const localizedStatus =
+      currentStatus === 'approved'
+        ? (isVi ? 'Đã duyệt' : 'Approved')
+        : currentStatus === 'rejected'
+          ? (isVi ? 'Từ chối' : 'Rejected')
+          : (isVi ? 'Chưa xét duyệt' : 'Pending review');
 
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4 py-10">
@@ -227,13 +234,16 @@ function VerifyEmailContent() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card className="border border-border">
               <CardHeader>
+                <div className="mb-2 inline-flex w-fit items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-sm">
+                  {localizedStatus}
+                </div>
                 <CardTitle className="text-3xl tracking-tight">
-                  {isVi ? 'Trạng thái tài khoản' : 'Account status'}
+                  {isVi ? 'Xét duyệt tài khoản' : 'Account approval'}
                 </CardTitle>
                 <CardDescription>
                   {isVi
-                    ? 'Tài khoản cần được xét duyệt trước khi truy cập dashboard.'
-                    : 'Your account must be approved before accessing dashboards.'}
+                    ? 'Tài khoản Analyst/Manager cần được duyệt trước khi truy cập Dashboard.'
+                    : 'Analyst/Manager accounts must be approved before dashboard access.'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -246,16 +256,16 @@ function VerifyEmailContent() {
                   <div className="space-y-2 rounded-xl border p-4">
                     <p><span className="text-muted-foreground">{isVi ? 'Email:' : 'Email:'}</span> <strong>{pendingInfo?.email || '-'}</strong></p>
                     <p><span className="text-muted-foreground">{isVi ? 'Vai trò:' : 'Role:'}</span> <strong>{pendingInfo?.role || '-'}</strong></p>
-                    <p><span className="text-muted-foreground">{isVi ? 'Trạng thái:' : 'Status:'}</span> <strong>{pendingInfo?.status || '-'}</strong></p>
+                    <p><span className="text-muted-foreground">{isVi ? 'Trạng thái:' : 'Status:'}</span> <strong>{localizedStatus}</strong></p>
                     <p><span className="text-muted-foreground">{isVi ? 'Đã có PIN:' : 'PIN set:'}</span> <strong>{pendingInfo?.has_pin ? (isVi ? 'Có' : 'Yes') : (isVi ? 'Chưa' : 'No')}</strong></p>
                   </div>
                 )}
                 <Button type="button" variant="outline" onClick={fetchPendingStatus} disabled={loadingPending}>
-                  {isVi ? 'Làm mới trạng thái' : 'Refresh status'}
+                  {isVi ? 'Kiểm tra lại trạng thái' : 'Refresh status'}
                 </Button>
                 {isApproved && (
-                  <Link href="/dashboard" className="block">
-                    <Button className="w-full">{isVi ? 'Vào Dashboard' : 'Go to dashboard'}</Button>
+                  <Link href={pendingHomeRoute} className="block">
+                    <Button className="w-full">{isVi ? 'Vào hệ thống' : 'Go to dashboard'}</Button>
                   </Link>
                 )}
               </CardContent>
@@ -264,12 +274,12 @@ function VerifyEmailContent() {
             <Card className="border border-border">
               <CardHeader>
                 <CardTitle className="text-3xl tracking-tight">
-                  {pendingInfo?.has_pin ? (isVi ? 'Đổi mã PIN' : 'Change PIN') : (isVi ? 'Thiết lập mã PIN' : 'Set PIN')}
+                  {pendingInfo?.has_pin ? (isVi ? 'Đổi mã PIN bảo mật' : 'Change security PIN') : (isVi ? 'Thiết lập mã PIN bảo mật' : 'Set security PIN')}
                 </CardTitle>
                 <CardDescription>
                   {isVi
-                    ? 'PIN 6 chữ số sẽ dùng cho quên mật khẩu và đổi email.'
-                    : 'Your 6-digit PIN is used for password reset and email changes.'}
+                    ? 'Mã PIN 6 số dùng để xác nhận khi quên mật khẩu hoặc đổi email.'
+                    : 'Your 6-digit PIN is required for password reset and email change verification.'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -290,15 +300,15 @@ function VerifyEmailContent() {
                   <div className="space-y-3">
                     <div>
                       <Label htmlFor="old-pin">{isVi ? 'PIN cũ' : 'Current PIN'}</Label>
-                      <Input id="old-pin" value={oldPin} onChange={(e) => setOldPin(e.target.value)} maxLength={6} inputMode="numeric" />
+                      <Input id="old-pin" value={oldPin} onChange={(e) => setOldPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN cũ' : 'Enter current PIN'} />
                     </div>
                     <div>
                       <Label htmlFor="new-pin">{isVi ? 'PIN mới' : 'New PIN'}</Label>
-                      <Input id="new-pin" value={newPin} onChange={(e) => setNewPin(e.target.value)} maxLength={6} inputMode="numeric" />
+                      <Input id="new-pin" value={newPin} onChange={(e) => setNewPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN mới 6 số' : 'Enter new 6-digit PIN'} />
                     </div>
                     <div>
                       <Label htmlFor="confirm-new-pin">{isVi ? 'Xác nhận PIN mới' : 'Confirm new PIN'}</Label>
-                      <Input id="confirm-new-pin" value={newPinConfirm} onChange={(e) => setNewPinConfirm(e.target.value)} maxLength={6} inputMode="numeric" />
+                      <Input id="confirm-new-pin" value={newPinConfirm} onChange={(e) => setNewPinConfirm(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập lại PIN mới' : 'Re-enter new PIN'} />
                     </div>
                     <Button className="w-full" onClick={submitChangePin} disabled={pinLoading}>
                       {pinLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -309,11 +319,11 @@ function VerifyEmailContent() {
                   <div className="space-y-3">
                     <div>
                       <Label htmlFor="pin">{isVi ? 'PIN 6 chữ số' : '6-digit PIN'}</Label>
-                      <Input id="pin" value={pin} onChange={(e) => setPin(e.target.value)} maxLength={6} inputMode="numeric" />
+                      <Input id="pin" value={pin} onChange={(e) => setPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN 6 số' : 'Enter 6-digit PIN'} />
                     </div>
                     <div>
                       <Label htmlFor="confirm-pin">{isVi ? 'Xác nhận PIN' : 'Confirm PIN'}</Label>
-                      <Input id="confirm-pin" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} maxLength={6} inputMode="numeric" />
+                      <Input id="confirm-pin" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập lại PIN 6 số' : 'Re-enter 6-digit PIN'} />
                     </div>
                     <Button className="w-full" onClick={submitSetPin} disabled={pinLoading}>
                       {pinLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
