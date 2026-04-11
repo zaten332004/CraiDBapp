@@ -7,14 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
 import { useI18n } from '@/components/i18n-provider';
 import { authHeaders, clearAccessToken, getAccessToken, getUserHasPin, getUserRole, getUserStatus, setUserHasPin, setUserRole, setUserStatus } from '@/lib/auth/token';
 import { isNumericPin } from '@/lib/validation/account';
+import { notifyError, notifySuccess } from '@/lib/notify';
 
 type PendingStatusResponse = {
   user_id: number;
@@ -44,7 +44,6 @@ function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const { locale } = useI18n();
   const isVi = locale === 'vi';
-  const [error, setError] = useState('');
   const [pendingInfo, setPendingInfo] = useState<PendingStatusResponse | null>(null);
   const [loadingPending, setLoadingPending] = useState(false);
   const [pin, setPin] = useState('');
@@ -52,7 +51,6 @@ function VerifyEmailContent() {
   const [oldPin, setOldPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [newPinConfirm, setNewPinConfirm] = useState('');
-  const [pinMessage, setPinMessage] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
   const emailQuery = (searchParams.get('email') || '').trim();
   const roleQuery = (searchParams.get('role') || '').trim().toLowerCase();
@@ -67,7 +65,6 @@ function VerifyEmailContent() {
       return null;
     }
     setLoadingPending(true);
-    setError('');
     try {
       const response = await fetch('/api/v1/auth/pending/status', {
         method: 'GET',
@@ -115,7 +112,7 @@ function VerifyEmailContent() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (!isAuthErrorMessage(msg)) {
-        setError(msg || (isVi ? 'Không thể tải trạng thái tài khoản.' : 'Could not load account status.'));
+        notifyError(isVi ? 'Không thể tải trạng thái tài khoản.' : 'Could not load account status.', msg || undefined);
       }
       return null;
     } finally {
@@ -141,14 +138,12 @@ function VerifyEmailContent() {
   };
 
   const submitSetPin = async () => {
-    setPinMessage('');
-    setError('');
     if (!isNumericPin(pin, 6) || !isNumericPin(confirmPin, 6)) {
-      setError(isVi ? 'PIN chỉ được chứa chữ số và gồm đúng 6 số.' : 'PIN must contain digits only and be exactly 6 digits.');
+      notifyError(isVi ? 'PIN chỉ được chứa chữ số và gồm đúng 6 số.' : 'PIN must contain digits only and be exactly 6 digits.');
       return;
     }
     if (pin !== confirmPin) {
-      setError(isVi ? 'Mã PIN xác nhận chưa khớp với mã PIN đã nhập.' : 'Confirmation PIN does not match the entered PIN.');
+      notifyError(isVi ? 'Mã PIN xác nhận chưa khớp với mã PIN đã nhập.' : 'Confirmation PIN does not match the entered PIN.');
       return;
     }
     setPinLoading(true);
@@ -165,7 +160,7 @@ function VerifyEmailContent() {
       if (!response.ok) {
         throw new Error(data?.detail || data?.message || (isVi ? 'Không thể lưu PIN.' : 'Could not set PIN.'));
       }
-      setPinMessage(data?.message || (isVi ? 'Đã lưu PIN thành công.' : 'PIN has been saved.'));
+      notifySuccess(data?.message || (isVi ? 'Đã lưu PIN thành công.' : 'PIN has been saved.'));
       setPin('');
       setConfirmPin('');
       setUserHasPin(true);
@@ -173,9 +168,9 @@ function VerifyEmailContent() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (isAuthErrorMessage(msg)) {
-        setError(isVi ? 'Bạn cần đăng nhập để thiết lập mã PIN.' : 'Please sign in to set your PIN.');
+        notifyError(isVi ? 'Bạn cần đăng nhập để thiết lập mã PIN.' : 'Please sign in to set your PIN.');
       } else {
-        setError(msg || (isVi ? 'Có lỗi xảy ra.' : 'Something went wrong.'));
+        notifyError(isVi ? 'Không thể lưu PIN.' : 'Could not set PIN.', msg || undefined);
       }
     } finally {
       setPinLoading(false);
@@ -183,14 +178,12 @@ function VerifyEmailContent() {
   };
 
   const submitChangePin = async () => {
-    setPinMessage('');
-    setError('');
     if (!isNumericPin(oldPin, 6) || !isNumericPin(newPin, 6) || !isNumericPin(newPinConfirm, 6)) {
-      setError(isVi ? 'Mỗi PIN chỉ được chứa chữ số và gồm đúng 6 số.' : 'Each PIN must contain digits only and be exactly 6 digits.');
+      notifyError(isVi ? 'Mỗi PIN chỉ được chứa chữ số và gồm đúng 6 số.' : 'Each PIN must contain digits only and be exactly 6 digits.');
       return;
     }
     if (newPin !== newPinConfirm) {
-      setError(isVi ? 'Mã PIN mới xác nhận chưa khớp với mã PIN mới đã nhập.' : 'New PIN confirmation does not match the entered new PIN.');
+      notifyError(isVi ? 'Mã PIN mới xác nhận chưa khớp với mã PIN mới đã nhập.' : 'New PIN confirmation does not match the entered new PIN.');
       return;
     }
     setPinLoading(true);
@@ -210,7 +203,7 @@ function VerifyEmailContent() {
       if (!response.ok) {
         throw new Error(data?.detail || data?.message || (isVi ? 'Không thể đổi PIN.' : 'Could not change PIN.'));
       }
-      setPinMessage(data?.message || (isVi ? 'Đổi PIN thành công.' : 'PIN changed successfully.'));
+      notifySuccess(data?.message || (isVi ? 'Đổi PIN thành công.' : 'PIN changed successfully.'));
       setOldPin('');
       setNewPin('');
       setNewPinConfirm('');
@@ -218,9 +211,9 @@ function VerifyEmailContent() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (isAuthErrorMessage(msg)) {
-        setError(isVi ? 'Bạn cần đăng nhập để đổi mã PIN.' : 'Please sign in to change your PIN.');
+        notifyError(isVi ? 'Bạn cần đăng nhập để đổi mã PIN.' : 'Please sign in to change your PIN.');
       } else {
-        setError(msg || (isVi ? 'Có lỗi xảy ra.' : 'Something went wrong.'));
+        notifyError(isVi ? 'Không thể đổi PIN.' : 'Could not change PIN.', msg || undefined);
       }
     } finally {
       setPinLoading(false);
@@ -328,19 +321,6 @@ function VerifyEmailContent() {
               )}
             </CardHeader>
             <CardContent className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              {pinMessage && (
-                <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>{pinMessage}</AlertDescription>
-                </Alert>
-              )}
-
               {isRejected ? (
                 <>
                   <div className="rounded-xl border border-red-200 bg-red-50/60 p-4">

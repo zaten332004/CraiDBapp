@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LanguageToggle } from '@/components/language-toggle';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useI18n } from '@/components/i18n-provider';
 import { isNumericPin, isStrongPassword, isValidEmail, passwordRuleMessage } from '@/lib/validation/account';
+import { notifyError, notifySuccess } from '@/lib/notify';
 
 type Step = 'request' | 'confirm';
 
@@ -28,8 +28,6 @@ export default function ForgotPasswordPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
 
   const pageTitle = useMemo(
     () => (isVi ? 'Quên mật khẩu' : 'Forgot Password'),
@@ -38,10 +36,8 @@ export default function ForgotPasswordPage() {
 
   const requestCode = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
-    setMessage('');
     if (!isValidEmail(email)) {
-      setError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
+      notifyError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
       return;
     }
     setLoading(true);
@@ -55,10 +51,10 @@ export default function ForgotPasswordPage() {
       if (!response.ok) {
         throw new Error(data?.detail || data?.message || (isVi ? 'Không thể bắt đầu quy trình đổi mật khẩu bằng PIN.' : 'Could not start PIN reset flow.'));
       }
-      setMessage(data?.message || (isVi ? 'Tiếp tục bằng cách nhập mã PIN 6 số của tài khoản.' : 'Continue by entering your account 6-digit PIN.'));
+      notifySuccess(data?.message || (isVi ? 'Tiếp tục bằng cách nhập mã PIN 6 số của tài khoản.' : 'Continue by entering your account 6-digit PIN.'));
       setStep('confirm');
     } catch (err) {
-      setError(err instanceof Error ? err.message : (isVi ? 'Đã có lỗi xảy ra.' : 'Something went wrong.'));
+      notifyError(isVi ? 'Không thể gửi yêu cầu khôi phục mật khẩu.' : 'Could not send password reset request.', err instanceof Error ? err.message : undefined);
     } finally {
       setLoading(false);
     }
@@ -66,22 +62,20 @@ export default function ForgotPasswordPage() {
 
   const confirmReset = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
-    setMessage('');
     if (!isValidEmail(email)) {
-      setError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
+      notifyError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
       return;
     }
     if (!isNumericPin(code, 6)) {
-      setError(isVi ? 'Mã PIN chỉ được chứa chữ số và gồm đúng 6 số.' : 'PIN must contain digits only and be exactly 6 digits.');
+      notifyError(isVi ? 'Mã PIN chỉ được chứa chữ số và gồm đúng 6 số.' : 'PIN must contain digits only and be exactly 6 digits.');
       return;
     }
     if (!isStrongPassword(newPassword)) {
-      setError(passwordRuleMessage(isVi));
+      notifyError(passwordRuleMessage(isVi));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError(isVi ? 'Mật khẩu xác nhận không khớp.' : 'Password confirmation does not match.');
+      notifyError(isVi ? 'Mật khẩu xác nhận không khớp.' : 'Password confirmation does not match.');
       return;
     }
     setLoading(true);
@@ -99,12 +93,12 @@ export default function ForgotPasswordPage() {
       if (!response.ok) {
         throw new Error(data?.detail || data?.message || (isVi ? 'Không thể đặt lại mật khẩu.' : 'Failed to reset password.'));
       }
-      setMessage(data?.message || (isVi ? 'Đổi mật khẩu thành công.' : 'Password reset successfully.'));
+      notifySuccess(data?.message || (isVi ? 'Đổi mật khẩu thành công.' : 'Password reset successfully.'));
       setCode('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : (isVi ? 'Đã có lỗi xảy ra.' : 'Something went wrong.'));
+      notifyError(isVi ? 'Không thể đặt lại mật khẩu.' : 'Failed to reset password.', err instanceof Error ? err.message : undefined);
     } finally {
       setLoading(false);
     }
@@ -135,17 +129,6 @@ export default function ForgotPasswordPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          {message && (
-            <Alert>
-              <AlertDescription>{message}</AlertDescription>
-            </Alert>
-          )}
-
           {step === 'request' ? (
             <form className="space-y-4" onSubmit={requestCode}>
               <div className="space-y-1.5">

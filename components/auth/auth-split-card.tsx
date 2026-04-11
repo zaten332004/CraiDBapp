@@ -8,15 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
-import { AlertCircle, CheckCircle, Chrome, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Chrome, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { setSession } from '@/lib/auth/token';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/components/i18n-provider';
 import { isStrongPassword, isValidEmail, passwordRuleMessage } from '@/lib/validation/account';
+import { notifyError } from '@/lib/notify';
 
 type Mode = 'login' | 'register';
 
@@ -84,7 +84,6 @@ export function AuthSplitCard() {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
-  const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
   const [regData, setRegData] = useState({
@@ -94,7 +93,6 @@ export function AuthSplitCard() {
     name: '',
     registrationType: 'analyst',
   });
-  const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
@@ -103,6 +101,15 @@ export function AuthSplitCard() {
     setMode((prev) => (prev === queryMode ? prev : queryMode));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryMode]);
+
+  useEffect(() => {
+    if (!sessionExpiredRedirect) return;
+    const message =
+      sessionReason === 'session_invalid'
+        ? t('session.expired_token')
+        : t('session.expired_idle');
+    notifyError(isVi ? 'Phiên đăng nhập đã hết hạn.' : 'Session expired.', message);
+  }, [isVi, sessionExpiredRedirect, sessionReason, t]);
 
   /** Google Identity Services: gửi id_token JWT tới POST /auth/login/google (backend không có GET /auth/oauth). */
   useEffect(() => {
@@ -182,7 +189,6 @@ export function AuthSplitCard() {
 
   const postGoogleCredential = useCallback(
     async (credential: string) => {
-      setLoginError('');
       setLoginLoading(true);
       try {
         const response = await fetch('/api/v1/auth/login/google', {
@@ -230,7 +236,7 @@ export function AuthSplitCard() {
         });
         router.push(safeNext ?? postLoginRoute({ role: normalized.role, status: normalized.status }));
       } catch (err) {
-        setLoginError(err instanceof Error ? err.message : t('common.error'));
+        notifyError(isVi ? 'Đăng nhập thất bại.' : 'Sign in failed.', err instanceof Error ? err.message : t('common.error'));
       } finally {
         setLoginLoading(false);
       }
@@ -244,7 +250,6 @@ export function AuthSplitCard() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginError('');
     setLoginLoading(true);
     try {
       const response = await fetch('/api/v1/auth/login', {
@@ -292,7 +297,7 @@ export function AuthSplitCard() {
       });
       router.push(safeNext ?? postLoginRoute({ role: normalized.role, status: normalized.status }));
     } catch (err) {
-      setLoginError(err instanceof Error ? err.message : t('common.error'));
+      notifyError(isVi ? 'Đăng nhập thất bại.' : 'Sign in failed.', err instanceof Error ? err.message : t('common.error'));
     } finally {
       setLoginLoading(false);
     }
@@ -300,20 +305,19 @@ export function AuthSplitCard() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRegError('');
 
     if (!isValidEmail(regData.email)) {
-      setRegError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
+      notifyError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
       return;
     }
 
     if (!isStrongPassword(regData.password)) {
-      setRegError(passwordRuleMessage(isVi));
+      notifyError(passwordRuleMessage(isVi));
       return;
     }
 
     if (regData.password !== regData.confirmPassword) {
-      setRegError(t('auth.passwords_no_match'));
+      notifyError(t('auth.passwords_no_match'));
       return;
     }
 
@@ -373,7 +377,7 @@ export function AuthSplitCard() {
         router.push(`/auth/verify-email?${params.toString()}`);
       }
     } catch (err) {
-      setRegError(err instanceof Error ? err.message : t('common.error'));
+      notifyError(isVi ? 'Đăng ký thất bại.' : 'Registration failed.', err instanceof Error ? err.message : t('common.error'));
     } finally {
       setRegLoading(false);
     }
@@ -414,13 +418,6 @@ export function AuthSplitCard() {
               >
                   <h2 className="text-xl font-semibold tracking-tight">{t('auth.create_account')}</h2>
                   <p className="text-sm text-muted-foreground mt-1.5">{t('auth.register_desc')}</p>
-
-                  {regError && (
-                    <Alert variant="destructive" className="mt-6">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{regError}</AlertDescription>
-                    </Alert>
-                  )}
 
                   <form onSubmit={handleRegister} className="mt-4 space-y-3">
                     <div className="space-y-1.5">
@@ -548,24 +545,6 @@ export function AuthSplitCard() {
               >
                 <h2 className="text-xl font-semibold tracking-tight">{t('auth.welcome_back')}</h2>
                 <p className="text-sm text-muted-foreground mt-1.5">{t('auth.sign_in_desc')}</p>
-
-                {sessionExpiredRedirect && (
-                  <Alert className="mt-4 border-emerald-200 bg-emerald-50/90 text-emerald-900">
-                    <CheckCircle className="h-4 w-4 text-emerald-600" />
-                    <AlertDescription>
-                      {sessionReason === 'session_invalid'
-                        ? t('session.expired_token')
-                        : t('session.expired_idle')}
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {loginError && (
-                  <Alert variant="destructive" className="mt-6">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{loginError}</AlertDescription>
-                  </Alert>
-                )}
 
                 <form onSubmit={handleLogin} className="mt-3 space-y-3">
                   <div className="space-y-1.5">
