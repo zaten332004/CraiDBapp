@@ -37,7 +37,7 @@ function usernameFromEmail(email: unknown) {
   return raw.slice(0, atIndex).trim();
 }
 
-function normalizeRegistration(item: any, fallbackType: RegistrationType): RegistrationRow | null {
+function normalizeRegistration(item: any, fallbackType: RegistrationType = 'analyst'): RegistrationRow | null {
   if (!item || typeof item !== 'object') return null;
   const id = String(item.user_id ?? item.userId ?? item.id ?? item.registration_id ?? item.registrationId ?? '').trim();
   if (!id) return null;
@@ -47,7 +47,12 @@ function normalizeRegistration(item: any, fallbackType: RegistrationType): Regis
     String(item.username ?? '').trim() ||
     String(item.name ?? item.full_name ?? item.fullName ?? '').trim();
   const name = preferredUsername || id;
-  const type = String(item.reg_type ?? item.type ?? item.role ?? fallbackType).trim().toLowerCase() || fallbackType;
+  const typeRaw = String(
+    item.user_type ?? item.userType ?? item.reg_type ?? item.type ?? item.role ?? fallbackType,
+  )
+    .trim()
+    .toLowerCase();
+  const type: RegistrationType = typeRaw === 'manager' ? 'manager' : 'analyst';
   const requestedAt = String(item.requested_at ?? item.requestedAt ?? item.created_at ?? item.createdAt ?? '') || null;
   return { id, name, email, type, requestedAt, raw: item };
 }
@@ -109,28 +114,21 @@ export default function AdminRegistrationsPage() {
   const loadPending = async (status: 'pending' | 'approved' | 'rejected' = statusFilter) => {
     setIsLoading(true);
     try {
-      const roles: RegistrationType[] = ['manager', 'analyst'];
-      const settled = await Promise.allSettled(
-        roles.map(async (role) => {
-          const data = await browserApiFetchAuth<any>(`/auth/register/list?reg_type=${role}&status_filter=${status}`, {
-            method: 'GET',
-          });
-          return extractList(data).map((x: any) => normalizeRegistration(x, role)).filter(Boolean) as RegistrationRow[];
-        }),
-      );
+      const data = await browserApiFetchAuth<any>(`/auth/register/list?status_filter=${status}`, {
+        method: 'GET',
+      });
 
-      const rows = settled
-        .filter((r): r is PromiseFulfilledResult<RegistrationRow[]> => r.status === 'fulfilled')
-        .flatMap((r) => r.value)
+      const rows = extractList(data)
+        .map((x: any) => normalizeRegistration(x))
+        .filter(Boolean) as RegistrationRow[];
+
+      const sorted = rows
         .sort((a, b) => {
           const ta = Date.parse(String(a.requestedAt || ''));
           const tb = Date.parse(String(b.requestedAt || ''));
           return (Number.isNaN(tb) ? 0 : tb) - (Number.isNaN(ta) ? 0 : ta);
         });
-      setRegistrations(rows);
-      if (settled.some((r) => r.status === 'rejected')) {
-        notifyError(locale === 'vi' ? 'Một phần danh sách không tải được.' : 'Part of the registration list could not be loaded.');
-      }
+      setRegistrations(sorted);
     } catch (err) {
       notifyError(locale === 'vi' ? 'Không tải được danh sách đăng ký.' : 'Could not load registration list.', formatApiError(err));
       setRegistrations([]);
