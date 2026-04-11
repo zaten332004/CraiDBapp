@@ -272,6 +272,8 @@ async function proxy(request: NextRequest, context: RouteContext) {
 
     const responseHeaders = new Headers(upstreamResponse.headers);
     responseHeaders.delete("content-encoding");
+    responseHeaders.delete("content-length");
+    responseHeaders.delete("transfer-encoding");
 
     if (
       isRegistrationResponse(path, method) &&
