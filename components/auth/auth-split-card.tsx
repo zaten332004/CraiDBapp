@@ -61,6 +61,7 @@ export function AuthSplitCard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useI18n();
+  const isVi = locale === 'vi';
 
   const googleClientId = (process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID || '').trim();
   const googleBtnDivRef = useRef<HTMLDivElement | null>(null);
@@ -300,7 +301,6 @@ export function AuthSplitCard() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
-    const isVi = locale === 'vi';
 
     if (!isValidEmail(regData.email)) {
       setRegError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
