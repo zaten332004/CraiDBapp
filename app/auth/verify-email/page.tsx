@@ -25,6 +25,18 @@ type PendingStatusResponse = {
   rejection_reason?: string | null;
 };
 
+function pickTopLevelRejectionFromPayload(payload: Record<string, unknown>): string | null {
+  const a = payload.rejection_reason;
+  const b = payload.rejectionReason;
+  for (const v of [a, b]) {
+    if (typeof v === 'string') {
+      const t = v.trim();
+      if (t) return t;
+    }
+  }
+  return null;
+}
+
 function extractRejectionReason(value: unknown, allowRawString = false): string | null {
   if (!value) return null;
   if (typeof value === 'string') {
@@ -153,7 +165,7 @@ function VerifyEmailContent() {
         role: normalizedRole,
         status: normalizedStatus,
         has_pin: Boolean(normalizedHasPin),
-        rejection_reason: extractRejectionReason(payload),
+        rejection_reason: pickTopLevelRejectionFromPayload(payload) ?? extractRejectionReason(payload),
       };
       if (
         normalizedPayload.rejection_reason &&
@@ -393,9 +405,17 @@ function VerifyEmailContent() {
                 <>
                   <div className="rounded-xl border border-red-200 bg-red-50/60 p-4">
                     <p className="text-sm font-semibold text-red-800">{isVi ? 'Chi tiết từ chối' : 'Rejection details'}</p>
-                    <p className="mt-2 text-sm text-red-900">
-                      {rejectionReason || (isVi ? 'Quản trị viên chưa cung cấp lý do cụ thể.' : 'No specific reason was provided by the administrator.')}
-                    </p>
+                    {loadingPending ? (
+                      <div className="mt-2 flex items-center gap-2 text-sm text-red-900/80">
+                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                        {isVi ? 'Đang tải lý do từ chối...' : 'Loading rejection reason...'}
+                      </div>
+                    ) : (
+                      <p className="mt-2 whitespace-pre-wrap break-words text-sm text-red-900">
+                        {rejectionReason ||
+                          (isVi ? 'Quản trị viên chưa cung cấp lý do cụ thể.' : 'No specific reason was provided by the administrator.')}
+                      </p>
+                    )}
                   </div>
                   <div className="rounded-xl border p-4 text-sm text-muted-foreground">
                     {isVi
