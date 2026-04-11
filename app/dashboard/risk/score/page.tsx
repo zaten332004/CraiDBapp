@@ -708,7 +708,7 @@ export default function RiskScorePage() {
       </div>
 
       <Dialog open={isExplanationOpen} onOpenChange={setIsExplanationOpen}>
-        <DialogContent className="flex max-h-[92vh] w-[90vw] max-w-none flex-col gap-4 overflow-hidden sm:max-w-[min(90vw,1280px)]">
+        <DialogContent className="flex max-h-[92vh] w-[calc(100%-1.5rem)] max-w-[min(92vw,42rem)] flex-col gap-4 overflow-hidden sm:max-w-[42rem]">
           <DialogHeader className="shrink-0">
             <DialogTitle>{t('risk.score.explanation')}</DialogTitle>
           </DialogHeader>
@@ -722,13 +722,10 @@ export default function RiskScorePage() {
                 riskLevel={getRiskLevel()}
               />
             ) : explanationText ? (
-              <div
-                className={cn(
-                  'mx-auto max-h-[min(75vh,640px)] w-full max-w-[min(100%,52rem)] overflow-y-auto overscroll-y-contain p-4',
-                  riskExplanationFrameClass(getRiskLevel()),
-                )}
-              >
-                <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">{explanationText}</div>
+              <div className={cn('mx-auto w-full max-w-full', riskExplanationFrameClass(getRiskLevel()))}>
+                <div className="max-h-[min(75vh,640px)] overflow-y-auto overscroll-y-contain p-4">
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">{explanationText}</div>
+                </div>
               </div>
             ) : null}
           </div>
