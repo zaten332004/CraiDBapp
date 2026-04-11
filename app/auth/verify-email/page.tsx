@@ -25,6 +25,36 @@ type PendingStatusResponse = {
   rejection_reason?: string | null;
 };
 
+function extractRejectionReason(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    return normalized ? normalized : null;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = extractRejectionReason(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const direct =
+      extractRejectionReason(obj.rejection_reason) ||
+      extractRejectionReason(obj.rejectionReason) ||
+      extractRejectionReason(obj.reason) ||
+      extractRejectionReason(obj.reject_reason) ||
+      extractRejectionReason(obj.rejectReason);
+    if (direct) return direct;
+    for (const nested of Object.values(obj)) {
+      const found = extractRejectionReason(nested);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function normalizeRoleFromPayload(data: Record<string, unknown>): string {
   const raw =
     (typeof data.role === 'string' && data.role) ||
@@ -54,6 +84,21 @@ function VerifyEmailContent() {
   const [pinLoading, setPinLoading] = useState(false);
   const emailQuery = (searchParams.get('email') || '').trim();
   const roleQuery = (searchParams.get('role') || '').trim().toLowerCase();
+
+  const fetchRegistrationReasonByUserId = async (userId: number): Promise<string | null> => {
+    if (!userId || !getAccessToken()) return null;
+    try {
+      const response = await fetch(`/api/v1/auth/register/registration/${encodeURIComponent(String(userId))}`, {
+        method: 'GET',
+        headers: authHeaders(),
+      });
+      if (!response.ok) return null;
+      const details = await response.json().catch(() => ({}));
+      return extractRejectionReason(details);
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     void fetchPendingStatus();
@@ -97,11 +142,14 @@ function VerifyEmailContent() {
         role: normalizedRole,
         status: normalizedStatus,
         has_pin: Boolean(normalizedHasPin),
-        rejection_reason:
-          (typeof payload.rejection_reason === 'string' && payload.rejection_reason.trim()) ||
-          (typeof payload.rejectionReason === 'string' && payload.rejectionReason.trim()) ||
-          null,
+        rejection_reason: extractRejectionReason(payload),
       };
+      if (String(normalizedStatus).trim().toLowerCase() === 'rejected' && !normalizedPayload.rejection_reason) {
+        const fallbackReason = await fetchRegistrationReasonByUserId(normalizedPayload.user_id);
+        if (fallbackReason) {
+          normalizedPayload.rejection_reason = fallbackReason;
+        }
+      }
       setPendingInfo(normalizedPayload);
       if (normalizedRole === 'admin' || normalizedRole === 'manager' || normalizedRole === 'analyst' || normalizedRole === 'viewer') {
         setUserRole(normalizedRole);

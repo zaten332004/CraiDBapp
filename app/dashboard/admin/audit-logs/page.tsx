@@ -36,7 +36,16 @@ function formatApiError(err: unknown) {
 function normalizeAuditLog(item: any, idx: number): AuditLogRow {
   const id = String(item?.id ?? item?.log_id ?? item?.logId ?? idx);
   const ts =
-    String(item?.timestamp ?? item?.ts ?? item?.created_at ?? item?.createdAt ?? item?.time ?? '').trim() ||
+    String(
+      item?.performed_at ??
+      item?.performedAt ??
+      item?.timestamp ??
+      item?.ts ??
+      item?.created_at ??
+      item?.createdAt ??
+      item?.time ??
+      '',
+    ).trim() ||
     '—';
   const rawActor = item?.actor ?? item?.user ?? item?.user_id ?? item?.userId ?? item?.email ?? '—';
   const actorText = String(rawActor ?? '').trim();
@@ -52,7 +61,7 @@ function normalizeAuditLog(item: any, idx: number): AuditLogRow {
 
 function formatAuditTs(ts: string, locale: string) {
   if (!ts || ts === '—') {
-    return formatDateTimeVietnam(new Date(), locale);
+    return locale === 'vi' ? 'Không có' : 'N/A';
   }
   if (/^\d+$/.test(ts.trim())) {
     const numeric = Number(ts.trim());
@@ -423,17 +432,17 @@ export default function AdminAuditLogsPage() {
           <div className="overflow-x-auto rounded-xl border border-black/70 bg-white min-h-[620px]">
             <Table className="w-full table-fixed">
               <colgroup>
-                <col className="w-[21%]" />
-                <col className="w-[21%]" />
                 <col className="w-[22%]" />
-                <col className="w-[36%]" />
+                <col className="w-[20%]" />
+                <col className="w-[20%]" />
+                <col />
               </colgroup>
               <TableHeader>
                 <TableRow className="bg-muted/35 hover:bg-muted/35">
                   <TableHead className="py-2.5 text-[13px] font-semibold">{t('common.date')}</TableHead>
                   <TableHead className="py-2.5 text-[13px] font-semibold">{t('admin.audit.actor')}</TableHead>
                   <TableHead className="py-2.5 text-[13px] font-semibold">{t('admin.audit.action')}</TableHead>
-                  <TableHead className="py-2.5 text-[13px] font-semibold">{locale === 'vi' ? 'Mô tả ngắn' : 'Short description'}</TableHead>
+                  <TableHead className="py-2.5 pr-3 text-[13px] font-semibold">{locale === 'vi' ? 'Mô tả ngắn' : 'Short description'}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -452,7 +461,7 @@ export default function AdminAuditLogsPage() {
                         {getActionLabel(r.action, locale)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="py-2 text-[13px] text-muted-foreground">
+                    <TableCell className="py-2 pr-3 text-[13px] text-muted-foreground">
                       {getActionShortDescription(r.action, locale)}
                     </TableCell>
                   </TableRow>

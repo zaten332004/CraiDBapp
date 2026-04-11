@@ -11,12 +11,13 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Search, MoreHorizontal, Loader2, RefreshCw, AlertCircle, Download } from 'lucide-react';
+import { Search, MoreHorizontal, Loader2, RefreshCw, AlertCircle, Download, Trash2 } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { ApiError } from '@/lib/api/shared';
 import { useI18n } from '@/components/i18n-provider';
 import { ListPagination } from '@/components/list-pagination';
 import { downloadCsvFile } from '@/lib/export/csv';
+import { notifyError, notifySuccess } from '@/lib/notify';
 
 type AdminUser = {
   id: string;
@@ -66,7 +67,7 @@ function getStatusBadgeClass(isActive: boolean) {
 
 export default function AdminUsersPage() {
   const PAGE_SIZE = 15;
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<'all' | 'active' | 'inactive'>('all');
@@ -75,6 +76,7 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>('');
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
 
   const loadUsers = async () => {
     setIsLoading(true);
@@ -123,8 +125,15 @@ export default function AdminUsersPage() {
       });
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, isActive } : u)));
       setSelectedUser((prev) => (prev && prev.id === userId ? { ...prev, isActive } : prev));
+      notifySuccess(
+        isActive
+          ? (locale === 'vi' ? 'Đã kích hoạt người dùng.' : 'User has been activated.')
+          : (locale === 'vi' ? 'Đã vô hiệu hóa người dùng.' : 'User has been deactivated.'),
+      );
     } catch (err) {
-      setError(formatApiError(err));
+      const message = formatApiError(err);
+      setError(message);
+      notifyError(locale === 'vi' ? 'Không thể cập nhật trạng thái người dùng.' : 'Could not update user status.', message);
     } finally {
       setIsLoading(false);
     }
@@ -142,8 +151,34 @@ export default function AdminUsersPage() {
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: updatedRole } : u)));
       setSelectedUser((prev) => (prev && prev.id === userId ? { ...prev, role: updatedRole } : prev));
       setSelectedRole(updatedRole);
+      notifySuccess(locale === 'vi' ? 'Đã cập nhật vai trò người dùng.' : 'User role updated successfully.');
     } catch (err) {
-      setError(formatApiError(err));
+      const message = formatApiError(err);
+      setError(message);
+      notifyError(locale === 'vi' ? 'Không thể cập nhật vai trò người dùng.' : 'Could not update user role.', message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteUser = async (user: AdminUser) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await browserApiFetchAuth<{ message?: string }>(`/admin/users/${encodeURIComponent(user.id)}`, {
+        method: 'DELETE',
+      });
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      setSelectedUser((prev) => (prev?.id === user.id ? null : prev));
+      setDeleteTarget(null);
+      notifySuccess(
+        response?.message ||
+          (locale === 'vi' ? `Đã xóa người dùng ${user.name}.` : `User ${user.name} was deleted successfully.`),
+      );
+    } catch (err) {
+      const message = formatApiError(err);
+      setError(message);
+      notifyError(locale === 'vi' ? 'Không thể xóa người dùng.' : 'Could not delete user.', message);
     } finally {
       setIsLoading(false);
     }
@@ -374,6 +409,16 @@ export default function AdminUsersPage() {
                           >
                             {user.isActive ? t('admin.users.deactivate') : t('admin.users.activate')}
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(user);
+                            }}
+                            className="text-red-600 focus:text-red-700"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {locale === 'vi' ? 'Xóa người dùng' : 'Delete user'}
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -444,8 +489,44 @@ export default function AdminUsersPage() {
                 {selectedUser.isActive ? t('admin.users.deactivate') : t('admin.users.activate')}
               </Button>
             ) : null}
+            {selectedUser ? (
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteTarget(selectedUser)}
+                disabled={isLoading}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                {locale === 'vi' ? 'Xóa người dùng' : 'Delete user'}
+              </Button>
+            ) : null}
             <Button variant="outline" onClick={() => setSelectedUser(null)}>
               {t('common.close')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{locale === 'vi' ? 'Xác nhận xóa người dùng' : 'Confirm user deletion'}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {locale === 'vi'
+              ? `Bạn có chắc chắn muốn xóa tài khoản "${deleteTarget?.name ?? ''}" (${deleteTarget?.email ?? ''})? Hành động này không thể hoàn tác.`
+              : `Are you sure you want to delete "${deleteTarget?.name ?? ''}" (${deleteTarget?.email ?? ''})? This action cannot be undone.`}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isLoading}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => { if (deleteTarget) void deleteUser(deleteTarget); }}
+              disabled={isLoading || !deleteTarget}
+            >
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              {locale === 'vi' ? 'Xóa vĩnh viễn' : 'Delete permanently'}
             </Button>
           </DialogFooter>
         </DialogContent>
