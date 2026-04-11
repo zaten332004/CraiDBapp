@@ -165,8 +165,16 @@ export default function RiskScorePage() {
   const [isExplanationOpen, setIsExplanationOpen] = useState(false);
   const [error, setError] = useState('');
   const lastFetchedLookupRef = useRef<string>('');
+  /** Khách đã có điểm nội bộ trên DB khi load hồ sơ — không ghi đè bằng kết quả CIC lần sau. */
+  const hadCreditScoreWhenLoadedRef = useRef(false);
+  /** Đã lưu điểm từ CIC ít nhất một lần sau khi load hồ sơ (cùng phiên / cùng lần load). */
+  const cicCreditPersistedThisLoadRef = useRef(false);
 
   const applyCustomer = useCallback((c: Record<string, unknown>) => {
+    const cs = c.credit_score;
+    hadCreditScoreWhenLoadedRef.current =
+      cs != null && String(cs).trim() !== '' && Number.isFinite(Number(cs));
+    cicCreditPersistedThisLoadRef.current = false;
     setFormData(customerToForm(c));
     const resolvedCustomerId = Number(c.customer_id);
     setLoadedCustomerId(Number.isFinite(resolvedCustomerId) && resolvedCustomerId > 0 ? resolvedCustomerId : null);
@@ -252,26 +260,41 @@ export default function RiskScorePage() {
         const normalizedRiskLabel = String(riskLabel || '').trim().toLowerCase();
         const scoreValue = Number(riskScore);
         const cicScoreValue = Number(cicScore);
+        const shouldPersistCreditScore =
+          !hadCreditScoreWhenLoadedRef.current && !cicCreditPersistedThisLoadRef.current;
+        const nextCreditScore = Number.isFinite(cicScoreValue)
+          ? Math.round(cicScoreValue)
+          : formData.creditScore
+            ? Number(formData.creditScore)
+            : undefined;
+        const body: Record<string, unknown> = {
+          full_name: formData.name.trim() || undefined,
+          monthly_income: parseVndDigitsToNumber(formData.incomeDigits),
+          requested_loan_amount: parseVndDigitsToNumber(formData.loanDigits),
+          age: Number(formData.age),
+          loan_type: formData.loanType.trim() || undefined,
+          requested_term_months: formData.loanTermMonths ? Number(formData.loanTermMonths) : undefined,
+          annual_interest_rate: formData.interestRate ? Number(formData.interestRate.replace(',', '.')) : undefined,
+          collateral_value: formData.collateralDigits ? parseVndDigitsToNumber(formData.collateralDigits) : undefined,
+          employment_status: formData.employmentStatus.trim() || formData.employmentDisplay.trim() || undefined,
+          notes: formData.notes.trim() || undefined,
+          risk_level: ['low', 'medium', 'high'].includes(normalizedRiskLabel) ? normalizedRiskLabel : undefined,
+          risk_score: Number.isFinite(scoreValue) ? scoreValue : undefined,
+        };
+        if (
+          shouldPersistCreditScore &&
+          nextCreditScore !== undefined &&
+          Number.isFinite(nextCreditScore)
+        ) {
+          body.credit_score = nextCreditScore;
+        }
         await browserApiFetchAuth(`/customers/${loadedCustomerId}`, {
           method: 'PUT',
-          body: {
-            full_name: formData.name.trim() || undefined,
-            monthly_income: parseVndDigitsToNumber(formData.incomeDigits),
-            requested_loan_amount: parseVndDigitsToNumber(formData.loanDigits),
-            age: Number(formData.age),
-            credit_score: Number.isFinite(cicScoreValue)
-              ? Math.round(cicScoreValue)
-              : (formData.creditScore ? Number(formData.creditScore) : undefined),
-            loan_type: formData.loanType.trim() || undefined,
-            requested_term_months: formData.loanTermMonths ? Number(formData.loanTermMonths) : undefined,
-            annual_interest_rate: formData.interestRate ? Number(formData.interestRate.replace(',', '.')) : undefined,
-            collateral_value: formData.collateralDigits ? parseVndDigitsToNumber(formData.collateralDigits) : undefined,
-            employment_status: formData.employmentStatus.trim() || formData.employmentDisplay.trim() || undefined,
-            notes: formData.notes.trim() || undefined,
-            risk_level: ['low', 'medium', 'high'].includes(normalizedRiskLabel) ? normalizedRiskLabel : undefined,
-            risk_score: Number.isFinite(scoreValue) ? scoreValue : undefined,
-          },
+          body,
         });
+        if ('credit_score' in body && Number.isFinite(Number(body.credit_score))) {
+          cicCreditPersistedThisLoadRef.current = true;
+        }
       } catch (err) {
         notifyError(formatUserFacingApiError(err));
       } finally {
