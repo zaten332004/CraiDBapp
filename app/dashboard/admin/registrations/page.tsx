@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -61,10 +62,17 @@ function formatStatusLabel(value: unknown, locale: string) {
   return String(value ?? (locale === 'vi' ? 'Không có' : 'N/A'));
 }
 
+function statusBadgeClass(status: string) {
+  if (status === 'approved') return 'border-emerald-300 bg-emerald-50 text-emerald-700';
+  if (status === 'rejected') return 'border-red-300 bg-red-50 text-red-700';
+  return 'border-amber-300 bg-amber-50 text-amber-800';
+}
+
 export default function AdminRegistrationsPage() {
   const PAGE_SIZE = 15;
   const { t, locale } = useI18n();
   const [registrations, setRegistrations] = useState<RegistrationRow[]>([]);
+  const [roleFilter, setRoleFilter] = useState<'all' | RegistrationType>('all');
   const [statusFilter, setStatusFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -191,19 +199,21 @@ export default function AdminRegistrationsPage() {
   }, [statusFilter]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return registrations;
+    const byRole = roleFilter === 'all'
+      ? registrations
+      : registrations.filter((r) => String(r.type).trim().toLowerCase() === roleFilter);
+
+    if (!search.trim()) return byRole;
     const q = search.trim().toLowerCase();
-    return registrations.filter((r) => {
-      return (
-        r.id.toLowerCase().includes(q) ||
-        r.name.toLowerCase().includes(q) ||
-        r.email.toLowerCase().includes(q)
-      );
-    });
-  }, [registrations, search]);
+    return byRole.filter((r) => (
+      r.id.toLowerCase().includes(q) ||
+      r.name.toLowerCase().includes(q) ||
+      r.email.toLowerCase().includes(q)
+    ));
+  }, [registrations, roleFilter, search]);
   useEffect(() => {
     setPage(1);
-  }, [search, registrations.length]);
+  }, [search, roleFilter, registrations.length]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -233,8 +243,16 @@ export default function AdminRegistrationsPage() {
 
           <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="w-fit">{t('role.manager')}</Badge>
-              <Badge variant="outline" className="w-fit">{t('role.analyst')}</Badge>
+              <Select value={roleFilter} onValueChange={(v: 'all' | RegistrationType) => setRoleFilter(v)}>
+                <SelectTrigger className="h-8 w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.all')}</SelectItem>
+                  <SelectItem value="manager">{t('role.manager')}</SelectItem>
+                  <SelectItem value="analyst">{t('role.analyst')}</SelectItem>
+                </SelectContent>
+              </Select>
               <Button
                 size="sm"
                 variant={statusFilter === 'pending' ? 'default' : 'outline'}
@@ -304,8 +322,15 @@ export default function AdminRegistrationsPage() {
                         <Badge variant="outline">{t(`role.${reg.type}`)}</Badge>
                       </TableCell>
                       <TableCell className="py-1.5 text-[12px] text-muted-foreground whitespace-nowrap">{reg.requestedAt || '—'}</TableCell>
-                      <TableCell className="py-1.5 text-right space-x-2">
-                        {statusFilter === 'pending' && (
+                      <TableCell className="py-1.5 text-right">
+                        {(() => {
+                          const rowStatus = String((reg.raw as any)?.status ?? statusFilter).trim().toLowerCase();
+                          return (
+                            <div className="flex flex-col items-end gap-2">
+                              <Badge variant="outline" className={statusBadgeClass(rowStatus)}>
+                                {formatStatusLabel(rowStatus, locale)}
+                              </Badge>
+                              {rowStatus === 'pending' && (
                           <>
                             <Button
                               size="sm"
@@ -333,7 +358,10 @@ export default function AdminRegistrationsPage() {
                               {t('common.reject')}
                             </Button>
                           </>
-                        )}
+                              )}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                     </TableRow>
                   ))}
