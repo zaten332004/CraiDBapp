@@ -18,12 +18,61 @@ import { ListPagination } from '@/components/list-pagination';
 import { downloadCsvFile } from '@/lib/export/csv';
 import { notifyError, notifySuccess } from '@/lib/notify';
 
+type LocalePin = 'vi' | 'en';
+
+const PIN_COPY: Record<
+  LocalePin,
+  {
+    section_title: string;
+    section_hint: string;
+    pin_status: string;
+    pin_set: string;
+    pin_not_set: string;
+    new_pin: string;
+    confirm_pin: string;
+    save_pin: string;
+    pin_invalid: string;
+    pin_mismatch: string;
+    pin_saved: string;
+  }
+> = {
+  vi: {
+    section_title: 'Mã PIN tài khoản',
+    section_hint:
+      'Đặt hoặc thay mã PIN 6 chữ số để người dùng dùng cho quên mật khẩu và thao tác nhạy cảm. Không hiển thị lại PIN sau khi lưu.',
+    pin_status: 'Trạng thái PIN',
+    pin_set: 'Đã đặt PIN',
+    pin_not_set: 'Chưa đặt PIN',
+    new_pin: 'Mã PIN mới (6 số)',
+    confirm_pin: 'Xác nhận PIN',
+    save_pin: 'Lưu mã PIN',
+    pin_invalid: 'PIN phải gồm đúng 6 chữ số.',
+    pin_mismatch: 'Hai lần nhập PIN không khớp.',
+    pin_saved: 'Đã cập nhật mã PIN.',
+  },
+  en: {
+    section_title: 'Account PIN',
+    section_hint:
+      'Set or replace the 6-digit PIN for forgot-password and sensitive actions. The PIN is never shown after saving.',
+    pin_status: 'PIN status',
+    pin_set: 'PIN is set',
+    pin_not_set: 'PIN not set',
+    new_pin: 'New PIN (6 digits)',
+    confirm_pin: 'Confirm PIN',
+    save_pin: 'Save PIN',
+    pin_invalid: 'PIN must be exactly 6 digits.',
+    pin_mismatch: 'PIN entries do not match.',
+    pin_saved: 'PIN updated.',
+  },
+};
+
 type AdminUser = {
   id: string;
   name: string;
   email: string;
   role: string;
   isActive: boolean;
+  hasPin: boolean;
   raw: unknown;
 };
 
@@ -35,11 +84,13 @@ function normalizeUser(item: any): AdminUser | null {
   const email = String(item.email ?? '').trim() || '—';
   const role = String(item.role ?? item.user_role ?? item.userRole ?? '').trim().toLowerCase() || '—';
   const isActiveRaw = item.is_active ?? item.isActive ?? item.active ?? item.status;
+  const activeStatuses = new Set(['approved', 'verified', 'active', 'true']);
   const isActive =
     typeof isActiveRaw === 'boolean'
       ? isActiveRaw
-      : String(isActiveRaw ?? '').toLowerCase() === 'active' || String(isActiveRaw ?? '').toLowerCase() === 'true';
-  return { id, name, email, role, isActive, raw: item };
+      : activeStatuses.has(String(isActiveRaw ?? '').toLowerCase());
+  const hasPin = Boolean(item.has_pin ?? item.hasPin);
+  return { id, name, email, role, isActive, hasPin, raw: item };
 }
 
 function getRoleBadgeClass(role: string) {
@@ -61,6 +112,7 @@ export default function AdminUsersPage() {
   const PAGE_SIZE = 15;
   const { t, locale } = useI18n();
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
+  const pinT = PIN_COPY[locale === 'en' ? 'en' : 'vi'];
   const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [query, setQuery] = useState('');
@@ -70,6 +122,8 @@ export default function AdminUsersPage() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
+  const [pinNew, setPinNew] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
 
   const loadUsers = async () => {
     setIsLoading(true);
@@ -173,6 +227,38 @@ export default function AdminUsersPage() {
     }
   };
 
+  const saveUserPin = async () => {
+    if (!selectedUser) return;
+    const a = pinNew.replace(/\D/g, '');
+    const b = pinConfirm.replace(/\D/g, '');
+    if (a.length !== 6) {
+      notifyError(pinT.pin_invalid);
+      return;
+    }
+    if (a !== b) {
+      notifyError(pinT.pin_mismatch);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const updated = await browserApiFetchAuth<{ has_pin?: boolean }>(
+        `/admin/users/${encodeURIComponent(selectedUser.id)}/pin`,
+        { method: 'POST', body: { pin: a } },
+      );
+      const hasPin = Boolean(updated?.has_pin ?? true);
+      setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? { ...u, hasPin } : u)));
+      setSelectedUser((prev) => (prev && prev.id === selectedUser.id ? { ...prev, hasPin } : prev));
+      setPinNew('');
+      setPinConfirm('');
+      notifySuccess(pinT.pin_saved);
+    } catch (err) {
+      const message = apiErr(err);
+      notifyError(locale === 'vi' ? 'Không thể cập nhật mã PIN.' : 'Could not update PIN.', { description: message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,6 +282,8 @@ export default function AdminUsersPage() {
   }, [query, scope, users.length]);
   useEffect(() => {
     setSelectedRole(selectedUser?.role ?? '');
+    setPinNew('');
+    setPinConfirm('');
   }, [selectedUser]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -232,6 +320,7 @@ export default function AdminUsersPage() {
         t('common.role'),
         t('common.status'),
         'ID',
+        pinT.pin_status,
       ],
       filtered.map((user) => [
         user.name,
@@ -239,6 +328,7 @@ export default function AdminUsersPage() {
         roleLabel(user.role),
         t(user.isActive ? 'status.active' : 'status.inactive'),
         user.id,
+        user.hasPin ? pinT.pin_set : pinT.pin_not_set,
       ]),
     );
   };
@@ -252,10 +342,13 @@ export default function AdminUsersPage() {
       { label: t('common.email'), value: selectedUser.email },
       { label: t('common.role'), value: roleLabel(selectedUser.role) },
       { label: t('common.status'), value: t(selectedUser.isActive ? 'status.active' : 'status.inactive') },
+      { label: pinT.pin_status, value: selectedUser.hasPin ? pinT.pin_set : pinT.pin_not_set },
       { label: 'Username', value: raw.username ?? raw.user_name ?? '—' },
       { label: 'Created at', value: String(raw.created_at ?? raw.createdAt ?? '—') },
     ];
-  }, [selectedUser, t]);
+  }, [selectedUser, t, pinT]);
+
+  const pinReady = pinNew.replace(/\D/g, '').length === 6 && pinConfirm.replace(/\D/g, '').length === 6;
 
   return (
     <div className="flex flex-col gap-6 p-6 bg-[#f4f7fc]">
@@ -429,7 +522,7 @@ export default function AdminUsersPage() {
       </Card>
 
       <Dialog open={Boolean(selectedUser)} onOpenChange={(open) => { if (!open) setSelectedUser(null); }}>
-        <DialogContent className="!w-[94vw] !max-w-[1150px] max-h-[90vh] overflow-hidden">
+        <DialogContent className="!w-[94vw] !max-w-[1150px] max-h-[90vh] overflow-hidden flex flex-col gap-3">
           <DialogHeader>
             <DialogTitle>{t('admin.users.list_title')} - {selectedUser?.name}</DialogTitle>
           </DialogHeader>
@@ -441,6 +534,44 @@ export default function AdminUsersPage() {
               </div>
             ))}
           </div>
+          {selectedUser ? (
+            <div className="rounded-lg border border-dashed bg-muted/15 p-4 space-y-3 shrink-0">
+              <div>
+                <p className="text-sm font-semibold">{pinT.section_title}</p>
+                <p className="text-xs text-muted-foreground mt-1">{pinT.section_hint}</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">{pinT.new_pin}</label>
+                  <Input
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="new-password"
+                    maxLength={6}
+                    value={pinNew}
+                    onChange={(e) => setPinNew(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="••••••"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">{pinT.confirm_pin}</label>
+                  <Input
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="new-password"
+                    maxLength={6}
+                    value={pinConfirm}
+                    onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="••••••"
+                  />
+                </div>
+              </div>
+              <Button type="button" variant="secondary" disabled={isLoading || !pinReady} onClick={() => void saveUserPin()}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {pinT.save_pin}
+              </Button>
+            </div>
+          ) : null}
           <DialogFooter>
             {selectedUser ? (
               <div className="mr-auto flex items-center gap-2">
