@@ -714,7 +714,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "admin.audit.short_desc": "Mô tả ngắn",
     "admin.audit.view_details": "Xem chi tiết",
     "admin.audit.detail_title": "Chi tiết thao tác",
-    "admin.audit.raw_payload": "Dữ liệu gốc (JSON)",
     "admin.audit.before": "Trước thay đổi",
     "admin.audit.after": "Sau thay đổi",
 
@@ -1616,7 +1615,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "admin.audit.short_desc": "Short description",
     "admin.audit.view_details": "View details",
     "admin.audit.detail_title": "Action details",
-    "admin.audit.raw_payload": "Raw payload (JSON)",
     "admin.audit.before": "Before change",
     "admin.audit.after": "After change",
 

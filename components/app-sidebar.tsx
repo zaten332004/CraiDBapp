@@ -220,7 +220,13 @@ export function AppSidebar() {
         continue;
       }
       if (isViewer) {
-        
+        if (item.href === '/dashboard/customers') {
+          hrefs.push(item.href);
+          continue;
+        }
+        if (item.titleKey !== 'sidebar.risk') {
+          continue;
+        }
       }
       if (item.items) {
         const baseSubItems = item.items.filter((subItem) => !subItem.hidden && Boolean(subItem.href));
@@ -301,7 +307,6 @@ export function AppSidebar() {
                 return ANALYST_NAV_TITLE_KEYS.has(item.titleKey);
               }
               if (isViewer) {
-                
                 if (item.href === '/dashboard/customers') return true;
                 if (item.titleKey === 'sidebar.risk') return true;
               }

@@ -470,14 +470,6 @@ function getActionBadgeClass(row: AuditLogRow): string {
   return '!border-slate-200 !bg-slate-50 !text-slate-700';
 }
 
-function safeJsonStringify(value: unknown): string {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
 function parseAuditPayload(value: unknown): Record<string, any> {
   if (value && typeof value === 'object') return value as Record<string, any>;
   if (typeof value === 'string' && value.trim()) {
@@ -853,13 +845,6 @@ export default function AdminAuditLogsPage() {
                       </div>
                     )}
                   </div>
-                </div>
-
-                <div className="rounded-xl border p-3">
-                  <p className="mb-2 text-sm font-medium">{t('admin.audit.raw_payload')}</p>
-                  <pre className="max-h-56 overflow-auto rounded-md bg-muted/80 p-3 text-left text-[11px] leading-relaxed whitespace-pre-wrap break-all">
-                    {safeJsonStringify(selected.raw)}
-                  </pre>
                 </div>
               </div>
 
