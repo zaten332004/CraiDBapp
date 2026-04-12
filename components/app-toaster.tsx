@@ -14,7 +14,7 @@ export function AppToaster({ ...props }: ToasterProps) {
     <Sonner
       theme={theme as ToasterProps['theme']}
       position="top-center"
-      closeButton
+      closeButton={false}
       duration={4000}
       visibleToasts={4}
       expand={false}
@@ -39,8 +39,6 @@ export function AppToaster({ ...props }: ToasterProps) {
           title: 'text-[15px] font-medium leading-snug',
           description: 'text-sm leading-relaxed',
           icon: '!size-5 [&_svg]:size-4',
-          closeButton:
-            '!size-5 !border-border/60 !bg-background/90 !text-muted-foreground hover:!bg-muted hover:!text-foreground',
         },
       }}
       {...props}

@@ -605,10 +605,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "powerbi.toast.disconnect_fail_title": "Không ngắt kết nối được",
     "powerbi.connect": "Kết nối Power BI",
     "powerbi.test_connection": "Kiểm tra kết nối",
-    "powerbi.config_subtitle":
-      "Workspace và dataset theo tài khoản; Client ID và secret cấu hình trên máy chủ (.env).",
-    "powerbi.guid_paste_hint":
-      "Dán GUID vào ô trên, hoặc chọn dataset ở khối bên dưới — lựa chọn sẽ tự điền vào ô Dataset ID.",
     "powerbi.status_title": "Trạng thái kết nối",
     "powerbi.status_server_label": "Kiểm tra máy chủ (.env)",
     "powerbi.status_account_label": "Cấu hình đã lưu",
@@ -659,6 +655,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "powerbi.table_suggestions_extended_hint": "Bấm để thêm nhanh các tên gợi ý mở rộng (rủi ro tín dụng / danh mục).",
     "powerbi.table_suggestions_remove": "Xóa gợi ý",
     "powerbi.workspace": "Workspace",
+    "powerbi.dataset": "Dataset",
     "powerbi.last_synced": "Đồng bộ gần nhất",
     "powerbi.view_workspaces": "Xem Workspaces",
     "powerbi.view_datasets": "Xem Datasets",
@@ -1510,9 +1507,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "powerbi.toast.disconnect_fail_title": "Could not disconnect",
     "powerbi.connect": "Connect Power BI",
     "powerbi.test_connection": "Test Connection",
-    "powerbi.config_subtitle": "Workspace and dataset are per user account; Client ID and secret are configured on the server (.env).",
-    "powerbi.guid_paste_hint":
-      "Paste GUIDs above, or pick a dataset in the section below — the selection fills the Dataset ID field.",
     "powerbi.status_title": "Connection status",
     "powerbi.status_server_label": "Server check (.env)",
     "powerbi.status_account_label": "Saved configuration",
@@ -1563,6 +1557,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "powerbi.table_suggestions_extended_hint": "Click to append common extended credit-risk / portfolio table names.",
     "powerbi.table_suggestions_remove": "Remove suggestion",
     "powerbi.workspace": "Workspace",
+    "powerbi.dataset": "Dataset",
     "powerbi.last_synced": "Last Synced",
     "powerbi.view_workspaces": "View Workspaces",
     "powerbi.view_datasets": "View Datasets",

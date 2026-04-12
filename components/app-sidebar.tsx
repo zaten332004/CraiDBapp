@@ -39,6 +39,7 @@ import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { CRAIDB_PROFILE_CHANGED_EVENT } from '@/lib/profile-sync-event';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
 
 import {
   LayoutDashboard,
@@ -421,9 +422,17 @@ export function AppSidebar() {
           <Link
             href="/dashboard/profile"
             title={currentUser.name}
-            className="mb-3 flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-2.5 py-2 transition-colors hover:bg-sidebar-accent group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
+            className={cn(
+              'mb-3 flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-2.5 py-2 transition-colors hover:bg-sidebar-accent',
+              'group-data-[collapsible=icon]:mb-2 group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:self-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:hover:bg-sidebar-accent/80',
+            )}
           >
-            <Avatar className="h-7 w-7 shrink-0">
+            <Avatar
+              className={cn(
+                'h-7 w-7 shrink-0',
+                'group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:border-2 group-data-[collapsible=icon]:border-sidebar-border',
+              )}
+            >
               <AvatarImage
                 key={currentUser.avatarUrl ?? 'no-avatar'}
                 src={currentUser.avatarUrl || undefined}
