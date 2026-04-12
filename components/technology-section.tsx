@@ -1,43 +1,52 @@
 "use client";
 
-import { Server, BarChart3, Smartphone, Bot, Cloud, Shield } from "lucide-react";
+import { Server, BarChart3, Monitor, Sparkles, Cloud, Shield } from "lucide-react";
 import { useI18n } from "@/components/i18n-provider";
 
 const technologies = [
   {
     categoryKey: "home.tech.cat.backend",
     icon: Server,
-    items: ["SQL Server", "Python", "Scikit-learn", "XGBoost", "SHAP"],
+    items: [
+      "FastAPI",
+      "Uvicorn",
+      "Pydantic",
+      "SQLAlchemy",
+      "PyMySQL",
+      "pandas",
+      "scikit-learn",
+      "NumPy",
+    ],
     descriptionKey: "home.tech.cat.backend_desc",
   },
   {
     categoryKey: "home.tech.cat.dashboard",
     icon: BarChart3,
-    items: ["Power BI", "DAX", "M Query", "Direct Query"],
+    items: ["Power BI REST API", "DAX", "Service Principal", "Semantic model"],
     descriptionKey: "home.tech.cat.dashboard_desc",
   },
   {
     categoryKey: "home.tech.cat.frontend",
-    icon: Smartphone,
-    items: ["Flutter", "Dart", "Material Design", "Responsive UI"],
+    icon: Monitor,
+    items: ["Next.js", "React", "TypeScript", "Tailwind CSS", "shadcn/ui"],
     descriptionKey: "home.tech.cat.frontend_desc",
   },
   {
     categoryKey: "home.tech.cat.chatbot",
-    icon: Bot,
-    items: ["Langflow", "LLM Integration", "RAG", "NLP"],
+    icon: Sparkles,
+    items: ["Google Gemini", "google-genai", "REST / JSON", "Power BI context"],
     descriptionKey: "home.tech.cat.chatbot_desc",
   },
   {
     categoryKey: "home.tech.cat.cloud",
     icon: Cloud,
-    items: ["AWS EC2", "S3", "Lambda", "RDS", "CloudWatch"],
+    items: ["boto3 (AWS SDK)", "HTTPX", "pytest"],
     descriptionKey: "home.tech.cat.cloud_desc",
   },
   {
     categoryKey: "home.tech.cat.security",
     icon: Shield,
-    items: ["IAM", "Encryption", "Audit Logs", "Compliance"],
+    items: ["JWT (python-jose)", "bcrypt", "OAuth (Google)", "Audit logs", "RBAC"],
     descriptionKey: "home.tech.cat.security_desc",
   },
 ];

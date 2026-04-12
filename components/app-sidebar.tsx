@@ -284,7 +284,7 @@ export function AppSidebar() {
         <Link
           href={homeHref}
           data-nav-dir={navDirForHref(homeHref)}
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity group-data-[collapsible=icon]:justify-center"
+          className="flex items-center gap-2 transition-opacity hover:opacity-80 group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:justify-center"
         >
           <Image
             src="/logo.svg"
@@ -396,7 +396,7 @@ export function AppSidebar() {
 
         {/* Admin Section */}
         {isAdmin && (
-          <div className="mt-8 pt-6 border-t border-sidebar-border">
+          <div className="mt-8 w-full border-t border-sidebar-border pt-6 group-data-[collapsible=icon]:mt-4 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:pt-4">
             <div className="px-3 py-2 group-data-[collapsible=icon]:hidden">
               <h3 className="text-xs font-semibold text-sidebar-foreground/70 uppercase tracking-wider">
                 {t("sidebar.admin")}
@@ -461,7 +461,10 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton tooltip={t("sidebar.settings")}>
+                <SidebarMenuButton
+                  tooltip={t("sidebar.settings")}
+                  className="group-data-[collapsible=icon]:mx-auto"
+                >
                   <Settings className="h-4 w-4" />
                   <span>{t("sidebar.settings")}</span>
                 </SidebarMenuButton>

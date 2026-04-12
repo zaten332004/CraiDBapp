@@ -51,10 +51,14 @@ type PowerBiStatus = {
   last_sync?: string | null;
 };
 
-type PowerBiSchemaPayload = {
+type PowerBiSchemaResponse = {
   ok?: boolean;
   tables?: string[];
   table_list_source?: string;
+  schemas?: Array<{ name: string; columns: string[]; sample_rows?: unknown[] }>;
+  errors?: Record<string, string>;
+  message?: string;
+  requires_table_hints?: boolean;
 };
 
 /** Lỗi probe global từ server (thiếu .env) — không hiển thị toast/banner cho người dùng cuối. */
@@ -84,6 +88,8 @@ export default function PowerBIConfigPage() {
   const [refreshResult, setRefreshResult] = useState<any>(null);
   const [tableSuggestions, setTableSuggestions] = useState<string[]>(() => getDefaultPowerBiTableSuggestions());
   const [newTableName, setNewTableName] = useState('');
+  const [powerBiSchemaPreview, setPowerBiSchemaPreview] = useState<PowerBiSchemaResponse | null>(null);
+  const [powerBiSchemaLoading, setPowerBiSchemaLoading] = useState(false);
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((w) => w.id === selectedWorkspaceId) ?? null,
@@ -298,7 +304,7 @@ export default function PowerBIConfigPage() {
         let sourceKey: 'api' | 'hints_saved' | 'account' | 'local' | null = null;
 
         try {
-          const schema = await browserApiFetchAuth<PowerBiSchemaPayload>('/powerbi/schema', { method: 'GET' });
+          const schema = await browserApiFetchAuth<PowerBiSchemaResponse>('/powerbi/schema', { method: 'GET' });
           if (Array.isArray(schema?.tables) && schema.tables.length > 0) {
             tables = schema.tables.map((x) => String(x).trim()).filter(Boolean);
             sourceKey =
@@ -447,6 +453,106 @@ export default function PowerBIConfigPage() {
     updateTableSuggestions([...tableSuggestions, name]);
   };
 
+  const handleUseTableData = async () => {
+    if (!accountStatus.connected) {
+      notifyInfo(t('powerbi.use_table_data_need_account'), { duration: 5200 });
+      return;
+    }
+    setPowerBiSchemaLoading(true);
+    setPowerBiSchemaPreview(null);
+    try {
+      const data = await browserApiFetchAuth<PowerBiSchemaResponse>('/powerbi/schema', { method: 'GET' });
+      if (data.ok === false && data.requires_table_hints) {
+        notifyError(t('powerbi.use_table_data_fail_title'), {
+          description:
+            (typeof data.message === 'string' && data.message.trim()) || t('powerbi.use_table_data_hints_required'),
+          duration: 7000,
+        });
+        return;
+      }
+      const tableCount = Array.isArray(data.tables) ? data.tables.length : 0;
+      const schemaList = Array.isArray(data.schemas) ? data.schemas : [];
+      if (!tableCount && !schemaList.length) {
+        notifyError(t('powerbi.use_table_data_fail_title'), {
+          description:
+            (typeof data.message === 'string' && data.message.trim()) || t('powerbi.use_table_data_hints_required'),
+          duration: 7000,
+        });
+        return;
+      }
+      setPowerBiSchemaPreview(data);
+      const displayCount = tableCount || schemaList.length;
+      notifySuccess(t('powerbi.use_table_data_ok_title'), {
+        description: `${displayCount} ${t('powerbi.use_table_data_ok_suffix')}`,
+        duration: 4800,
+      });
+    } catch (err) {
+      notifyError(t('powerbi.use_table_data_fail_title'), {
+        description: formatUserFacingApiError(err, msgLocale),
+        duration: 7000,
+      });
+    } finally {
+      setPowerBiSchemaLoading(false);
+    }
+  };
+
+  const tableDataPreviewSection =
+    powerBiSchemaPreview &&
+    (() => {
+      const p = powerBiSchemaPreview;
+      const schemas = Array.isArray(p.schemas) ? p.schemas : [];
+      const tablesOnly = Array.isArray(p.tables) ? p.tables : [];
+      if (!schemas.length && !tablesOnly.length) return null;
+      return (
+        <div className="space-y-3 border-t border-border pt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-foreground">{t('powerbi.table_data_preview_title')}</span>
+            {p.table_list_source ? (
+              <Badge variant="secondary" className="max-w-full whitespace-normal font-normal">
+                {t('powerbi.table_data_source_label')}:{' '}
+                {p.table_list_source === 'saved_hints'
+                  ? t('powerbi.toast.test_tables_source_hints_saved')
+                  : t('powerbi.toast.test_tables_source_api')}
+              </Badge>
+            ) : null}
+          </div>
+          {schemas.length > 0 ? (
+            <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
+              {schemas.map((sch) => {
+                const err = p.errors?.[sch.name];
+                const cols = Array.isArray(sch.columns) ? sch.columns : [];
+                const samples = Array.isArray(sch.sample_rows) ? sch.sample_rows.length : 0;
+                return (
+                  <div key={sch.name} className="rounded-md border border-border bg-background/80 p-2.5 text-sm">
+                    <p className="font-mono font-semibold text-foreground">{sch.name}</p>
+                    <p className="mt-1 break-words text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{t('powerbi.table_data_columns_label')}:</span>{' '}
+                      {cols.length ? cols.join(', ') : '—'}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{t('powerbi.table_data_sample_count')}:</span>{' '}
+                      {samples}
+                    </p>
+                    {err ? (
+                      <p className="mt-1 break-words text-xs text-destructive">
+                        {t('powerbi.table_data_error_prefix')}: {err}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <ul className="max-h-48 list-inside list-disc overflow-y-auto font-mono text-sm text-muted-foreground">
+              {tablesOnly.map((name) => (
+                <li key={name}>{name}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+    })();
+
   return (
     <div className="flex flex-col gap-8 p-8">
       <div>
@@ -536,12 +642,9 @@ export default function PowerBIConfigPage() {
               </div>
 
               <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
-                <p className="text-sm font-semibold text-foreground">
-                  {t('powerbi.view_workspaces')} · {t('powerbi.view_datasets')}
-                </p>
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="flex flex-col gap-6">
                   <div className="space-y-2">
-                    <Label>{t('powerbi.workspace')}</Label>
+                    <Label>{t('powerbi.workspace_select_label')}</Label>
                     <Select
                       value={selectedWorkspaceId}
                       onValueChange={(v) => {
@@ -643,7 +746,7 @@ export default function PowerBIConfigPage() {
                 </div>
 
                 {(workspaces.length > 0 || datasets.length > 0) && (
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <div className="flex flex-col gap-6">
                     <div className="max-h-40 overflow-y-auto overflow-x-auto rounded-md border">
                       <Table>
                         <TableHeader>
@@ -876,9 +979,26 @@ export default function PowerBIConfigPage() {
             </div>
 
             <p className="text-xs leading-relaxed text-muted-foreground">{t('powerbi.rules_ref_note')}</p>
-            <p className="rounded-md border border-dashed border-emerald-300/80 bg-emerald-50/80 px-2.5 py-2 text-xs text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100/90">
-              {t('powerbi.rules_checklist_hint')}
-            </p>
+
+            <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  type="button"
+                  onClick={handleUseTableData}
+                  disabled={!accountStatus.connected || powerBiSchemaLoading}
+                >
+                  {powerBiSchemaLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                  ) : null}
+                  {t('powerbi.use_table_data')}
+                </Button>
+                {!accountStatus.connected ? (
+                  <p className="text-xs text-muted-foreground sm:max-w-md">{t('powerbi.use_table_data_need_account')}</p>
+                ) : null}
+              </div>
+
+              {tableDataPreviewSection}
+            </div>
           </CardContent>
         </Card>
       </div>

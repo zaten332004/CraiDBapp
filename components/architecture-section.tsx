@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, Brain, BarChart3, MessageSquare, Smartphone, Cloud, ArrowDown, ArrowRight } from "lucide-react";
+import { Database, Brain, BarChart3, Sparkles, Monitor, Cloud, ArrowRight } from "lucide-react";
 import { useI18n } from "@/components/i18n-provider";
 
 const architectureLayers = [

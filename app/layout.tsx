@@ -13,23 +13,10 @@ import { SessionActivityTracker } from '@/components/session-activity-tracker'
 export const metadata: Metadata = {
   title: 'CRAI DB - Intelligent Credit Risk Analytics Platform',
   description: 'Credit Risk Analysis & Smart Dashboard - Chatbot System. ML-powered credit scoring with explainable AI, real-time dashboards, and conversational analytics.',
-  generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: [{ url: '/logo.svg', type: 'image/svg+xml' }],
+    shortcut: '/logo.svg',
+    apple: '/logo.svg',
   },
 }
 

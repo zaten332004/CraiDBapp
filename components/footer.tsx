@@ -2,14 +2,14 @@ import { Github, FileText, Mail } from "lucide-react";
 import { useI18n } from "@/components/i18n-provider";
 
 const technologies = [
-  "SQL Server",
-  "Python",
+  "FastAPI",
+  "MySQL",
+  "Next.js",
+  "Gemini",
   "Power BI",
-  "Flutter",
-  "Langflow",
-  "AWS",
-  "SHAP",
-  "Machine Learning",
+  "scikit-learn",
+  "AWS (boto3)",
+  "JWT / OAuth",
 ];
 
 const links = [

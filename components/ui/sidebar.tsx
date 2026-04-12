@@ -29,7 +29,8 @@ const SIDEBAR_COOKIE_NAME = 'sidebar_state'
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = '16rem'
 const SIDEBAR_WIDTH_MOBILE = '18rem'
-const SIDEBAR_WIDTH_ICON = '3rem'
+/** Collapsed rail width: wider than default 3rem so logo, icons, avatar stay readable and centered. */
+const SIDEBAR_WIDTH_ICON = '4.75rem'
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b'
 
 type SidebarContextProps = {
@@ -337,7 +338,11 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="sidebar-header"
       data-sidebar="header"
-      className={cn('flex flex-col gap-2 p-2', className)}
+      className={cn(
+        'flex flex-col gap-2 p-2',
+        'group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5 group-data-[collapsible=icon]:px-2.5 group-data-[collapsible=icon]:py-3',
+        className,
+      )}
       {...props}
     />
   )
@@ -348,7 +353,11 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="sidebar-footer"
       data-sidebar="footer"
-      className={cn('flex flex-col gap-2 p-2', className)}
+      className={cn(
+        'flex flex-col gap-2 p-2',
+        'group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-2 group-data-[collapsible=icon]:px-2.5 group-data-[collapsible=icon]:py-3',
+        className,
+      )}
       {...props}
     />
   )
@@ -362,7 +371,11 @@ function SidebarSeparator({
     <Separator
       data-slot="sidebar-separator"
       data-sidebar="separator"
-      className={cn('bg-sidebar-border mx-2 w-auto', className)}
+      className={cn(
+        'bg-sidebar-border mx-2 w-auto',
+        'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:w-10',
+        className,
+      )}
       {...props}
     />
   )
@@ -375,6 +388,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<'div'>) {
       data-sidebar="content"
       className={cn(
         'flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden',
+        'group-data-[collapsible=icon]:items-center',
         className,
       )}
       {...props}
@@ -456,7 +470,12 @@ function SidebarMenu({ className, ...props }: React.ComponentProps<'ul'>) {
     <ul
       data-slot="sidebar-menu"
       data-sidebar="menu"
-      className={cn('flex w-full min-w-0 flex-col gap-1', className)}
+      className={cn(
+        'flex w-full min-w-0 flex-col gap-1',
+        // Icon mode: rail is wider; shrink menu to icon column and center it in the sidebar.
+        'group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:items-center',
+        className,
+      )}
       {...props}
     />
   )
@@ -467,7 +486,11 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<'li'>) {
     <li
       data-slot="sidebar-menu-item"
       data-sidebar="menu-item"
-      className={cn('group/menu-item relative', className)}
+      className={cn(
+        'group/menu-item relative',
+        'group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center',
+        className,
+      )}
       {...props}
     />
   )
