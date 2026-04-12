@@ -47,7 +47,14 @@ type PowerBiStatus = {
   workspace_name?: string | null;
   dataset_id?: string | null;
   dataset_name?: string | null;
+  table_names?: string[] | null;
   last_sync?: string | null;
+};
+
+type PowerBiSchemaPayload = {
+  ok?: boolean;
+  tables?: string[];
+  table_list_source?: string;
 };
 
 /** Lỗi probe global từ server (thiếu .env) — không hiển thị toast/banner cho người dùng cuối. */
@@ -264,9 +271,10 @@ export default function PowerBIConfigPage() {
 
       let accountLine = t('powerbi.toast.test_account_status_unknown');
       let accountConnected: boolean | null = null;
+      let statusPayload: PowerBiStatus | null = null;
       try {
-        const st = await browserApiFetchAuth<{ connected?: boolean }>('/powerbi/status', { method: 'GET' });
-        accountConnected = Boolean(st?.connected);
+        statusPayload = await browserApiFetchAuth<PowerBiStatus>('/powerbi/status', { method: 'GET' });
+        accountConnected = Boolean(statusPayload?.connected);
         accountLine = accountConnected
           ? t('powerbi.toast.test_account_configured')
           : t('powerbi.toast.test_account_not_configured');
@@ -286,14 +294,52 @@ export default function PowerBIConfigPage() {
           duration: 6200,
         });
       } else if (result.suppressUserNotification) {
-        const desc =
-          accountConnected === true
-            ? t('powerbi.toast.test_not_assessed_desc_with_account')
-            : [t('powerbi.toast.test_not_assessed_desc'), accountLine].join('\n\n');
-        notifyInfo(t('powerbi.toast.test_not_assessed_title'), {
-          description: desc,
-          duration: accountConnected === true ? 7200 : 6000,
-        });
+        let tables: string[] = [];
+        let sourceKey: 'api' | 'hints_saved' | 'account' | 'local' | null = null;
+
+        try {
+          const schema = await browserApiFetchAuth<PowerBiSchemaPayload>('/powerbi/schema', { method: 'GET' });
+          if (Array.isArray(schema?.tables) && schema.tables.length > 0) {
+            tables = schema.tables.map((x) => String(x).trim()).filter(Boolean);
+            sourceKey =
+              schema.table_list_source === 'saved_hints' ? 'hints_saved' : 'api';
+          }
+        } catch {
+          /* 400 nếu chưa lưu workspace/dataset — bỏ qua */
+        }
+
+        if (!tables.length && Array.isArray(statusPayload?.table_names)) {
+          const fromAccount = statusPayload.table_names.map((x) => String(x).trim()).filter(Boolean);
+          if (fromAccount.length) {
+            tables = fromAccount;
+            sourceKey = 'account';
+          }
+        }
+
+        if (!tables.length && tableSuggestions.length > 0) {
+          tables = [...tableSuggestions];
+          sourceKey = 'local';
+        }
+
+        if (tables.length > 0) {
+          const sourceLine = sourceKey ? t(`powerbi.toast.test_tables_source_${sourceKey}`) : '';
+          const body = [
+            sourceLine,
+            ...tables.map((name) => `• ${name}`),
+            accountLine,
+          ]
+            .filter((x) => String(x).trim().length > 0)
+            .join('\n');
+          notifySuccess(t('powerbi.toast.test_tables_title'), {
+            description: body,
+            duration: Math.min(12000, 4200 + tables.length * 180),
+          });
+        } else {
+          notifyInfo(t('powerbi.toast.test_tables_empty_title'), {
+            description: [t('powerbi.toast.test_tables_empty_desc'), accountLine].filter(Boolean).join('\n\n'),
+            duration: 5600,
+          });
+        }
       } else {
         const parts = [
           t('powerbi.toast.test_unstable_summary'),
