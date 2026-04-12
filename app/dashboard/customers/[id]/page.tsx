@@ -91,13 +91,6 @@ export default function CustomerDetailPage() {
     { value: 'business', labelVi: 'Kinh doanh', labelEn: 'Business' },
   ] as const;
 
-  const EMPLOYMENT_STATUS_OPTIONS = [
-    { value: 'employed', labelVi: 'Đang làm việc', labelEn: 'Employed' },
-    { value: 'self_employed', labelVi: 'Tự kinh doanh', labelEn: 'Self-employed' },
-    { value: 'contract', labelVi: 'Hợp đồng / bán thời gian', labelEn: 'Contract / part-time' },
-    { value: 'unemployed', labelVi: 'Thất nghiệp', labelEn: 'Unemployed' },
-  ] as const;
-
   const normalizeLoanType = (value: unknown): string => {
     const normalized = String(value ?? '').trim().toLowerCase();
     if (!normalized) return '';
@@ -131,7 +124,7 @@ export default function CustomerDetailPage() {
           phone_number: String(customerData.phone_number ?? customerData.phone ?? ''),
           email: String(customerData.email ?? ''),
           occupation: String(customerData.occupation ?? ''),
-          employment_status: normalizeEmploymentStatus(customerData.employment_status),
+          employment_status: String(customerData.employment_status ?? '').trim(),
           monthly_income: customerData.monthly_income != null ? String(customerData.monthly_income) : '',
           permanent_address: String(customerData.permanent_address ?? ''),
           current_address: String(customerData.current_address ?? ''),
@@ -223,6 +216,7 @@ export default function CustomerDetailPage() {
       employed: 'Đang làm việc',
       unemployed: 'Thất nghiệp',
       self_employed: 'Tự kinh doanh',
+      contract: 'Hợp đồng / bán thời gian',
       single: 'Độc thân',
       married: 'Đã kết hôn',
       divorced: 'Ly hôn',
@@ -439,49 +433,35 @@ export default function CustomerDetailPage() {
                   <div key={fieldId} className="rounded-lg border p-3">
                     <p className="text-xs text-muted-foreground">{label}</p>
                     {editableRow ? (
-                      fieldId === 'employment_status' ? (
-                        <Select
-                          value={editForm.employment_status || ''}
-                          onValueChange={(v) => setEditForm((p) => ({ ...p, employment_status: v }))}
-                        >
-                          <SelectTrigger className="mt-1 h-9 w-full">
-                            <SelectValue placeholder={t('customers.detail.employment_ph')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {EMPLOYMENT_STATUS_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {isVi ? opt.labelVi : opt.labelEn}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          className="mt-1 h-9"
-                          value={
-                            fieldId === 'phone'
-                              ? editForm.phone_number
-                              : fieldId === 'email'
-                                ? editForm.email
-                                : fieldId === 'occupation'
-                                  ? editForm.occupation
+                      <Input
+                        className="mt-1 h-9"
+                        placeholder={fieldId === 'employment_status' ? t('customers.detail.employment_ph') : undefined}
+                        value={
+                          fieldId === 'phone'
+                            ? editForm.phone_number
+                            : fieldId === 'email'
+                              ? editForm.email
+                              : fieldId === 'occupation'
+                                ? editForm.occupation
+                                : fieldId === 'employment_status'
+                                  ? editForm.employment_status
                                   : fieldId === 'monthly_income'
                                     ? editForm.monthly_income
                                     : fieldId === 'permanent_address'
                                       ? editForm.permanent_address
                                       : editForm.current_address
-                          }
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (fieldId === 'phone') setEditForm((p) => ({ ...p, phone_number: sanitizePhoneInput(v) }));
-                            else if (fieldId === 'email') setEditForm((p) => ({ ...p, email: v }));
-                            else if (fieldId === 'occupation') setEditForm((p) => ({ ...p, occupation: v }));
-                            else if (fieldId === 'monthly_income') setEditForm((p) => ({ ...p, monthly_income: v.replace(/[^\d.]/g, '') }));
-                            else if (fieldId === 'permanent_address') setEditForm((p) => ({ ...p, permanent_address: v }));
-                            else setEditForm((p) => ({ ...p, current_address: v }));
-                          }}
-                        />
-                      )
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (fieldId === 'phone') setEditForm((p) => ({ ...p, phone_number: sanitizePhoneInput(v) }));
+                          else if (fieldId === 'email') setEditForm((p) => ({ ...p, email: v }));
+                          else if (fieldId === 'occupation') setEditForm((p) => ({ ...p, occupation: v }));
+                          else if (fieldId === 'employment_status') setEditForm((p) => ({ ...p, employment_status: v }));
+                          else if (fieldId === 'monthly_income') setEditForm((p) => ({ ...p, monthly_income: v.replace(/[^\d.]/g, '') }));
+                          else if (fieldId === 'permanent_address') setEditForm((p) => ({ ...p, permanent_address: v }));
+                          else setEditForm((p) => ({ ...p, current_address: v }));
+                        }}
+                      />
                     ) : (
                       <p className="mt-1 text-sm font-medium break-words">{readDisplay}</p>
                     )}

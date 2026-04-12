@@ -170,6 +170,15 @@ export default function NewCustomerPage() {
       if (!isValidVietnamNationalId(normalizedNationalId)) {
         throw new Error(t('customers.new.err.national_id'));
       }
+      if (!formData.id_issue_date.trim()) {
+        throw new Error(t('customers.new.err.id_issue_date'));
+      }
+      if (!formData.id_issue_place.trim()) {
+        throw new Error(t('customers.new.err.id_issue_place'));
+      }
+      if (!formData.nationality.trim()) {
+        throw new Error(t('customers.new.err.nationality'));
+      }
       if (formData.date_of_birth.trim() && (age == null || age < 18)) {
         throw new Error(t('customers.new.err.age'));
       }
@@ -203,9 +212,9 @@ export default function NewCustomerPage() {
           date_of_birth: formData.date_of_birth || undefined,
           gender: formData.gender || undefined,
           national_id: normalizedNationalId,
-          id_issue_date: formData.id_issue_date || undefined,
-          id_issue_place: formData.id_issue_place.trim() || undefined,
-          nationality: formData.nationality.trim() || undefined,
+          id_issue_date: formData.id_issue_date.trim(),
+          id_issue_place: formData.id_issue_place.trim(),
+          nationality: formData.nationality.trim(),
           marital_status: formData.marital_status.trim() || undefined,
           occupation: formData.occupation.trim() || undefined,
           employment_status: formData.employment_status.trim() || undefined,
@@ -392,7 +401,9 @@ export default function NewCustomerPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="id_issue_date">{t('customers.new.label.id_issue_date')}</Label>
+                  <Label htmlFor="id_issue_date" required>
+                    {t('customers.new.label.id_issue_date')}
+                  </Label>
                   <Input
                     id="id_issue_date"
                     name="id_issue_date"
@@ -400,13 +411,16 @@ export default function NewCustomerPage() {
                     value={formData.id_issue_date}
                     onChange={handleChange}
                     disabled={isLoading}
+                    required
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="id_issue_place">{t('customers.new.label.id_issue_place')}</Label>
+                  <Label htmlFor="id_issue_place" required>
+                    {t('customers.new.label.id_issue_place')}
+                  </Label>
                   <Input
                     id="id_issue_place"
                     name="id_issue_place"
@@ -414,10 +428,13 @@ export default function NewCustomerPage() {
                     value={formData.id_issue_place}
                     onChange={handleChange}
                     disabled={isLoading}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="nationality">{t('customers.new.label.nationality')}</Label>
+                  <Label htmlFor="nationality" required>
+                    {t('customers.new.label.nationality')}
+                  </Label>
                   <Input
                     id="nationality"
                     name="nationality"
@@ -425,6 +442,7 @@ export default function NewCustomerPage() {
                     value={formData.nationality}
                     onChange={handleChange}
                     disabled={isLoading}
+                    required
                   />
                 </div>
               </div>
