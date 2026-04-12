@@ -6,7 +6,7 @@ import * as LabelPrimitive from '@radix-ui/react-label'
 import { cn } from '@/lib/utils'
 
 type LabelProps = React.ComponentProps<typeof LabelPrimitive.Root> & {
-  /** When true, shows a red asterisk after the label (common for required fields). */
+  /** When true, shows a soft red asterisk after the label (common for required fields). */
   required?: boolean
 }
 
@@ -24,7 +24,10 @@ function Label({ className, children, required, ...props }: LabelProps) {
     >
       {children}
       {required ? (
-        <span className="text-destructive font-semibold" aria-hidden="true">
+        <span
+          className="shrink-0 font-normal text-red-400/80 dark:text-red-300/70"
+          aria-hidden="true"
+        >
           *
         </span>
       ) : null}

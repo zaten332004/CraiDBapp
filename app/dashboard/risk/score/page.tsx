@@ -436,7 +436,9 @@ export default function RiskScorePage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="customerLookup">{t('customers.customer_id')}</Label>
+                <Label htmlFor="customerLookup" required>
+                  {t('customers.customer_id')}
+                </Label>
                 <div className="relative">
                   <Input
                     id="customerLookup"

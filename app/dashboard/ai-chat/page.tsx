@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import {
   useCallback,
@@ -42,7 +42,8 @@ import { browserApiFetchAuth } from '@/lib/api/browser';
 import { useI18n } from '@/components/i18n-provider';
 import { getAccessToken, getUserRole, type UserRole } from '@/lib/auth/token';
 import { cn } from '@/lib/utils';
-import { notifyError } from '@/lib/notify';
+import { loadPowerBiTableSuggestions } from '@/lib/powerbi/table-suggestions-storage';
+import { notifyError, notifyInfo } from '@/lib/notify';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { ChatMarkdown } from '@/components/ai-chat/chat-markdown';
 import {
@@ -434,6 +435,35 @@ export default function AIChatPage() {
   const { t, locale } = useI18n();
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
+
+  const activatePowerBiDataSource = useCallback(async () => {
+    try {
+      const names = loadPowerBiTableSuggestions();
+      await browserApiFetchAuth('/powerbi/table-hints', {
+        method: 'POST',
+        body: { table_names: names },
+      });
+    } catch {
+      /* Chưa lưu workspace/dataset hoặc lỗi mạng — vẫn chạy readiness bên dưới. */
+    }
+    try {
+      const r = await browserApiFetchAuth<{
+        ready_for_ai_context?: boolean;
+        warnings?: string[];
+      }>('/ai-chat/powerbi-readiness', { method: 'GET' });
+      if (!r?.ready_for_ai_context && Array.isArray(r?.warnings) && r.warnings.length) {
+        notifyInfo(t('ai_chat.powerbi_readiness_title'), {
+          description: r.warnings.join('\n'),
+          duration: 10000,
+        });
+      }
+    } catch (err) {
+      notifyError(t('ai_chat.powerbi_readiness_error_title'), {
+        description: apiErr(err),
+        duration: 6500,
+      });
+    }
+  }, [t, apiErr]);
 
   const [aiDataSource, setAiDataSource] = useState<AiDataSource>('portfolio');
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
@@ -1279,6 +1309,7 @@ export default function AIChatPage() {
             setSelectedCustomerIds([]);
             setPendingFiles([]);
             if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
+            void activatePowerBiDataSource();
           }}
         >
           <BarChart3 className="mr-2 h-4 w-4 shrink-0 opacity-80" />

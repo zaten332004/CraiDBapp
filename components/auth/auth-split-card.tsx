@@ -381,7 +381,9 @@ export function AuthSplitCard() {
 
                   <form onSubmit={handleRegister} className="mt-4 space-y-3">
                     <div className="space-y-1.5">
-                      <Label htmlFor="reg-name" className="text-sm">{t('auth.full_name')}</Label>
+                      <Label htmlFor="reg-name" className="text-sm" required>
+                        {t('auth.full_name')}
+                      </Label>
                       <Input
                         id="reg-name"
                         className="h-9"
@@ -392,7 +394,9 @@ export function AuthSplitCard() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="reg-email" className="text-sm">Email</Label>
+                      <Label htmlFor="reg-email" className="text-sm" required>
+                        Email
+                      </Label>
                       <Input
                         id="reg-email"
                         type="email"
@@ -420,7 +424,9 @@ export function AuthSplitCard() {
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="reg-password" className="text-sm">{t('auth.password')}</Label>
+                      <Label htmlFor="reg-password" className="text-sm" required>
+                        {t('auth.password')}
+                      </Label>
                       <div className="relative">
                         <Input
                           id="reg-password"
@@ -442,7 +448,9 @@ export function AuthSplitCard() {
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="reg-confirm" className="text-sm">{t('auth.confirm_password')}</Label>
+                      <Label htmlFor="reg-confirm" className="text-sm" required>
+                        {t('auth.confirm_password')}
+                      </Label>
                       <div className="relative">
                         <Input
                           id="reg-confirm"
@@ -508,7 +516,9 @@ export function AuthSplitCard() {
 
                 <form onSubmit={handleLogin} className="mt-3 space-y-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="login-id" className="text-sm">{t('auth.username_or_email')}</Label>
+                    <Label htmlFor="login-id" className="text-sm" required>
+                      {t('auth.username_or_email')}
+                    </Label>
                     <Input
                       id="login-id"
                       type="text"
@@ -521,7 +531,9 @@ export function AuthSplitCard() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="login-password" className="text-sm">{t('auth.password')}</Label>
+                    <Label htmlFor="login-password" className="text-sm" required>
+                      {t('auth.password')}
+                    </Label>
                     <div className="relative">
                       <Input
                         id="login-password"

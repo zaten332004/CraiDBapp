@@ -452,15 +452,21 @@ function VerifyEmailContent() {
                   {resolvedHasPin ? (
                     <div className="space-y-3">
                       <div>
-                        <Label htmlFor="old-pin">{isVi ? 'PIN cũ' : 'Current PIN'}</Label>
+                        <Label htmlFor="old-pin" required>
+                          {isVi ? 'PIN cũ' : 'Current PIN'}
+                        </Label>
                         <Input id="old-pin" value={oldPin} onChange={(e) => setOldPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN cũ' : 'Enter current PIN'} />
                       </div>
                       <div>
-                        <Label htmlFor="new-pin">{isVi ? 'PIN mới' : 'New PIN'}</Label>
+                        <Label htmlFor="new-pin" required>
+                          {isVi ? 'PIN mới' : 'New PIN'}
+                        </Label>
                         <Input id="new-pin" value={newPin} onChange={(e) => setNewPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN mới 6 số' : 'Enter new 6-digit PIN'} />
                       </div>
                       <div>
-                        <Label htmlFor="confirm-new-pin">{isVi ? 'Xác nhận PIN mới' : 'Confirm new PIN'}</Label>
+                        <Label htmlFor="confirm-new-pin" required>
+                          {isVi ? 'Xác nhận PIN mới' : 'Confirm new PIN'}
+                        </Label>
                         <Input id="confirm-new-pin" value={newPinConfirm} onChange={(e) => setNewPinConfirm(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập lại PIN mới' : 'Re-enter new PIN'} />
                       </div>
                       <Button className="w-full" onClick={submitChangePin} disabled={pinLoading}>
@@ -471,11 +477,15 @@ function VerifyEmailContent() {
                   ) : (
                     <div className="space-y-3">
                       <div>
-                        <Label htmlFor="pin">{isVi ? 'PIN 6 chữ số' : '6-digit PIN'}</Label>
+                        <Label htmlFor="pin" required>
+                          {isVi ? 'PIN 6 chữ số' : '6-digit PIN'}
+                        </Label>
                         <Input id="pin" value={pin} onChange={(e) => setPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập PIN 6 số' : 'Enter 6-digit PIN'} />
                       </div>
                       <div>
-                        <Label htmlFor="confirm-pin">{isVi ? 'Xác nhận PIN' : 'Confirm PIN'}</Label>
+                        <Label htmlFor="confirm-pin" required>
+                          {isVi ? 'Xác nhận PIN' : 'Confirm PIN'}
+                        </Label>
                         <Input id="confirm-pin" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} maxLength={6} inputMode="numeric" placeholder={isVi ? 'Nhập lại PIN 6 số' : 'Re-enter 6-digit PIN'} />
                       </div>
                       <Button className="w-full" onClick={submitSetPin} disabled={pinLoading}>

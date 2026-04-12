@@ -246,7 +246,9 @@ export default function RiskSimulationPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="customerIdInput">{t('customers.customer_id')}</Label>
+              <Label htmlFor="customerIdInput" required>
+                {t('customers.customer_id')}
+              </Label>
               <div className="flex gap-2">
                 <Input id="customerIdInput" value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder={t('risk.simulation.customer_id_ph')} />
                 <Button type="button" variant="outline" onClick={loadCustomerById} disabled={isLoadingCustomer}>{isLoadingCustomer ? t('common.loading') : t('common.search')}</Button>

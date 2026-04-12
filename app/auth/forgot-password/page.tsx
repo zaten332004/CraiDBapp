@@ -140,7 +140,9 @@ export default function ForgotPasswordPage() {
           {step === 'request' ? (
             <form className="space-y-4" onSubmit={requestCode}>
               <div className="space-y-1.5">
-                <Label htmlFor="email">{isVi ? 'Email đã đăng ký' : 'Registered email'}</Label>
+                <Label htmlFor="email" required>
+                  {isVi ? 'Email đã đăng ký' : 'Registered email'}
+                </Label>
                 <div className="relative">
                   <Input
                     id="email"
@@ -162,7 +164,9 @@ export default function ForgotPasswordPage() {
           ) : (
             <form className="space-y-4" onSubmit={confirmReset}>
               <div className="space-y-1.5">
-                <Label htmlFor="email-confirm">{isVi ? 'Email đã đăng ký' : 'Registered email'}</Label>
+                <Label htmlFor="email-confirm" required>
+                  {isVi ? 'Email đã đăng ký' : 'Registered email'}
+                </Label>
                 <div className="relative">
                   <Input
                     id="email-confirm"
@@ -177,7 +181,9 @@ export default function ForgotPasswordPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="code">{isVi ? 'Mã PIN 6 số' : '6-digit PIN'}</Label>
+                <Label htmlFor="code" required>
+                  {isVi ? 'Mã PIN 6 số' : '6-digit PIN'}
+                </Label>
                 <div className="relative">
                   <Input
                     id="code"
@@ -192,7 +198,9 @@ export default function ForgotPasswordPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="new-password">{isVi ? 'Mật khẩu mới' : 'New password'}</Label>
+                <Label htmlFor="new-password" required>
+                  {isVi ? 'Mật khẩu mới' : 'New password'}
+                </Label>
                 <div className="relative">
                   <Input
                     id="new-password"
@@ -215,7 +223,9 @@ export default function ForgotPasswordPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="confirm-password">{isVi ? 'Xác nhận mật khẩu mới' : 'Confirm new password'}</Label>
+                <Label htmlFor="confirm-password" required>
+                  {isVi ? 'Xác nhận mật khẩu mới' : 'Confirm new password'}
+                </Label>
                 <div className="relative">
                   <Input
                     id="confirm-password"

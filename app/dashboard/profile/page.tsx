@@ -586,7 +586,9 @@ export default function ProfilePage() {
                 <Input value={profile?.email ?? ''} disabled />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-email">{isVi ? 'Email mới' : 'New email'}</Label>
+                <Label htmlFor="new-email" required>
+                  {isVi ? 'Email mới' : 'New email'}
+                </Label>
                 <Input
                   id="new-email"
                   type="email"
@@ -607,7 +609,9 @@ export default function ProfilePage() {
                     {expiresInSeconds ? ` (${isVi ? 'hết hạn sau' : 'expires in'} ${Math.max(1, Math.floor(expiresInSeconds / 60))} ${isVi ? 'phút' : 'minutes'})` : ''}
                   </p>
                   <div className="space-y-2">
-                    <Label htmlFor="email-code">{isVi ? 'Mã xác minh' : 'Verification code'}</Label>
+                    <Label htmlFor="email-code" required>
+                      {isVi ? 'Mã xác minh' : 'Verification code'}
+                    </Label>
                     <Input
                       id="email-code"
                       value={emailCode}
@@ -635,17 +639,23 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="current">{t('profile.security.current')}</Label>
+                <Label htmlFor="current" required>
+                  {t('profile.security.current')}
+                </Label>
                 <Input id="current" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="new">{t('profile.security.new')}</Label>
+                <Label htmlFor="new" required>
+                  {t('profile.security.new')}
+                </Label>
                 <Input id="new" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirm">{t('profile.security.confirm')}</Label>
+                <Label htmlFor="confirm" required>
+                  {t('profile.security.confirm')}
+                </Label>
                 <Input id="confirm" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               </div>
 
@@ -669,7 +679,9 @@ export default function ProfilePage() {
               {profile?.has_pin ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="pin-current">{isVi ? 'Mã PIN hiện tại' : 'Current PIN'}</Label>
+                    <Label htmlFor="pin-current" required>
+                      {isVi ? 'Mã PIN hiện tại' : 'Current PIN'}
+                    </Label>
                     <Input
                       id="pin-current"
                       value={pinCurrent}
@@ -681,7 +693,9 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="pin-new">{isVi ? 'Mã PIN mới' : 'New PIN'}</Label>
+                    <Label htmlFor="pin-new" required>
+                      {isVi ? 'Mã PIN mới' : 'New PIN'}
+                    </Label>
                     <Input
                       id="pin-new"
                       value={pinNew}
@@ -693,7 +707,9 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="pin-confirm">{isVi ? 'Xác nhận mã PIN mới' : 'Confirm new PIN'}</Label>
+                    <Label htmlFor="pin-confirm" required>
+                      {isVi ? 'Xác nhận mã PIN mới' : 'Confirm new PIN'}
+                    </Label>
                     <Input
                       id="pin-confirm"
                       value={pinConfirm}
@@ -717,7 +733,9 @@ export default function ProfilePage() {
                       : 'You have not set a PIN yet. Set one to protect account recovery and email changes.'}
                   </p>
                   <div className="space-y-2">
-                    <Label htmlFor="pin-init">{isVi ? 'Mã PIN 6 chữ số' : '6-digit PIN'}</Label>
+                    <Label htmlFor="pin-init" required>
+                      {isVi ? 'Mã PIN 6 chữ số' : '6-digit PIN'}
+                    </Label>
                     <Input
                       id="pin-init"
                       value={pinInitial}
@@ -729,7 +747,9 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="pin-init-confirm">{isVi ? 'Xác nhận mã PIN' : 'Confirm PIN'}</Label>
+                    <Label htmlFor="pin-init-confirm" required>
+                      {isVi ? 'Xác nhận mã PIN' : 'Confirm PIN'}
+                    </Label>
                     <Input
                       id="pin-init-confirm"
                       value={pinInitialConfirm}

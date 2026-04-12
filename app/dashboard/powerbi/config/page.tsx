@@ -61,6 +61,13 @@ type PowerBiSchemaResponse = {
   requires_table_hints?: boolean;
 };
 
+type PowerBiReadinessResponse = {
+  ready_for_ai_context?: boolean;
+  discovered_table_count?: number;
+  hint_table_count?: number;
+  warnings?: string[];
+};
+
 /** Lỗi probe global từ server (thiếu .env) — không hiển thị toast/banner cho người dùng cuối. */
 function isGlobalPowerBiEnvMissingMessage(text: string): boolean {
   return /missing\s+power_bi_/i.test(text);
@@ -90,6 +97,7 @@ export default function PowerBIConfigPage() {
   const [newTableName, setNewTableName] = useState('');
   const [powerBiSchemaPreview, setPowerBiSchemaPreview] = useState<PowerBiSchemaResponse | null>(null);
   const [powerBiSchemaLoading, setPowerBiSchemaLoading] = useState(false);
+  const [tableHintsReadiness, setTableHintsReadiness] = useState<PowerBiReadinessResponse | null>(null);
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((w) => w.id === selectedWorkspaceId) ?? null,
@@ -469,6 +477,7 @@ export default function PowerBIConfigPage() {
     const defaults = getDefaultPowerBiTableSuggestions();
     setTableSuggestions(defaults);
     savePowerBiTableSuggestions(defaults);
+    setTableHintsReadiness(null);
   };
 
   const handleAppendExtendedSuggestion = (name: string) => {
@@ -577,6 +586,44 @@ export default function PowerBIConfigPage() {
       );
     })();
 
+  /** Đồng bộ danh sách gợi ý lên server + kiểm tra token/DAX/bảng — để biết AI có đọc được dữ liệu không. */
+  const handleVerifyTableHintsForAi = async () => {
+    setIsLoading(true);
+    setTableHintsReadiness(null);
+    try {
+      await browserApiFetchAuth('/powerbi/table-hints', {
+        method: 'POST',
+        body: { table_names: tableSuggestions },
+      });
+    } catch (err) {
+      const detail = formatUserFacingApiError(err, msgLocale);
+      notifyError(t('powerbi.verify_error_title'), { description: detail, duration: 7000 });
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const r = await browserApiFetchAuth<PowerBiReadinessResponse>('/ai-chat/powerbi-readiness', { method: 'GET' });
+      setTableHintsReadiness(r);
+      const apiN = Number(r.discovered_table_count ?? 0);
+      const hintN = Number(r.hint_table_count ?? 0);
+      const lines = [
+        `${t('powerbi.verify_line_api_tables')}: ${apiN}`,
+        `${t('powerbi.verify_line_server_hints')}: ${hintN}`,
+      ];
+      if (r.ready_for_ai_context) {
+        notifySuccess(t('powerbi.verify_ready_title'), { description: lines.join('\n'), duration: 6500 });
+      } else {
+        const w = Array.isArray(r.warnings) && r.warnings.length ? r.warnings.join('\n') : t('powerbi.verify_not_ready_fallback');
+        notifyInfo(t('powerbi.verify_not_ready_title'), { description: [lines.join('\n'), w].filter(Boolean).join('\n\n'), duration: 11000 });
+      }
+    } catch (err) {
+      setTableHintsReadiness(null);
+      notifyError(t('powerbi.verify_error_title'), { description: formatUserFacingApiError(err, msgLocale), duration: 7000 });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8 p-8">
       <div>
@@ -632,7 +679,9 @@ export default function PowerBIConfigPage() {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="tenantId">{t('powerbi.tenant_id')}</Label>
+                  <Label htmlFor="tenantId" required>
+                    {t('powerbi.tenant_id')}
+                  </Label>
                   <Input
                     id="tenantId"
                     placeholder={t('powerbi.tenant_id_ph')}
@@ -643,7 +692,9 @@ export default function PowerBIConfigPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="workspaceId">{t('powerbi.workspace_id')}</Label>
+                  <Label htmlFor="workspaceId" required>
+                    {t('powerbi.workspace_id')}
+                  </Label>
                   <Input
                     id="workspaceId"
                     placeholder={t('powerbi.workspace_id_ph')}
@@ -654,7 +705,9 @@ export default function PowerBIConfigPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="datasetId">{t('powerbi.dataset_id')}</Label>
+                  <Label htmlFor="datasetId" required>
+                    {t('powerbi.dataset_id')}
+                  </Label>
                   <Input
                     id="datasetId"
                     placeholder={t('powerbi.dataset_id_ph')}
@@ -878,6 +931,9 @@ export default function PowerBIConfigPage() {
               </section>
               <section className="rounded-lg border border-border bg-muted/40 p-3">
                 <p className="font-medium text-foreground">{t('powerbi.hints_sp_label')}</p>
+                <p className="mt-1 text-[13px] font-medium text-amber-900 dark:text-amber-100/90">
+                  {t('powerbi.hints_sp_mandatory_note')}
+                </p>
                 <ul className="mt-2 list-inside list-disc space-y-1 text-[13px]">
                   <li>
                     <span className="font-medium text-foreground">{t('powerbi.hints_sp_app_name')}</span> CreditRisk_Backend
@@ -926,10 +982,24 @@ export default function PowerBIConfigPage() {
                   {t('powerbi.table_suggestions_title')}
                 </CardTitle>
                 <CardDescription>{t('powerbi.table_suggestions_desc')}</CardDescription>
+                <p className="text-sm text-muted-foreground pt-1">{t('powerbi.table_suggestions_verify_intro')}</p>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={handleResetTableSuggestions} className="shrink-0">
-                {t('powerbi.table_suggestions_reset')}
-              </Button>
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={() => void handleVerifyTableHintsForAi()}
+                  disabled={isLoading}
+                  className="shrink-0"
+                >
+                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ListChecks className="mr-2 h-4 w-4" />}
+                  {t('powerbi.table_suggestions_verify_button')}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleResetTableSuggestions} className="shrink-0">
+                  {t('powerbi.table_suggestions_reset')}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -993,6 +1063,35 @@ export default function PowerBIConfigPage() {
                 ))}
               </ul>
             </div>
+
+            {tableHintsReadiness ? (
+              <div
+                className={
+                  tableHintsReadiness.ready_for_ai_context
+                    ? 'rounded-lg border border-emerald-300/90 bg-emerald-50/70 p-3 text-sm text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-50/95'
+                    : 'rounded-lg border border-amber-300/90 bg-amber-50/70 p-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-50/95'
+                }
+              >
+                <p className="font-semibold">
+                  {tableHintsReadiness.ready_for_ai_context
+                    ? t('powerbi.verify_banner_ready')
+                    : t('powerbi.verify_banner_not_ready')}
+                </p>
+                <p className="mt-1.5 tabular-nums">
+                  {t('powerbi.verify_line_api_tables')}: {Number(tableHintsReadiness.discovered_table_count ?? 0)}
+                </p>
+                <p className="tabular-nums">
+                  {t('powerbi.verify_line_server_hints')}: {Number(tableHintsReadiness.hint_table_count ?? 0)}
+                </p>
+                {Array.isArray(tableHintsReadiness.warnings) && tableHintsReadiness.warnings.length > 0 ? (
+                  <ul className="mt-2 list-inside list-disc space-y-1 text-[13px] opacity-95">
+                    {tableHintsReadiness.warnings.map((w, i) => (
+                      <li key={`${i}-${w.slice(0, 48)}`}>{w}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground">{t('powerbi.rules_ref_extended')}</p>

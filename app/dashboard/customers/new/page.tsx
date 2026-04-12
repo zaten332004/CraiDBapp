@@ -291,7 +291,9 @@ export default function NewCustomerPage() {
             <form id="new-customer-form" onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="full_name">{t('common.full_name')} *</Label>
+                  <Label htmlFor="full_name" required>
+                    {t('common.full_name')}
+                  </Label>
                   <Input
                     id="full_name"
                     name="full_name"
@@ -304,7 +306,9 @@ export default function NewCustomerPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">{t('common.email')} *</Label>
+                  <Label htmlFor="email" required>
+                    {t('common.email')}
+                  </Label>
                   <Input
                     id="email"
                     name="email"
@@ -372,7 +376,9 @@ export default function NewCustomerPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="national_id">{t('customers.new.label.national_id')}</Label>
+                  <Label htmlFor="national_id" required>
+                    {t('customers.new.label.national_id')}
+                  </Label>
                   <Input
                     id="national_id"
                     name="national_id"
@@ -461,7 +467,9 @@ export default function NewCustomerPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="monthly_income">{t('customers.new.income')} *</Label>
+                  <Label htmlFor="monthly_income" required>
+                    {t('customers.new.income')}
+                  </Label>
                   <Input id="monthly_income" name="monthly_income" inputMode="decimal" placeholder={t('customers.new.income_ph')} value={formData.monthly_income} onChange={handleChange} disabled={isLoading} required />
                 </div>
               </div>
@@ -506,7 +514,9 @@ export default function NewCustomerPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="loan_type">{t('customers.new.label.loan_type')}</Label>
+                <Label htmlFor="loan_type" required>
+                  {t('customers.new.label.loan_type')}
+                </Label>
                 <Select
                   value={formData.loan_type}
                   onValueChange={(value) => setFormData((prev) => ({ ...prev, loan_type: value }))}
@@ -525,7 +535,9 @@ export default function NewCustomerPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="loan_purpose">{t('customers.new.label.loan_purpose')}</Label>
+                <Label htmlFor="loan_purpose" required>
+                  {t('customers.new.label.loan_purpose')}
+                </Label>
                 <Input
                   id="loan_purpose"
                   name="loan_purpose"
@@ -542,7 +554,9 @@ export default function NewCustomerPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="requested_loan_amount">{t('customers.new.label.requested_loan_amount')} *</Label>
+                <Label htmlFor="requested_loan_amount" required>
+                  {t('customers.new.label.requested_loan_amount')}
+                </Label>
                 <Input
                   id="requested_loan_amount"
                   name="requested_loan_amount"
@@ -556,7 +570,9 @@ export default function NewCustomerPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="requested_term_months">{t('customers.new.label.requested_term_months')} *</Label>
+                <Label htmlFor="requested_term_months" required>
+                  {t('customers.new.label.requested_term_months')}
+                </Label>
                 <Input
                   id="requested_term_months"
                   name="requested_term_months"
