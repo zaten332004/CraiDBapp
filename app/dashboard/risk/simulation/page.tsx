@@ -14,6 +14,7 @@ import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError } from '@/lib/notify';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatVnd } from '@/lib/money';
+import { RECHART_MARGIN } from '@/lib/recharts-layout';
 import { riskBadgeOutlineClass } from '@/components/risk-score-explanation';
 import { cn } from '@/lib/utils';
 
@@ -482,10 +483,10 @@ export default function RiskSimulationPage() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={scenarioData}>
+            <LineChart data={scenarioData} margin={RECHART_MARGIN.lineSimple}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="change" />
-              <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}`} width={40} />
+              <XAxis dataKey="change" tickMargin={10} height={44} tick={{ fontSize: 11 }} />
+              <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}`} width={48} tickMargin={8} tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => [formatUiRiskScore(Number(v)), t('customers.risk_score')]} />
               <Legend />
               <Line

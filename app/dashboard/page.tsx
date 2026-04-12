@@ -11,6 +11,7 @@ import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/forma
 import { notifyError } from '@/lib/notify';
 import { formatDateTimeVietnam, formatDateVietnam } from '@/lib/datetime';
 import { formatCompactVnd } from '@/lib/money';
+import { RECHART_MARGIN, RECHART_Y_WIDTH } from '@/lib/recharts-layout';
 
 type PortfolioKPI = {
   total_exposure: number;
@@ -163,16 +164,17 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={trendData} margin={{ top: 12, right: 28, left: 20, bottom: 8 }}>
+                  <LineChart data={trendData} margin={RECHART_MARGIN.lineDualY}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
+                    <XAxis dataKey="month" tickMargin={8} />
                     <YAxis
                       yAxisId="left"
                       tickFormatter={(v) => formatCompactVnd(Number(v), locale === 'vi' ? 'vi' : 'en')}
-                      width={72}
+                      width={RECHART_Y_WIDTH.money}
                       tickMargin={8}
+                      tick={{ fontSize: 11 }}
                     />
-                    <YAxis yAxisId="right" orientation="right" width={44} tickMargin={8} />
+                    <YAxis yAxisId="right" orientation="right" width={RECHART_Y_WIDTH.score} tickMargin={8} />
                     <Tooltip
                       formatter={(value: number, name: string) =>
                         name === 'value'

@@ -10,6 +10,7 @@ import { notifyError } from '@/lib/notify';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatDateVietnam } from '@/lib/datetime';
 import { formatCompactVnd } from '@/lib/money';
+import { RECHART_MARGIN, RECHART_Y_WIDTH } from '@/lib/recharts-layout';
 
 type PortfolioKPI = { total_exposure: number; avg_pd: number; npl_ratio: number };
 type PortfolioTrend = { points: Array<{ timestamp: string; value: number }> };
@@ -43,7 +44,7 @@ const SECTOR_BAR_COLORS = [
   '#84cc16',
 ];
 
-function truncateLabel(value: string, maxLength = 16) {
+function truncateLabel(value: string, maxLength = 28) {
   if (!value) return '';
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
 }
@@ -156,11 +157,17 @@ export default function PortfolioOverviewPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={trendData} margin={{ top: 12, right: 28, left: 20, bottom: 8 }}>
+              <LineChart data={trendData} margin={RECHART_MARGIN.lineDualY}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis yAxisId="left" tickFormatter={(value) => formatCompactVnd(Number(value), moneyLocale)} width={72} tickMargin={8} />
-                <YAxis yAxisId="right" orientation="right" width={44} tickMargin={8} />
+                <XAxis dataKey="month" tickMargin={8} />
+                <YAxis
+                  yAxisId="left"
+                  tickFormatter={(value) => formatCompactVnd(Number(value), moneyLocale)}
+                  width={RECHART_Y_WIDTH.money}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis yAxisId="right" orientation="right" width={RECHART_Y_WIDTH.score} tickMargin={8} />
                 <Tooltip formatter={(value: number, name: string) => name === t('portfolio.overview.legend_value') ? [formatCompactVnd(Number(value), moneyLocale), name] : [value, name]} />
                 <Legend />
                 <Line yAxisId="left" type="monotone" dataKey="value" stroke={CHART_COLORS.exposure} strokeWidth={2} name={t('portfolio.overview.legend_value')} />
@@ -191,7 +198,7 @@ export default function PortfolioOverviewPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
+              <PieChart margin={RECHART_MARGIN.pie}>
                 <Pie data={riskDistributionLocalized} cx="50%" cy="50%" labelLine={false} outerRadius={72} fill="#8884d8" dataKey="count">
                   {riskDistributionLocalized.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                 </Pie>
@@ -208,26 +215,36 @@ export default function PortfolioOverviewPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t('portfolio.overview.sector_title')}</CardTitle>
+        <CardHeader className="min-w-0">
+          <CardTitle className="break-words">{t('portfolio.overview.sector_title')}</CardTitle>
           <CardDescription>
-            <span className="block">{t('portfolio.overview.sector_desc')}</span>
-            <span className="mt-1 block text-xs text-muted-foreground">{t('portfolio.overview.sector_sort_hint')}</span>
+            <span className="block break-words">{t('portfolio.overview.sector_desc')}</span>
+            <span className="mt-1 block break-words text-xs text-muted-foreground">{t('portfolio.overview.sector_sort_hint')}</span>
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={sectorBreakdownLocalized} margin={{ top: 8, right: 16, left: 16, bottom: 8 }}>
+        <CardContent className="overflow-x-auto overflow-y-visible pb-1">
+          <ResponsiveContainer width="100%" height={300} minWidth={320}>
+            <BarChart data={sectorBreakdownLocalized} margin={RECHART_MARGIN.barSector}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 dataKey="sector"
-                interval="preserveStartEnd"
-                minTickGap={24}
+                interval={0}
+                minTickGap={8}
+                angle={-28}
+                textAnchor="end"
+                height={78}
+                tickMargin={10}
+                tick={{ fontSize: 11 }}
                 tickFormatter={(v) =>
                   truncateLabel(v === '__unspecified__' ? t('portfolio.overview.sector_unspecified') : String(v))
                 }
               />
-              <YAxis tickFormatter={(value) => formatCompactVnd(Number(value), moneyLocale)} width={64} />
+              <YAxis
+                tickFormatter={(value) => formatCompactVnd(Number(value), moneyLocale)}
+                width={RECHART_Y_WIDTH.money}
+                tickMargin={6}
+                tick={{ fontSize: 11 }}
+              />
               <Tooltip
                 formatter={(value: number) => [formatCompactVnd(Number(value), moneyLocale), t('portfolio.overview.legend_value')]}
                 labelFormatter={(label) =>

@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import { CRAIDB_SET_DEMO_TAB_EVENT, type CraidbDemoTabPayload } from "@/lib/home-events";
 import { formatCompactVnd } from "@/lib/money";
+import { RECHART_MARGIN, RECHART_Y_WIDTH } from "@/lib/recharts-layout";
 
 const demoTabs = [
   { id: "dashboard", labelKey: "home.demo.tab.dashboard", icon: BarChart3 },
@@ -206,17 +207,17 @@ function DashboardDemo() {
           </CardHeader>
           <CardContent className="pt-0">
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={mockTrend} margin={{ top: 8, right: 20, left: 4, bottom: 4 }}>
+              <LineChart data={mockTrend} margin={RECHART_MARGIN.lineDualYDemo}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} tickMargin={8} />
                 <YAxis
                   yAxisId="left"
                   tickFormatter={(v) => formatCompactVnd(Number(v), moneyLocale)}
-                  width={68}
+                  width={RECHART_Y_WIDTH.moneyTight}
                   tick={{ fontSize: 10 }}
                   tickMargin={6}
                 />
-                <YAxis yAxisId="right" orientation="right" width={36} tick={{ fontSize: 10 }} tickMargin={6} />
+                <YAxis yAxisId="right" orientation="right" width={RECHART_Y_WIDTH.score} tick={{ fontSize: 10 }} tickMargin={6} />
                 <Tooltip
                   formatter={(value: number, name: string) =>
                     name === "value"
@@ -627,7 +628,7 @@ function RiskAnalyzeDemo() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={riskFactorDataLocalized}
-                    margin={{ top: 8, right: 10, left: 12, bottom: 22 }}
+                    margin={RECHART_MARGIN.factors}
                     barCategoryGap="6%"
                     barGap={2}
                   >
@@ -643,7 +644,7 @@ function RiskAnalyzeDemo() {
                     />
                     <YAxis
                       domain={[0, 100]}
-                      width={56}
+                      width={48}
                       tick={FactorDemoYAxisTick}
                       ticks={[0, 25, 50, 75, 100]}
                       orientation="left"
@@ -680,9 +681,9 @@ function RiskAnalyzeDemo() {
 
         <TabsContent value="distribution" className="space-y-4">
           <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle>{t("risk.analyze.portfolio_dist_title")}</CardTitle>
-              <CardDescription>{t("risk.analyze.portfolio_dist_desc")}</CardDescription>
+            <CardHeader className="min-w-0">
+              <CardTitle className="break-words">{t("risk.analyze.portfolio_dist_title")}</CardTitle>
+              <CardDescription className="break-words">{t("risk.analyze.portfolio_dist_desc")}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
@@ -736,18 +737,26 @@ function RiskAnalyzeDemo() {
               <CardDescription>{t("risk.analyze.correlation_desc")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={320}>
-                <ScatterChart>
+              <ResponsiveContainer width="100%" height={320} minWidth={360}>
+                <ScatterChart margin={RECHART_MARGIN.scatterMoney}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     dataKey="income"
                     name={t("customers.annual_income_short")}
+                    type="number"
                     tickFormatter={(v) => formatCompactVnd(Number(v), moneyLocale)}
+                    height={56}
+                    tick={{ fontSize: 10 }}
+                    tickMargin={10}
                   />
                   <YAxis
                     dataKey="loanAmount"
                     name={t("customers.loan_amount_short")}
+                    type="number"
                     tickFormatter={(v) => formatCompactVnd(Number(v), moneyLocale)}
+                    width={RECHART_Y_WIDTH.money}
+                    tick={{ fontSize: 10 }}
+                    tickMargin={8}
                   />
                   <Tooltip
                     cursor={{ strokeDasharray: "3 3" }}

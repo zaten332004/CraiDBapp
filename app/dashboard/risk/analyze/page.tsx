@@ -10,6 +10,7 @@ import { ApiError } from '@/lib/api/shared';
 import { notifyError } from '@/lib/notify';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatCompactVnd } from '@/lib/money';
+import { RECHART_MARGIN, RECHART_Y_WIDTH } from '@/lib/recharts-layout';
 
 type DistResp = { chart_data: Array<{ bucket: string; count?: number }> };
 type ConcResp = { items: Array<{ name: string; exposure: number }> };
@@ -325,7 +326,7 @@ export default function RiskAnalyzePage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={riskFactorDataLocalized}
-                      margin={{ top: 8, right: 10, left: 12, bottom: 22 }}
+                      margin={RECHART_MARGIN.factors}
                       barCategoryGap="6%"
                       barGap={2}
                     >
@@ -341,7 +342,7 @@ export default function RiskAnalyzePage() {
                       />
                       <YAxis
                         domain={[0, 100]}
-                        width={56}
+                        width={48}
                         tick={FactorYAxisTick}
                         ticks={[0, 25, 50, 75, 100]}
                         orientation="left"
@@ -380,9 +381,9 @@ export default function RiskAnalyzePage() {
         {/* Distribution */}
         <TabsContent value="distribution" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>{t('risk.analyze.portfolio_dist_title')}</CardTitle>
-              <CardDescription>
+            <CardHeader className="min-w-0">
+              <CardTitle className="break-words">{t('risk.analyze.portfolio_dist_title')}</CardTitle>
+              <CardDescription className="break-words">
                 {t('risk.analyze.portfolio_dist_desc')}
               </CardDescription>
             </CardHeader>
@@ -442,12 +443,28 @@ export default function RiskAnalyzePage() {
                 {t('risk.analyze.correlation_desc')}
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <ScatterChart>
+            <CardContent className="overflow-x-auto pb-1">
+              <ResponsiveContainer width="100%" height={400} minWidth={360}>
+                <ScatterChart margin={RECHART_MARGIN.scatterMoney}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="income" name={t('customers.annual_income_short')} tickFormatter={(v) => formatCompactVnd(Number(v), locale)} />
-                  <YAxis dataKey="loanAmount" name={t('customers.loan_amount_short')} tickFormatter={(v) => formatCompactVnd(Number(v), locale)} />
+                  <XAxis
+                    dataKey="income"
+                    name={t('customers.annual_income_short')}
+                    type="number"
+                    tickFormatter={(v) => formatCompactVnd(Number(v), locale)}
+                    height={56}
+                    tick={{ fontSize: 10 }}
+                    tickMargin={10}
+                  />
+                  <YAxis
+                    dataKey="loanAmount"
+                    name={t('customers.loan_amount_short')}
+                    type="number"
+                    tickFormatter={(v) => formatCompactVnd(Number(v), locale)}
+                    width={RECHART_Y_WIDTH.money}
+                    tick={{ fontSize: 10 }}
+                    tickMargin={8}
+                  />
                   <Tooltip
                     cursor={{ strokeDasharray: '3 3' }}
                     content={({ active, payload }) => {

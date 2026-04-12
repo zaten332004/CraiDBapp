@@ -7,6 +7,7 @@ import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError } from '@/lib/notify';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
+import { RECHART_MARGIN, RECHART_Y_WIDTH } from '@/lib/recharts-layout';
 
 type RiskDistributionResponse = {
   chart_data: Array<{ bucket: string; value: number; count?: number }>;
@@ -98,7 +99,7 @@ export default function RiskDistributionPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
+              <PieChart margin={RECHART_MARGIN.pie}>
                 <Pie
                   data={riskDataLocalized}
                   cx="50%"
@@ -127,10 +128,10 @@ export default function RiskDistributionPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={scoreDistribution}>
+              <BarChart data={scoreDistribution} margin={RECHART_MARGIN.barScoreBuckets}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="range" />
-                <YAxis />
+                <XAxis dataKey="range" tickMargin={8} height={40} tick={{ fontSize: 12 }} />
+                <YAxis width={RECHART_Y_WIDTH.count} tickMargin={6} tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#06b6d4" name={t('customers.count')} />
               </BarChart>
