@@ -197,6 +197,16 @@ export default function PowerBIConfigPage() {
     }
   };
 
+  /** Đẩy danh sách gợi ý (localStorage) lên máy chủ để /schema và DAX dùng đúng tên bảng — tránh lệch với mặc định .env (CustomerMaster, …). */
+  const pushBrowserTableHintsToServer = async () => {
+    const cleaned = [...new Set(tableSuggestions.map((s) => String(s).trim()).filter(Boolean))];
+    if (!cleaned.length) return;
+    await browserApiFetchAuth<{ success?: boolean; table_names?: string[] }>('/powerbi/table-hints', {
+      method: 'POST',
+      body: { table_names: cleaned },
+    });
+  };
+
   const handleConnect = async () => {
     const workspace_id = config.workspaceId.trim() || selectedWorkspaceId.trim();
     const dataset_id = selectedDatasetId.trim() || config.datasetId.trim();
@@ -260,6 +270,11 @@ export default function PowerBIConfigPage() {
         description: lines.join('\n'),
         duration: 5200,
       });
+      try {
+        await pushBrowserTableHintsToServer();
+      } catch {
+        /* gợi ý bảng không bắt buộc để kết nối thành công */
+      }
       await loadAccountPowerBiStatus();
     } catch (err) {
       setIsConnected(false);
@@ -302,6 +317,14 @@ export default function PowerBIConfigPage() {
       } else if (result.suppressUserNotification) {
         let tables: string[] = [];
         let sourceKey: 'api' | 'hints_saved' | 'account' | 'local' | null = null;
+
+        if (accountConnected === true) {
+          try {
+            await pushBrowserTableHintsToServer();
+          } catch {
+            /* bỏ qua — vẫn thử đọc schema / fallback */
+          }
+        }
 
         try {
           const schema = await browserApiFetchAuth<PowerBiSchemaResponse>('/powerbi/schema', { method: 'GET' });
@@ -461,6 +484,15 @@ export default function PowerBIConfigPage() {
     setPowerBiSchemaLoading(true);
     setPowerBiSchemaPreview(null);
     try {
+      try {
+        await pushBrowserTableHintsToServer();
+      } catch (hintErr) {
+        notifyError(t('powerbi.table_hints_sync_fail_title'), {
+          description: formatUserFacingApiError(hintErr, msgLocale),
+          duration: 6500,
+        });
+        return;
+      }
       const data = await browserApiFetchAuth<PowerBiSchemaResponse>('/powerbi/schema', { method: 'GET' });
       if (data.ok === false && data.requires_table_hints) {
         notifyError(t('powerbi.use_table_data_fail_title'), {
@@ -641,168 +673,7 @@ export default function PowerBIConfigPage() {
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
-                <div className="flex flex-col gap-6">
-                  <div className="space-y-2">
-                    <Label>{t('powerbi.workspace_select_label')}</Label>
-                    <Select
-                      value={selectedWorkspaceId}
-                      onValueChange={(v) => {
-                        setSelectedWorkspaceId(v);
-                        setConfig((prev) => ({ ...prev, workspaceId: v }));
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('powerbi.workspace_id_ph')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {workspaces.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={async () => {
-                          setIsLoading(true);
-                          try {
-                            await loadWorkspaces();
-                          } catch (err) {
-                            notifyError(t('powerbi.view_workspaces'), {
-                              description: formatUserFacingApiError(err, msgLocale),
-                              duration: 6500,
-                            });
-                          } finally {
-                            setIsLoading(false);
-                          }
-                        }}
-                        disabled={isLoading}
-                      >
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        {t('common.refresh')}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setConfig((prev) => ({ ...prev, workspaceId: selectedWorkspaceId }));
-                        }}
-                        disabled={!selectedWorkspaceId}
-                      >
-                        {t('common.use')}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>{t('powerbi.view_datasets')}</Label>
-                    <Select
-                      value={selectedDatasetId}
-                      onValueChange={(v) => {
-                        setSelectedDatasetId(v);
-                        setConfig((prev) => ({ ...prev, datasetId: v }));
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('common.select')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {datasets.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>
-                            {d.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={async () => {
-                          setIsLoading(true);
-                          try {
-                            await loadDatasets();
-                          } catch (err) {
-                            notifyError(t('powerbi.view_datasets'), {
-                              description: formatUserFacingApiError(err, msgLocale),
-                              duration: 6500,
-                            });
-                          } finally {
-                            setIsLoading(false);
-                          }
-                        }}
-                        disabled={isLoading}
-                      >
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        {t('common.refresh')}
-                      </Button>
-                      <Button onClick={handleRefreshDataset} disabled={isLoading || !selectedDatasetId}>
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        {t('powerbi.refresh_dataset')}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {(workspaces.length > 0 || datasets.length > 0) && (
-                  <div className="flex flex-col gap-6">
-                    <div className="max-h-40 overflow-y-auto overflow-x-auto rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>ID</TableHead>
-                            <TableHead>{t('common.name')}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {workspaces.slice(0, 10).map((w) => (
-                            <TableRow
-                              key={w.id}
-                              className={w.id === selectedWorkspaceId ? 'bg-secondary/60' : undefined}
-                            >
-                              <TableCell className="font-mono text-xs">{w.id}</TableCell>
-                              <TableCell>{w.name}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                    <div className="max-h-40 overflow-y-auto overflow-x-auto rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>ID</TableHead>
-                            <TableHead>{t('common.name')}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {datasets.slice(0, 10).map((d) => (
-                            <TableRow
-                              key={d.id}
-                              className={d.id === selectedDatasetId ? 'bg-secondary/60' : undefined}
-                            >
-                              <TableCell className="font-mono text-xs">{d.id}</TableCell>
-                              <TableCell>{d.name}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
-
-                {refreshResult && (
-                  <div className="rounded-md border bg-secondary p-3">
-                    <p className="text-sm font-medium">{t('powerbi.refresh_result')}</p>
-                    <pre className="mt-2 max-h-48 overflow-auto text-xs text-muted-foreground">
-                      {JSON.stringify(refreshResult, null, 2)}
-                    </pre>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-auto flex flex-col gap-2 pt-1 sm:flex-row">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Button onClick={handleConnect} disabled={isLoading} className="flex-1">
                   {isLoading ? (
                     <>
@@ -830,6 +701,164 @@ export default function PowerBIConfigPage() {
                   <Unplug className="mr-2 h-4 w-4" />
                   {t('common.disconnect')}
                 </Button>
+              </div>
+
+              <div className="space-y-6 rounded-lg border border-border bg-muted/20 p-4">
+                <div className="space-y-3">
+                  <Label>{t('powerbi.workspace_select_label')}</Label>
+                  <Select
+                    value={selectedWorkspaceId}
+                    onValueChange={(v) => {
+                      setSelectedWorkspaceId(v);
+                      setConfig((prev) => ({ ...prev, workspaceId: v }));
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('powerbi.workspace_id_ph')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workspaces.map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        setIsLoading(true);
+                        try {
+                          await loadWorkspaces();
+                        } catch (err) {
+                          notifyError(t('powerbi.view_workspaces'), {
+                            description: formatUserFacingApiError(err, msgLocale),
+                            duration: 6500,
+                          });
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }}
+                      disabled={isLoading}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      {t('common.refresh')}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setConfig((prev) => ({ ...prev, workspaceId: selectedWorkspaceId }));
+                      }}
+                      disabled={!selectedWorkspaceId}
+                    >
+                      {t('common.use')}
+                    </Button>
+                  </div>
+                  {workspaces.length > 0 ? (
+                    <div className="max-h-40 overflow-x-auto overflow-y-auto rounded-md border bg-background/60">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>ID</TableHead>
+                            <TableHead>{t('common.name')}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {workspaces.slice(0, 10).map((w) => (
+                            <TableRow
+                              key={w.id}
+                              className={w.id === selectedWorkspaceId ? 'bg-secondary/60' : undefined}
+                            >
+                              <TableCell className="font-mono text-xs">{w.id}</TableCell>
+                              <TableCell>{w.name}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="space-y-3 border-t border-border pt-6">
+                  <Label>{t('powerbi.view_datasets')}</Label>
+                  <Select
+                    value={selectedDatasetId}
+                    onValueChange={(v) => {
+                      setSelectedDatasetId(v);
+                      setConfig((prev) => ({ ...prev, datasetId: v }));
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('common.select')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {datasets.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        setIsLoading(true);
+                        try {
+                          await loadDatasets();
+                        } catch (err) {
+                          notifyError(t('powerbi.view_datasets'), {
+                            description: formatUserFacingApiError(err, msgLocale),
+                            duration: 6500,
+                          });
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }}
+                      disabled={isLoading}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      {t('common.refresh')}
+                    </Button>
+                    <Button onClick={handleRefreshDataset} disabled={isLoading || !selectedDatasetId}>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      {t('powerbi.refresh_dataset')}
+                    </Button>
+                  </div>
+                  {datasets.length > 0 ? (
+                    <div className="max-h-40 overflow-x-auto overflow-y-auto rounded-md border bg-background/60">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>ID</TableHead>
+                            <TableHead>{t('common.name')}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {datasets.slice(0, 10).map((d) => (
+                            <TableRow
+                              key={d.id}
+                              className={d.id === selectedDatasetId ? 'bg-secondary/60' : undefined}
+                            >
+                              <TableCell className="font-mono text-xs">{d.id}</TableCell>
+                              <TableCell>{d.name}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : null}
+                </div>
+
+                {refreshResult ? (
+                  <div className="rounded-md border border-border bg-secondary p-3">
+                    <p className="text-sm font-medium">{t('powerbi.refresh_result')}</p>
+                    <pre className="mt-2 max-h-48 overflow-auto text-xs text-muted-foreground">
+                      {JSON.stringify(refreshResult, null, 2)}
+                    </pre>
+                  </div>
+                ) : null}
               </div>
             </CardContent>
           </Card>
@@ -931,7 +960,10 @@ export default function PowerBIConfigPage() {
                   {t('powerbi.table_suggestions_add')}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">{t('powerbi.table_suggestions_persist_note')}</p>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <p>{t('powerbi.table_suggestions_persist_note')}</p>
+                <p>{t('powerbi.table_suggestions_server_sync_note')}</p>
+              </div>
             </div>
 
             <div>

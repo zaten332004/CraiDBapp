@@ -672,6 +672,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "powerbi.table_suggestions_list_label": "Danh sách đang lưu",
     "powerbi.table_suggestions_extended_hint": "Bấm để thêm nhanh các tên gợi ý mở rộng (rủi ro tín dụng / danh mục).",
     "powerbi.table_suggestions_remove": "Xóa gợi ý",
+    "powerbi.table_hints_sync_fail_title": "Không đồng bộ được gợi ý bảng",
+    "powerbi.table_suggestions_server_sync_note":
+      "Schema và DAX trên máy chủ dùng danh sách bảng đã lưu cho tài khoản (đồng bộ khi \"Kết nối Power BI\" hoặc khi \"Sử dụng dữ liệu bảng\"). Danh sách trình duyệt và máy chủ có thể khác nếu chưa đồng bộ; khi chưa có gợi ý trên máy chủ có thể dùng tên mặc định từ cấu hình server (.env) — mỗi tên phải trùng đúng bảng trong semantic model Power BI.",
     "powerbi.workspace": "Workspace",
     "powerbi.workspace_select_label": "xem workspace",
     "powerbi.dataset": "Dataset",
@@ -1592,6 +1595,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "powerbi.table_suggestions_list_label": "Saved list",
     "powerbi.table_suggestions_extended_hint": "Click to append common extended credit-risk / portfolio table names.",
     "powerbi.table_suggestions_remove": "Remove suggestion",
+    "powerbi.table_hints_sync_fail_title": "Could not sync table hints",
+    "powerbi.table_suggestions_server_sync_note":
+      "Server-side schema and DAX use the table list saved for your account (synced when you connect Power BI or use table data). The browser list and server list can differ until synced; if the server has no hints it may fall back to names from server config (.env). Each name must match a table in your Power BI semantic model.",
     "powerbi.workspace": "Workspace",
     "powerbi.workspace_select_label": "View workspace",
     "powerbi.dataset": "Dataset",
