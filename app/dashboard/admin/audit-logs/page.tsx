@@ -23,11 +23,13 @@ type AuditLogRow = {
   actorRaw: string;
   action: string;
   target: string;
+  entityType: string;
+  entityId: number | null;
   raw: unknown;
 };
 
 function normalizeAuditLog(item: any, idx: number): AuditLogRow {
-  const id = String(item?.id ?? item?.log_id ?? item?.logId ?? idx);
+  const id = String(item?.audit_id ?? item?.auditId ?? item?.id ?? item?.log_id ?? item?.logId ?? idx);
   const ts =
     String(
       item?.performed_at ??
@@ -40,16 +42,58 @@ function normalizeAuditLog(item: any, idx: number): AuditLogRow {
       '',
     ).trim() ||
     '—';
-  const rawActor = item?.actor ?? item?.user ?? item?.user_id ?? item?.userId ?? item?.email ?? '—';
-  const actorText = String(rawActor ?? '').trim();
-  const actor = !actorText || actorText === '—'
-    ? 'System Admin'
-    : /^\d+$/.test(actorText)
-      ? `User #${actorText}`
-      : actorText;
+  const entityType = String(item?.entity_type ?? item?.entityType ?? '').trim();
+  const rawEntityId = item?.entity_id ?? item?.entityId;
+  let entityId: number | null = null;
+  if (rawEntityId != null && rawEntityId !== '') {
+    const n = Number(rawEntityId);
+    if (!Number.isNaN(n)) entityId = n;
+  }
+  const userIdRaw = item?.user_id ?? item?.userId;
+  const actorNameApi = String(item?.actor_name ?? item?.actorName ?? '').trim();
+  const actorRaw = String(userIdRaw ?? item?.email ?? item?.actor ?? item?.user ?? '').trim() || '—';
+  const actor = actorNameApi
+    ? actorNameApi
+    : !actorRaw || actorRaw === '—'
+      ? 'System Admin'
+      : /^\d+$/.test(actorRaw)
+        ? `User #${actorRaw}`
+        : actorRaw;
   const action = String(item?.action ?? item?.event ?? item?.type ?? '—');
-  const target = String(item?.target ?? item?.resource ?? item?.entity ?? item?.path ?? '—');
-  return { id, ts, actor, actorRaw: actorText, action, target, raw: item };
+  const targetFromApi =
+    entityType && entityId != null
+      ? `${entityType} #${entityId}`
+      : entityType || String(item?.target ?? item?.resource ?? item?.entity ?? item?.path ?? '—');
+  return {
+    id,
+    ts,
+    actor,
+    actorRaw,
+    action,
+    target: targetFromApi,
+    entityType,
+    entityId,
+    raw: item,
+  };
+}
+
+function entityDisplayName(entityType: string, locale: string): string {
+  const t = String(entityType || '').trim();
+  const map: Record<string, { vi: string; en: string }> = {
+    Customer: { vi: 'Khách hàng', en: 'Customer' },
+    User: { vi: 'Người dùng', en: 'User' },
+    UserProfile: { vi: 'Hồ sơ người dùng', en: 'User profile' },
+    Alert: { vi: 'Cảnh báo', en: 'Alert' },
+    CustomerImport: { vi: 'Nhập khách hàng', en: 'Customer import' },
+  };
+  const m = map[t];
+  if (m) return locale === 'vi' ? m.vi : m.en;
+  return t || (locale === 'vi' ? 'Đối tượng' : 'Entity');
+}
+
+function entityIdSuffix(entityId: number | null, locale: string): string {
+  if (entityId == null || Number.isNaN(entityId)) return '';
+  return locale === 'vi' ? ` #${entityId}` : ` #${entityId}`;
 }
 
 function formatAuditTs(ts: string, locale: string) {
@@ -94,8 +138,77 @@ function formatAuditTimeOnly(ts: string, locale: string) {
   });
 }
 
-function getActionLabel(action: string, locale: string) {
-  const raw = String(action || '').trim();
+function getActionLabel(row: AuditLogRow, locale: string): string {
+  const action = String(row.action || '').trim().toUpperCase();
+  const et = String(row.entityType || '').trim();
+  const idS = entityIdSuffix(row.entityId, locale);
+  const en = entityDisplayName(et, locale);
+
+  if (action === 'INSERT' && et === 'Customer') {
+    return locale === 'vi' ? `Thêm ${en}${idS}` : `Insert ${en.toLowerCase()}${idS}`;
+  }
+  if (action === 'UPDATE' && et === 'Customer') {
+    return locale === 'vi' ? `Cập nhật ${en}${idS}` : `Update ${en.toLowerCase()}${idS}`;
+  }
+  if (action === 'DELETE' && et === 'Customer') {
+    return locale === 'vi' ? `Xóa ${en}${idS}` : `Delete ${en.toLowerCase()}${idS}`;
+  }
+  if (action === 'APPROVE_CUSTOMER') {
+    return locale === 'vi' ? `Duyệt hồ sơ ${en}${idS}` : `Approve ${en.toLowerCase()} dossier${idS}`;
+  }
+  if (action === 'REJECT_CUSTOMER') {
+    return locale === 'vi' ? `Từ chối hồ sơ ${en}${idS}` : `Reject ${en.toLowerCase()} dossier${idS}`;
+  }
+  if (action === 'RESOLVE_ALERT') {
+    return locale === 'vi' ? `Xử lý ${en}${idS}` : `Resolve ${en.toLowerCase()}${idS}`;
+  }
+  if (action === 'CREATE_USER') {
+    return locale === 'vi' ? `Tạo ${en}${idS}` : `Create ${en.toLowerCase()}${idS}`;
+  }
+  if (action === 'DELETE_USER') {
+    return locale === 'vi' ? `Xóa ${en}${idS}` : `Delete ${en.toLowerCase()}${idS}`;
+  }
+  if (action === 'UPDATE_USER_STATUS') {
+    return locale === 'vi' ? `Cập nhật trạng thái ${en}${idS}` : `Update ${en.toLowerCase()} status${idS}`;
+  }
+  if (action === 'UPDATE_USER_ROLE') {
+    return locale === 'vi' ? `Cập nhật vai trò ${en}${idS}` : `Update ${en.toLowerCase()} role${idS}`;
+  }
+  if (action === 'SET_PIN') {
+    return locale === 'vi' ? 'Thiết lập mã PIN' : 'Set security PIN';
+  }
+  if (action === 'CHANGE_PIN') {
+    return locale === 'vi' ? 'Đổi mã PIN' : 'Change PIN';
+  }
+  if (action === 'ADMIN_SET_USER_PIN') {
+    return locale === 'vi' ? `Admin đặt PIN ${en}${idS}` : `Admin set PIN ${en.toLowerCase()}${idS}`;
+  }
+  if (action === 'RESET_PASSWORD_WITH_PIN') {
+    return locale === 'vi' ? 'Đặt lại mật khẩu bằng PIN' : 'Reset password with PIN';
+  }
+  if (action === 'CHANGE_EMAIL_WITH_PIN') {
+    return locale === 'vi' ? 'Đổi email (xác nhận PIN)' : 'Change email (PIN verified)';
+  }
+  if (action === 'UPDATE_PROFILE') {
+    return locale === 'vi' ? 'Cập nhật hồ sơ (tên/SĐT)' : 'Update profile (name/phone)';
+  }
+  if (action === 'UPDATE_AVATAR') {
+    return locale === 'vi' ? 'Cập nhật ảnh đại diện' : 'Update avatar';
+  }
+  if (action === 'IMPORT_CUSTOMERS') {
+    return locale === 'vi' ? 'Nhập danh sách khách hàng' : 'Import customers';
+  }
+  if (action === 'IMPORT_CUSTOMERS_FAILED' || action === 'UPLOAD_FAILED') {
+    return locale === 'vi' ? 'Nhập dữ liệu thất bại' : 'Import/upload failed';
+  }
+  if (action === 'APPROVE_REGISTRATION') {
+    return locale === 'vi' ? 'Duyệt đăng ký' : 'Approve registration';
+  }
+  if (action === 'REJECT_REGISTRATION') {
+    return locale === 'vi' ? 'Từ chối đăng ký' : 'Reject registration';
+  }
+
+  const raw = String(row.action || '').trim();
   const normalized = raw.toLowerCase().replace(/_/g, ' ');
   if (normalized.includes('approve customer')) return locale === 'vi' ? 'Duyệt hồ sơ khách hàng' : 'Approve customer dossier';
   if (normalized.includes('reject customer')) return locale === 'vi' ? 'Từ chối hồ sơ khách hàng' : 'Reject customer dossier';
@@ -118,10 +231,10 @@ function getActionLabel(action: string, locale: string) {
     return locale === 'vi' ? 'Đổi email' : 'Change email';
   }
   if (normalized.includes('verify email')) {
-    return locale === 'vi' ? 'Xác minh email' : 'Verify email';
+    return locale === 'vi' ? 'Xác nhận liên kết đăng ký' : 'Confirm registration link';
   }
   if (normalized.includes('resend verification email')) {
-    return locale === 'vi' ? 'Gửi lại email xác minh' : 'Resend verification email';
+    return locale === 'vi' ? 'Gửi lại liên kết xác nhận email' : 'Resend confirmation email';
   }
   if (normalized.includes('register user')) {
     return locale === 'vi' ? 'Đăng ký người dùng' : 'Register user';
@@ -143,13 +256,83 @@ function getActionLabel(action: string, locale: string) {
     return locale === 'vi' ? 'Cập nhật trạng thái người dùng' : 'Update user status';
   }
   if (normalized.includes('delete')) return locale === 'vi' ? 'Xóa' : 'Delete';
-  if (normalized.includes('update')) return locale === 'vi' ? 'Cập nhật' : 'Update';
-  if (normalized.includes('create')) return locale === 'vi' ? 'Tạo mới' : 'Create';
+  if (normalized.includes('update')) return locale === 'vi' ? `Cập nhật ${en || 'bản ghi'}${idS}` : `Update ${(en || 'record').toLowerCase()}${idS}`;
+  if (normalized.includes('create')) return locale === 'vi' ? `Tạo ${en || 'bản ghi'}${idS}` : `Create ${(en || 'record').toLowerCase()}${idS}`;
+  if (normalized.includes('insert')) return locale === 'vi' ? `Thêm ${en || 'bản ghi'}${idS}` : `Insert ${(en || 'record').toLowerCase()}${idS}`;
   return raw.replace(/_/g, ' ');
 }
 
-function getActionShortDescription(action: string, locale: string) {
-  const normalized = String(action || '').toLowerCase().replace(/_/g, ' ');
+function getActionShortDescription(row: AuditLogRow, locale: string): string {
+  const action = String(row.action || '').trim().toUpperCase();
+  const et = String(row.entityType || '').trim();
+  const idS = entityIdSuffix(row.entityId, locale);
+  const en = entityDisplayName(et, locale);
+
+  if (action === 'INSERT' && et === 'Customer') {
+    return locale === 'vi' ? `Thêm mới hồ sơ ${en}${idS}.` : `Created ${en.toLowerCase()} record${idS}.`;
+  }
+  if (action === 'UPDATE' && et === 'Customer') {
+    return locale === 'vi' ? `Cập nhật dữ liệu ${en}${idS}.` : `Updated ${en.toLowerCase()} data${idS}.`;
+  }
+  if (action === 'DELETE' && et === 'Customer') {
+    return locale === 'vi' ? `Đã xóa hồ sơ ${en}${idS}.` : `Deleted ${en.toLowerCase()} record${idS}.`;
+  }
+  if (action === 'APPROVE_CUSTOMER') {
+    return locale === 'vi' ? `Phê duyệt hồ sơ ${en}${idS}.` : `Approved ${en.toLowerCase()} dossier${idS}.`;
+  }
+  if (action === 'REJECT_CUSTOMER') {
+    return locale === 'vi' ? `Từ chối hồ sơ ${en}${idS}.` : `Rejected ${en.toLowerCase()} dossier${idS}.`;
+  }
+  if (action === 'RESOLVE_ALERT') {
+    return locale === 'vi' ? `Đánh dấu xử lý ${en}${idS}.` : `Resolved ${en.toLowerCase()}${idS}.`;
+  }
+  if (action === 'CREATE_USER') {
+    return locale === 'vi' ? `Tạo tài khoản ${en}${idS}.` : `Created ${en.toLowerCase()} account${idS}.`;
+  }
+  if (action === 'DELETE_USER') {
+    return locale === 'vi' ? `Xóa tài khoản ${en}${idS}.` : `Deleted ${en.toLowerCase()} account${idS}.`;
+  }
+  if (action === 'UPDATE_USER_STATUS') {
+    return locale === 'vi' ? `Đổi trạng thái kích hoạt ${en}${idS}.` : `Changed activation status${idS}.`;
+  }
+  if (action === 'UPDATE_USER_ROLE') {
+    return locale === 'vi' ? `Đổi vai trò ${en}${idS}.` : `Changed role${idS}.`;
+  }
+  if (action === 'SET_PIN') {
+    return locale === 'vi' ? 'Người dùng thiết lập mã PIN bảo mật.' : 'User set security PIN.';
+  }
+  if (action === 'CHANGE_PIN') {
+    return locale === 'vi' ? 'Người dùng đổi mã PIN bảo mật.' : 'User changed security PIN.';
+  }
+  if (action === 'ADMIN_SET_USER_PIN') {
+    return locale === 'vi' ? `Quản trị viên đặt lại PIN cho ${en}${idS}.` : `Administrator set PIN for ${en.toLowerCase()}${idS}.`;
+  }
+  if (action === 'RESET_PASSWORD_WITH_PIN') {
+    return locale === 'vi' ? 'Đặt lại mật khẩu sau khi xác minh PIN.' : 'Password reset after PIN verification.';
+  }
+  if (action === 'CHANGE_EMAIL_WITH_PIN') {
+    return locale === 'vi' ? 'Đổi email sau khi xác minh PIN.' : 'Email changed after PIN verification.';
+  }
+  if (action === 'UPDATE_PROFILE') {
+    return locale === 'vi' ? 'Cập nhật họ tên hoặc số điện thoại hồ sơ.' : 'Updated name or phone on profile.';
+  }
+  if (action === 'UPDATE_AVATAR') {
+    return locale === 'vi' ? 'Cập nhật ảnh đại diện tài khoản.' : 'Updated profile avatar.';
+  }
+  if (action === 'IMPORT_CUSTOMERS') {
+    return locale === 'vi' ? 'Nhập khách hàng từ tệp (batch).' : 'Imported customers from file (batch).';
+  }
+  if (action === 'IMPORT_CUSTOMERS_FAILED' || action === 'UPLOAD_FAILED') {
+    return locale === 'vi' ? 'Nhập hoặc tải tệp thất bại.' : 'Import or file upload failed.';
+  }
+  if (action === 'APPROVE_REGISTRATION') {
+    return locale === 'vi' ? 'Phê duyệt yêu cầu đăng ký.' : 'Approved registration request.';
+  }
+  if (action === 'REJECT_REGISTRATION') {
+    return locale === 'vi' ? 'Từ chối yêu cầu đăng ký.' : 'Rejected registration request.';
+  }
+
+  const normalized = String(row.action || '').toLowerCase().replace(/_/g, ' ');
   if (normalized.includes('approve customer')) return locale === 'vi' ? 'Duyệt hồ sơ khách hàng.' : 'Approved customer dossier.';
   if (normalized.includes('reject customer')) return locale === 'vi' ? 'Từ chối hồ sơ khách hàng.' : 'Rejected customer dossier.';
   if (normalized.includes('approve registration') || normalized.includes('approve user')) {
@@ -168,62 +351,131 @@ function getActionShortDescription(action: string, locale: string) {
   if (normalized.includes('update user') || normalized.includes('user status')) {
     return locale === 'vi' ? 'Cập nhật trạng thái kích hoạt người dùng.' : 'Updated user activation status.';
   }
-  if (normalized.includes('verify email')) return locale === 'vi' ? 'Email đã được xác minh.' : 'Email has been verified.';
-  if (normalized.includes('resend verification email')) return locale === 'vi' ? 'Đã gửi lại email xác minh.' : 'Verification email resent.';
+  if (normalized.includes('verify email')) {
+    return locale === 'vi' ? 'Liên kết xác nhận trong email đăng ký đã được sử dụng.' : 'The registration confirmation link was used.';
+  }
+  if (normalized.includes('resend verification email')) {
+    return locale === 'vi' ? 'Đã gửi lại email chứa liên kết xác nhận.' : 'Confirmation email was resent.';
+  }
   if (normalized.includes('register user')) return locale === 'vi' ? 'Tạo mới yêu cầu đăng ký người dùng.' : 'Created a new user registration request.';
   if (normalized.includes('import customers')) return locale === 'vi' ? 'Nhập dữ liệu khách hàng từ tệp.' : 'Imported customers from file.';
   if (normalized.includes('resolve alert')) return locale === 'vi' ? 'Cảnh báo đã được xử lý.' : 'Alert has been resolved.';
-  if (normalized.includes('update')) return locale === 'vi' ? 'Cập nhật dữ liệu hệ thống.' : 'Updated system data.';
-  if (normalized.includes('delete')) return locale === 'vi' ? 'Xóa dữ liệu hệ thống.' : 'Deleted system data.';
-  if (normalized.includes('create') || normalized.includes('insert')) return locale === 'vi' ? 'Tạo mới bản ghi dữ liệu.' : 'Created new data record.';
+  if (normalized.includes('update')) {
+    return locale === 'vi'
+      ? idS
+        ? `Cập nhật ${en}${idS}.`
+        : `Cập nhật ${en || 'dữ liệu hệ thống'}.`
+      : idS
+        ? `Updated ${en.toLowerCase()}${idS}.`
+        : `Updated ${(en || 'system data').toLowerCase()}.`;
+  }
+  if (normalized.includes('delete')) {
+    return locale === 'vi'
+      ? idS
+        ? `Xóa ${en}${idS}.`
+        : `Xóa ${en || 'dữ liệu'}.`
+      : idS
+        ? `Deleted ${en.toLowerCase()}${idS}.`
+        : `Deleted ${(en || 'data').toLowerCase()}.`;
+  }
+  if (normalized.includes('create') || normalized.includes('insert')) {
+    return locale === 'vi'
+      ? idS
+        ? `Thêm ${en}${idS}.`
+        : `Thêm ${en || 'bản ghi mới'}.`
+      : idS
+        ? `Inserted ${en.toLowerCase()}${idS}.`
+        : `Inserted ${(en || 'new record').toLowerCase()}.`;
+  }
   return locale === 'vi' ? 'Thao tác hệ thống.' : 'System action.';
 }
 
-function getActionBadgeClass(action: string) {
-  const normalized = String(action || '').toLowerCase().replace(/_/g, ' ');
-  if (normalized.includes('duyệt hồ sơ') || normalized.includes('approve customer')) {
+function getActionBadgeClass(row: AuditLogRow): string {
+  const action = String(row.action || '').trim().toUpperCase();
+  const et = String(row.entityType || '').trim();
+  const normalized = String(row.action || '').toLowerCase().replace(/_/g, ' ');
+
+  if (action === 'APPROVE_CUSTOMER' || normalized.includes('approve customer')) {
     return '!border-emerald-300 !bg-emerald-50 !text-emerald-700';
   }
-  if (normalized.includes('duyệt đăng ký') || normalized.includes('duyệt người dùng') || normalized.includes('approve registration') || normalized.includes('approve user')) {
-    return '!border-emerald-300 !bg-emerald-50 !text-emerald-700';
-  }
-  if (normalized.includes('từ chối người dùng') || normalized.includes('reject registration') || normalized.includes('reject user')) {
+  if (action === 'REJECT_CUSTOMER' || (normalized.includes('reject') && normalized.includes('customer'))) {
     return '!border-rose-300 !bg-rose-50 !text-rose-700';
   }
-  if (normalized.includes('request password reset') || normalized.includes('reset password')) {
-    return '!border-amber-300 !bg-amber-50 !text-amber-800';
+  if (action === 'INSERT' && et === 'Customer') {
+    return '!border-teal-300 !bg-teal-50 !text-teal-800';
   }
-  if (normalized.includes('request email change') || normalized.includes('change email')) {
-    return '!border-cyan-300 !bg-cyan-50 !text-cyan-800';
+  if (action === 'UPDATE' && et === 'Customer') {
+    return '!border-indigo-300 !bg-indigo-50 !text-indigo-800';
   }
-  if (normalized.includes('verify email') || normalized.includes('resend verification email')) {
-    return '!border-violet-300 !bg-violet-50 !text-violet-800';
+  if (action === 'DELETE' && et === 'Customer') {
+    return '!border-red-300 !bg-red-50 !text-red-800';
   }
-  if (normalized.includes('register user')) {
-    return '!border-cyan-300 !bg-cyan-50 !text-cyan-800';
-  }
-  if (normalized.includes('import customers failed') || normalized.includes('upload failed')) {
-    return '!border-rose-300 !bg-rose-50 !text-rose-700';
-  }
-  if (normalized.includes('import customers')) {
-    return '!border-blue-300 !bg-blue-50 !text-blue-700';
-  }
-  if (normalized.includes('xử lý cảnh báo') || normalized.includes('resolve alert')) {
+  if (action === 'RESOLVE_ALERT' || normalized.includes('resolve alert')) {
     return '!border-sky-300 !bg-sky-50 !text-sky-800';
   }
-  if (normalized.includes('từ chối') || normalized.includes('reject')) {
+  if (action === 'SET_PIN' || action === 'CHANGE_PIN' || action === 'ADMIN_SET_USER_PIN') {
+    return '!border-violet-300 !bg-violet-50 !text-violet-800';
+  }
+  if (action === 'RESET_PASSWORD_WITH_PIN' || action === 'REQUEST_PASSWORD_RESET' || normalized.includes('reset password')) {
+    return '!border-amber-300 !bg-amber-50 !text-amber-900';
+  }
+  if (action === 'CHANGE_EMAIL_WITH_PIN' || normalized.includes('request email change') || normalized.includes('change email')) {
+    return '!border-cyan-300 !bg-cyan-50 !text-cyan-800';
+  }
+  if (action === 'CHANGE_PASSWORD' || normalized.includes('change password')) {
+    return '!border-orange-300 !bg-orange-50 !text-orange-900';
+  }
+  if (action === 'CREATE_USER' || normalized.includes('register user')) {
+    return '!border-lime-300 !bg-lime-50 !text-lime-900';
+  }
+  if (action === 'DELETE_USER' || (normalized.includes('delete') && normalized.includes('user'))) {
+    return '!border-red-300 !bg-red-50 !text-red-800';
+  }
+  if (action === 'UPDATE_USER_ROLE') {
+    return '!border-blue-300 !bg-blue-50 !text-blue-800';
+  }
+  if (action === 'UPDATE_USER_STATUS' || normalized.includes('update user') || normalized.includes('user status')) {
+    return '!border-amber-300 !bg-amber-50 !text-amber-900';
+  }
+  if (action === 'UPDATE_PROFILE' || action === 'UPDATE_AVATAR' || normalized.includes('update profile') || normalized.includes('update avatar')) {
+    return '!border-indigo-200 !bg-indigo-50/80 !text-indigo-800';
+  }
+  if (action === 'IMPORT_CUSTOMERS_FAILED' || action === 'UPLOAD_FAILED' || normalized.includes('import customers failed') || normalized.includes('upload failed')) {
     return '!border-rose-300 !bg-rose-50 !text-rose-700';
   }
-  if (normalized.includes('xóa') || normalized.includes('delete')) {
+  if (action === 'IMPORT_CUSTOMERS' || normalized.includes('import customers')) {
+    return '!border-blue-300 !bg-blue-50 !text-blue-700';
+  }
+  if (normalized.includes('verify email') || normalized.includes('resend verification email')) {
+    return '!border-purple-300 !bg-purple-50 !text-purple-800';
+  }
+  if (action === 'APPROVE_REGISTRATION' || normalized.includes('approve registration') || normalized.includes('approve user')) {
+    return '!border-emerald-300 !bg-emerald-50 !text-emerald-700';
+  }
+  if (action === 'REJECT_REGISTRATION' || normalized.includes('reject registration') || normalized.includes('reject user')) {
+    return '!border-rose-300 !bg-rose-50 !text-rose-700';
+  }
+  if (normalized.includes('reject')) {
+    return '!border-rose-300 !bg-rose-50 !text-rose-700';
+  }
+  if (normalized.includes('delete')) {
     return '!border-red-300 !bg-red-50 !text-red-700';
   }
-  if (normalized.includes('cập nhật') || normalized.includes('update')) {
+  if (normalized.includes('update')) {
     return '!border-indigo-300 !bg-indigo-50 !text-indigo-700';
   }
   if (normalized.includes('insert') || normalized.includes('create')) {
     return '!border-emerald-300 !bg-emerald-50 !text-emerald-700';
   }
   return '!border-slate-200 !bg-slate-50 !text-slate-700';
+}
+
+function safeJsonStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 function parseAuditPayload(value: unknown): Record<string, any> {
@@ -264,6 +516,11 @@ function fieldLabel(key: string, locale: string) {
     message: locale === 'vi' ? 'Nội dung' : 'Message',
     is_resolved: locale === 'vi' ? 'Đã xử lý' : 'Resolved',
     alert_type: locale === 'vi' ? 'Loại cảnh báo' : 'Alert type',
+    entity_type: locale === 'vi' ? 'Loại thực thể' : 'Entity type',
+    entity_id: locale === 'vi' ? 'Mã thực thể' : 'Entity ID',
+    user_id: locale === 'vi' ? 'Mã người dùng' : 'User ID',
+    performed_at: locale === 'vi' ? 'Thời gian thực hiện' : 'Performed at',
+    audit_id: locale === 'vi' ? 'Mã nhật ký' : 'Audit ID',
     severity: locale === 'vi' ? 'Mức độ' : 'Severity',
     email: 'Email',
     phone_number: locale === 'vi' ? 'Số điện thoại' : 'Phone',
@@ -396,13 +653,15 @@ export default function AdminAuditLogsPage() {
         locale === 'vi' ? 'Người thực hiện' : 'Actor',
         locale === 'vi' ? 'Hành động' : 'Action',
         locale === 'vi' ? 'Đối tượng' : 'Target',
+        locale === 'vi' ? 'Mô tả ngắn' : 'Short description',
       ],
       filtered.map((r) => [
         r.id,
         formatAuditTs(r.ts, locale),
         resolveActorDisplay(r),
-        getActionLabel(r.action, locale),
+        getActionLabel(r, locale),
         r.target,
+        getActionShortDescription(r, locale),
       ]),
     );
   };
@@ -437,13 +696,14 @@ export default function AdminAuditLogsPage() {
         </CardHeader>
         <CardContent className="pt-0 pb-3">
           <div className="overflow-x-auto rounded-xl border border-black/70 bg-white min-h-[620px]">
-            <Table className="w-full min-w-[1100px] table-fixed">
+            <Table className="w-full min-w-[1280px] table-fixed">
               <colgroup>
-                <col className="w-[15%]" />
-                <col className="w-[12%]" />
-                <col className="w-[21%]" />
+                <col className="w-[11%]" />
+                <col className="w-[9%]" />
+                <col className="w-[16%]" />
+                <col className="w-[20%]" />
                 <col className="w-[22%]" />
-                <col />
+                <col className="w-[10%]" />
               </colgroup>
               <TableHeader>
                 <TableRow className="bg-muted/35 hover:bg-muted/35">
@@ -451,34 +711,36 @@ export default function AdminAuditLogsPage() {
                   <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{locale === 'vi' ? 'Giờ' : 'Time'}</TableHead>
                   <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('admin.audit.actor')}</TableHead>
                   <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('admin.audit.action')}</TableHead>
-                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{locale === 'vi' ? 'Mô tả ngắn' : 'Short description'}</TableHead>
+                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('admin.audit.short_desc')}</TableHead>
+                  <TableHead className="px-4 py-3.5 text-[13px] font-semibold text-center">{t('admin.audit.details')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paged.map((r) => (
-                  <TableRow
-                    key={r.id}
-                    className="cursor-pointer border-b border-black/15 hover:bg-muted/30"
-                    onClick={() => setSelected(r)}
-                  >
+                  <TableRow key={r.id} className="border-b border-black/15 hover:bg-muted/30">
                     <TableCell className="px-6 py-3 whitespace-nowrap text-[13px]">{formatAuditDateOnly(r.ts, locale)}</TableCell>
                     <TableCell className="px-6 py-3 whitespace-nowrap text-[13px]">{formatAuditTimeOnly(r.ts, locale)}</TableCell>
                     <TableCell className="px-6 py-3 text-[13px] font-medium">
                       {resolveActorDisplay(r)}
                     </TableCell>
                     <TableCell className="px-6 py-3">
-                      <Badge variant="outline" className={getActionBadgeClass(r.action)}>
-                        {getActionLabel(r.action, locale)}
+                      <Badge variant="outline" className={getActionBadgeClass(r)}>
+                        {getActionLabel(r, locale)}
                       </Badge>
                     </TableCell>
                     <TableCell className="px-6 py-3 text-[13px] text-muted-foreground">
-                      {getActionShortDescription(r.action, locale)}
+                      {getActionShortDescription(r, locale)}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-center">
+                      <Button type="button" variant="outline" size="sm" className="text-[12px]" onClick={() => setSelected(r)}>
+                        {t('admin.audit.view_details')}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
                 {paged.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                       {isLoading ? t('common.loading') : t('common.no_results')}
                     </TableCell>
                   </TableRow>
@@ -496,74 +758,116 @@ export default function AdminAuditLogsPage() {
 
       <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open) setSelected(null); }}>
         <DialogContent className="!w-[95vw] !max-w-[1500px] max-h-[92vh] overflow-hidden p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle>Chi tiết</DialogTitle>
-          </DialogHeader>
+          {selected ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t('admin.audit.detail_title')}</DialogTitle>
+              </DialogHeader>
 
-          <div className="overflow-x-auto xl:overflow-x-visible">
-            <div
-              className={
-                hasMeaningfulNewData
-                  ? 'grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)_minmax(0,1fr)] gap-4'
-                  : 'grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4'
-              }
-            >
-            <div className="space-y-3">
-              {[
-                { label: 'ACTOR', value: resolveActorDisplay(selected), icon: User },
-                { label: 'ACTION', value: getActionLabel(selected?.action ?? '-', locale) },
-                { label: 'NGÀY', value: formatAuditTs(String(selected?.ts ?? ''), locale), icon: Clock3 },
-              ].map((item) => (
-                <div key={item.label} className="rounded-xl border p-3">
-                  <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-                    {item.icon ? <item.icon className="h-3.5 w-3.5" /> : null}
-                    {item.label}
-                  </p>
-                  {item.label === 'ACTION' ? (
-                    <div className="mt-2">
-                      <Badge variant="outline" className={getActionBadgeClass(String(selected?.action ?? ''))}>
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        {String(item.value)}
-                      </Badge>
+              <div className="max-h-[calc(92vh-8rem)] overflow-y-auto space-y-4 pr-1">
+                <div className="overflow-x-auto xl:overflow-x-visible">
+                  <div
+                    className={
+                      hasMeaningfulNewData
+                        ? 'grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)_minmax(0,1fr)] gap-4'
+                        : 'grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4'
+                    }
+                  >
+                    <div className="space-y-3">
+                      {[
+                        {
+                          label: t('admin.audit.actor'),
+                          value: resolveActorDisplay(selected),
+                          icon: User,
+                          kind: 'text' as const,
+                        },
+                        {
+                          label: t('admin.audit.action'),
+                          value: getActionLabel(selected, locale),
+                          kind: 'action' as const,
+                        },
+                        {
+                          label: t('admin.audit.target'),
+                          value:
+                            selected.entityType || selected.entityId != null
+                              ? `${entityDisplayName(selected.entityType, locale)}${entityIdSuffix(selected.entityId, locale)}`
+                              : selected.target,
+                          icon: Hash,
+                          kind: 'text' as const,
+                        },
+                        {
+                          label: locale === 'vi' ? 'Thời gian' : 'Timestamp',
+                          value: formatAuditTs(String(selected.ts ?? ''), locale),
+                          icon: Clock3,
+                          kind: 'text' as const,
+                        },
+                      ].map((item) => (
+                        <div key={item.label} className="rounded-xl border p-3">
+                          <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+                            {item.icon ? <item.icon className="h-3.5 w-3.5" /> : null}
+                            {item.label}
+                          </p>
+                          {item.kind === 'action' ? (
+                            <div className="mt-2">
+                              <Badge variant="outline" className={getActionBadgeClass(selected)}>
+                                <ShieldCheck className="h-3.5 w-3.5" />
+                                {String(item.value)}
+                              </Badge>
+                            </div>
+                          ) : (
+                            <p className="mt-2 font-medium break-words">{item.value}</p>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ) : (
-                    <p className="mt-2 font-medium">{item.value}</p>
-                  )}
-                </div>
-              ))}
-            </div>
 
-            <div className="rounded-xl border p-3 min-w-0">
-              <p className="mb-3 flex items-center gap-2 font-medium"><User className="h-4 w-4 text-muted-foreground" />Dữ liệu trước thay đổi</p>
-              <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
-                {oldEntries.map(([key, value]) => (
-                  <div key={key} className="rounded-lg border p-2">
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{fieldLabel(key, locale)}</p>
-                    <p className="mt-1 text-sm break-words">{formatFieldValue(value, locale)}</p>
+                    <div className="rounded-xl border p-3 min-w-0">
+                      <p className="mb-3 flex items-center gap-2 font-medium">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        {t('admin.audit.before')}
+                      </p>
+                      <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                        {oldEntries.map(([key, value]) => (
+                          <div key={key} className="rounded-lg border p-2">
+                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{fieldLabel(key, locale)}</p>
+                            <p className="mt-1 text-sm break-words">{formatFieldValue(value, locale)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {hasMeaningfulNewData && (
+                      <div className="rounded-xl border p-3 min-w-0">
+                        <p className="mb-3 flex items-center gap-2 font-medium">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          {t('admin.audit.after')}
+                        </p>
+                        <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                          {newEntries.map(([key, value]) => (
+                            <div key={key} className="rounded-lg border p-2">
+                              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{fieldLabel(key, locale)}</p>
+                              <p className="mt-1 text-sm break-words">{formatFieldValue(value, locale)}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {hasMeaningfulNewData && (
-              <div className="rounded-xl border p-3 min-w-0">
-                <p className="mb-3 flex items-center gap-2 font-medium"><User className="h-4 w-4 text-muted-foreground" />Dữ liệu sau thay đổi</p>
-                <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
-                  {newEntries.map(([key, value]) => (
-                    <div key={key} className="rounded-lg border p-2">
-                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{fieldLabel(key, locale)}</p>
-                      <p className="mt-1 text-sm break-words">{formatFieldValue(value, locale)}</p>
-                    </div>
-                  ))}
+                <div className="rounded-xl border p-3">
+                  <p className="mb-2 text-sm font-medium">{t('admin.audit.raw_payload')}</p>
+                  <pre className="max-h-56 overflow-auto rounded-md bg-muted/80 p-3 text-left text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+                    {safeJsonStringify(selected.raw)}
+                  </pre>
                 </div>
               </div>
-            )}
-            </div>
-          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelected(null)}>Đóng</Button>
-          </DialogFooter>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelected(null)}>{t('common.close')}</Button>
+              </DialogFooter>
+            </>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

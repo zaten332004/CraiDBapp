@@ -129,6 +129,24 @@ function VerifyEmailContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Đã duyệt + đã có PIN → vào dashboard; chưa có PIN thì phải lưu PIN trên trang này. */
+  useEffect(() => {
+    if (loadingPending) return;
+    if (!getAccessToken()) return;
+    if (!pendingInfo) return;
+    const st = String(pendingInfo.status || "").trim().toLowerCase();
+    if (st === "rejected") return;
+    if (st === "approved" && pendingInfo.has_pin) {
+      const dest =
+        String(pendingInfo.role || "")
+          .trim()
+          .toLowerCase() === "analyst"
+          ? "/dashboard/customers"
+          : "/dashboard";
+      router.replace(dest);
+    }
+  }, [loadingPending, pendingInfo, router]);
+
   const fetchPendingStatus = async () => {
     if (!getAccessToken()) {
       return null;
@@ -204,11 +222,7 @@ function VerifyEmailContent() {
   }
 
   const handleRefreshStatus = async () => {
-    const payload = await fetchPendingStatus();
-    const status = String(payload?.status || '').trim().toLowerCase();
-    if (status === 'approved' || (!payload && currentStatus === 'approved')) {
-      router.push(payload ? dashboardRouteByRole(payload?.role) : pendingHomeRoute);
-    }
+    await fetchPendingStatus();
   };
 
   const handleBackToLogin = () => {
@@ -362,7 +376,7 @@ function VerifyEmailContent() {
               <Button type="button" variant="outline" onClick={handleRefreshStatus} disabled={loadingPending}>
                 {isVi ? 'Kiểm tra lại trạng thái' : 'Refresh status'}
               </Button>
-              {isApproved && (
+              {isApproved && resolvedHasPin && (
                 <Link href={pendingHomeRoute} className="block">
                   <Button className="w-full">{isVi ? 'Vào hệ thống' : 'Go to dashboard'}</Button>
                 </Link>

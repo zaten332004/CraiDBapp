@@ -47,6 +47,7 @@ import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/forma
 import { ChatMarkdown } from '@/components/ai-chat/chat-markdown';
 import {
   BarChart3,
+  Bell,
   CircleX,
   FileText,
   LayoutDashboard,
@@ -119,7 +120,7 @@ type UploadedFileCtx = {
   [key: string]: unknown;
 };
 
-type AiDataSource = 'portfolio' | 'customer' | 'upload' | 'powerbi';
+type AiDataSource = 'portfolio' | 'customer' | 'upload' | 'powerbi' | 'alerts';
 
 function normalizeCustomerSearchResponse(data: unknown): Array<{ customer_id: number; label: string }> {
   if (data == null || typeof data !== 'object') return [];
@@ -164,6 +165,7 @@ function normalizeCustomerListResponse(data: unknown): { items: unknown[]; total
 
 const PENDING_FILES_STORAGE_KEY = 'crs_ai_chat_pending_uploads_v1';
 const LAST_AI_CHAT_MODEL_STORAGE_KEY = 'crs_ai_chat_last_model_v1';
+const SESSION_MODEL_STORAGE_PREFIX = 'crs_ai_chat_session_model_v1:';
 
 function readStoredLastAiChatModel(): string {
   if (typeof window === 'undefined') return '';
@@ -180,6 +182,29 @@ function writeStoredLastAiChatModel(model: string) {
   if (!s) return;
   try {
     window.localStorage.setItem(LAST_AI_CHAT_MODEL_STORAGE_KEY, s);
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function readStoredSessionModel(sessionId: string): string {
+  if (typeof window === 'undefined') return '';
+  const sid = String(sessionId || '').trim();
+  if (!sid) return '';
+  try {
+    return String(window.localStorage.getItem(`${SESSION_MODEL_STORAGE_PREFIX}${sid}`) || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function writeStoredSessionModel(sessionId: string, model: string) {
+  if (typeof window === 'undefined') return;
+  const sid = String(sessionId || '').trim();
+  const s = String(model || '').trim();
+  if (!sid || !s) return;
+  try {
+    window.localStorage.setItem(`${SESSION_MODEL_STORAGE_PREFIX}${sid}`, s);
   } catch {
     // ignore quota / private mode
   }
@@ -283,6 +308,11 @@ function roleRank(role: UserRole | null) {
     default:
       return 0;
   }
+}
+
+/** Alerts as AI context: backend allows manager+ only. */
+function canUseAlertsAiDataSource(role: UserRole | null) {
+  return roleRank(role ?? getUserRole()) >= roleRank('manager');
 }
 
 function normalizeMinRole(value: unknown): UserRole | null {
@@ -443,6 +473,8 @@ export default function AIChatPage() {
   const [selectedModel, setSelectedModel] = useState<string>('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  /** Avoid re-applying stored model preferences on every render while the same session stays open. */
+  const lastSessionIdModelPrefsAppliedRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   /** Incremented when sending the first message from the hero layout (triggers bottom snap animation). */
@@ -543,7 +575,53 @@ export default function AIChatPage() {
     const opt = modelOptions.find((o) => o.model === selectedModel);
     if (!opt || !isModelAllowed(opt)) return;
     writeStoredLastAiChatModel(selectedModel);
-  }, [selectedModel, modelOptions, userRole]);
+    const sid = sessionId?.trim();
+    if (sid) writeStoredSessionModel(sid, selectedModel);
+  }, [selectedModel, modelOptions, userRole, sessionId]);
+
+  useEffect(() => {
+    if (aiDataSource !== 'alerts') return;
+    if (!canUseAlertsAiDataSource(userRole)) {
+      setAiDataSource('portfolio');
+    }
+  }, [userRole, aiDataSource]);
+
+  /** If role/catalog changes and current model is no longer allowed, pick a valid tier. */
+  useEffect(() => {
+    const currentRole = userRole ?? getUserRole();
+    const allowed = modelOptions.filter((o) => roleRank(currentRole) >= roleRank(o.minRole));
+    if (!allowed.length) return;
+    if (selectedModel && allowed.some((o) => o.model === selectedModel)) return;
+    const saved = readStoredLastAiChatModel();
+    if (saved && allowed.some((o) => o.model === saved)) {
+      setSelectedModel(saved);
+      return;
+    }
+    setSelectedModel(allowed[0].model);
+  }, [modelOptions, userRole, selectedModel]);
+
+  useEffect(() => {
+    if (!sessionId?.trim()) {
+      lastSessionIdModelPrefsAppliedRef.current = null;
+      return;
+    }
+    if (modelOptions.length === 0) return;
+    const sid = sessionId.trim();
+    if (lastSessionIdModelPrefsAppliedRef.current === sid) return;
+    lastSessionIdModelPrefsAppliedRef.current = sid;
+
+    const tryPick = (modelId: string): boolean => {
+      const m = String(modelId || '').trim();
+      if (!m) return false;
+      const option = modelOptions.find((o) => o.model === m);
+      if (!option || !isModelAllowed(option)) return false;
+      setSelectedModel(m);
+      return true;
+    };
+
+    if (tryPick(readStoredSessionModel(sid))) return;
+    if (tryPick(readStoredLastAiChatModel())) return;
+  }, [sessionId, modelOptions, userRole]);
 
   useEffect(() => {
     if (!previewAttachment?.id) {
@@ -1139,19 +1217,14 @@ export default function AIChatPage() {
         </span>
       </SelectTrigger>
       <SelectContent>
-        {modelOptions.map((o) => {
-          const allowed = isModelAllowed(o);
+        {modelOptions.filter((o) => isModelAllowed(o)).map((o) => {
           const label = resolveModelLabel(o.tier, o.label);
           const desc = resolveModelDesc(o.tier, o.description);
-          const needs = o.minRole ? `${t('ai_chat.model.min_role')}: ${t(`role.${o.minRole}`)}` : '';
           return (
-            <SelectItem key={o.model} value={o.model} disabled={!allowed}>
+            <SelectItem key={o.model} value={o.model}>
               <div className="flex flex-col">
                 <span className="font-medium">{label}</span>
-                <span className="text-xs text-muted-foreground">
-                  {desc}
-                  {!allowed && needs ? ` • ${needs}` : ''}
-                </span>
+                <span className="text-xs text-muted-foreground">{desc}</span>
               </div>
             </SelectItem>
           );
@@ -1174,7 +1247,12 @@ export default function AIChatPage() {
           {isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-[min(calc(100vw-2rem),17rem)]">
+      <DropdownMenuContent
+        side="top"
+        align="start"
+        sideOffset={6}
+        className="w-[min(calc(100vw-2rem),17rem)]"
+      >
         <DropdownMenuItem
           onClick={() => {
             setAiDataSource('customer');
@@ -1206,6 +1284,19 @@ export default function AIChatPage() {
           <BarChart3 className="mr-2 h-4 w-4 shrink-0 opacity-80" />
           {t('ai_chat.data_source_powerbi')}
         </DropdownMenuItem>
+        {canUseAlertsAiDataSource(userRole) ? (
+          <DropdownMenuItem
+            onClick={() => {
+              setAiDataSource('alerts');
+              setSelectedCustomerIds([]);
+              setPendingFiles([]);
+              if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
+            }}
+          >
+            <Bell className="mr-2 h-4 w-4 shrink-0 opacity-80" />
+            {t('ai_chat.data_source_alerts')}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
@@ -1236,7 +1327,9 @@ export default function AIChatPage() {
                 ? t('ai_chat.data_source_portfolio')
                 : aiDataSource === 'upload'
                   ? t('ai_chat.data_source_upload')
-                  : t('ai_chat.data_source_powerbi')}
+                  : aiDataSource === 'alerts'
+                    ? t('ai_chat.data_source_alerts')
+                    : t('ai_chat.data_source_powerbi')}
           </span>
         </>
       )}

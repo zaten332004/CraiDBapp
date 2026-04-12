@@ -87,13 +87,36 @@ function parseDetail(bodyText?: string): string {
   }
 }
 
+/** Map common English API `detail` strings to clearer Vi/En copy (especially “must be different from current”). */
+export function translateKnownApiDetail(detail: string, locale: UserFacingLocale): string {
+  const d = detail.trim();
+  const rows: Array<{ en: string; vi: string }> = [
+    {
+      en: "New password must be different from the current password",
+      vi: "Mật khẩu mới không được trùng với mật khẩu hiện tại.",
+    },
+    {
+      en: "New email must be different from the current email",
+      vi: "Email mới không được trùng với email hiện tại.",
+    },
+    {
+      en: "New PIN must be different from old PIN",
+      vi: "Mã PIN mới không được trùng với mã PIN hiện tại.",
+    },
+  ];
+  for (const row of rows) {
+    if (d === row.en) return locale === "vi" ? row.vi : row.en;
+  }
+  return d;
+}
+
 export function formatUserFacingFetchError(
   status: number,
   bodyText?: string,
   locale: UserFacingLocale = "vi",
 ): string {
   const detail = parseDetail(bodyText);
-  if (detail) return detail;
+  if (detail) return translateKnownApiDetail(detail, locale);
   return httpStatusHint(status, locale);
 }
 

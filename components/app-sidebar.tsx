@@ -17,6 +17,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import {
   DropdownMenu,
@@ -129,6 +130,13 @@ const navigationItems = [
   },
 ];
 
+/** Analyst sidebar: customers, AI Chat, Power BI only (no dashboard, risk, portfolio, alerts). */
+const ANALYST_NAV_TITLE_KEYS = new Set([
+  'sidebar.customers',
+  'sidebar.ai_chat',
+  'sidebar.powerbi',
+]);
+
 const adminItems = [
   {
     titleKey: 'sidebar.admin.users',
@@ -148,9 +156,11 @@ const adminItems = [
 ];
 
 export function AppSidebar() {
+  const { state: sidebarState } = useSidebar();
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useI18n();
+  const isSidebarCollapsed = sidebarState === 'collapsed';
   const [openItems, setOpenItems] = React.useState<string[]>([]);
   const [role, setRole] = React.useState<UserRole | null>(null);
   const [currentUser, setCurrentUser] = React.useState<{ name: string; avatarUrl?: string | null } | null>(null);
@@ -205,6 +215,9 @@ export function AppSidebar() {
   const visibleNavHrefs = React.useMemo(() => {
     const hrefs: string[] = [];
     for (const item of navigationItems) {
+      if (isAnalyst && !ANALYST_NAV_TITLE_KEYS.has(item.titleKey)) {
+        continue;
+      }
       if (isViewer) {
         
       }
@@ -259,20 +272,23 @@ export function AppSidebar() {
   );
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <Link
           href={homeHref}
           data-nav-dir={navDirForHref(homeHref)}
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity group-data-[collapsible=icon]:justify-center"
         >
           <Image
             src="/logo.svg"
             alt="CRAI DB"
             width={32}
             height={32}
+            className="shrink-0"
           />
-          <span className="font-semibold text-sm text-sidebar-foreground">CRAI DB</span>
+          <span className="font-semibold text-sm text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+            CRAI DB
+          </span>
         </Link>
       </SidebarHeader>
 
@@ -280,7 +296,9 @@ export function AppSidebar() {
         <SidebarMenu>
           {navigationItems
             .filter((item) => {
-              if (isAnalyst && item.href === '/dashboard') return false;
+              if (isAnalyst) {
+                return ANALYST_NAV_TITLE_KEYS.has(item.titleKey);
+              }
               if (isViewer) {
                 
                 if (item.href === '/dashboard/customers') return true;
@@ -291,6 +309,29 @@ export function AppSidebar() {
             .map((item) => {
             if (item.items) {
               const baseSubItems = item.items.filter((subItem) => !subItem.hidden && Boolean(subItem.href));
+              if (isSidebarCollapsed) {
+                return (
+                  <SidebarMenuItem key={item.titleKey}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <SidebarMenuButton tooltip={t(item.titleKey)}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{t(item.titleKey)}</span>
+                        </SidebarMenuButton>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56" side="right" align="start">
+                        {baseSubItems.map((subItem) => (
+                          <DropdownMenuItem key={subItem.href} asChild>
+                            <Link href={subItem.href} data-nav-dir={navDirForHref(subItem.href)}>
+                              {t(subItem.titleKey)}
+                            </Link>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </SidebarMenuItem>
+                );
+              }
               return (
                 <Collapsible
                   key={item.titleKey}
@@ -350,7 +391,7 @@ export function AppSidebar() {
         {/* Admin Section */}
         {isAdmin && (
           <div className="mt-8 pt-6 border-t border-sidebar-border">
-            <div className="px-3 py-2">
+            <div className="px-3 py-2 group-data-[collapsible=icon]:hidden">
               <h3 className="text-xs font-semibold text-sidebar-foreground/70 uppercase tracking-wider">
                 {t("sidebar.admin")}
               </h3>
@@ -379,9 +420,10 @@ export function AppSidebar() {
         {currentUser ? (
           <Link
             href="/dashboard/profile"
-            className="mb-3 flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-2.5 py-2 transition-colors hover:bg-sidebar-accent"
+            title={currentUser.name}
+            className="mb-3 flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-2.5 py-2 transition-colors hover:bg-sidebar-accent group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
           >
-            <Avatar className="h-7 w-7">
+            <Avatar className="h-7 w-7 shrink-0">
               <AvatarImage
                 key={currentUser.avatarUrl ?? 'no-avatar'}
                 src={currentUser.avatarUrl || undefined}
@@ -396,7 +438,9 @@ export function AppSidebar() {
                   .join('') || 'U'}
               </AvatarFallback>
             </Avatar>
-            <p className="truncate text-sm font-medium text-sidebar-foreground">{currentUser.name}</p>
+            <p className="truncate text-sm font-medium text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+              {currentUser.name}
+            </p>
           </Link>
         ) : null}
         <SidebarMenu>

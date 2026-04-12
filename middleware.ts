@@ -10,6 +10,7 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value;
   const role = request.cookies.get("user_role")?.value?.toLowerCase();
   const status = request.cookies.get("user_status")?.value?.toLowerCase();
+  const hasPin = request.cookies.get("user_has_pin")?.value === "1";
 
   const isApproved = status === "approved";
 
@@ -22,6 +23,10 @@ export function middleware(request: NextRequest) {
     }
 
     if (!isApproved) {
+      return NextResponse.redirect(new URL("/auth/verify-email?mode=pending", request.url));
+    }
+
+    if (!hasPin) {
       return NextResponse.redirect(new URL("/auth/verify-email?mode=pending", request.url));
     }
 
@@ -49,6 +54,12 @@ export function middleware(request: NextRequest) {
   if (pathname.startsWith("/auth")) {
     if (token) {
       if (!isApproved) {
+        if (pathname.startsWith("/auth/verify-email")) {
+          return NextResponse.next();
+        }
+        return NextResponse.redirect(new URL("/auth/verify-email?mode=pending", request.url));
+      }
+      if (!hasPin) {
         if (pathname.startsWith("/auth/verify-email")) {
           return NextResponse.next();
         }

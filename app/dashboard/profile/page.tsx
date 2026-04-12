@@ -15,8 +15,8 @@ import { browserApiFetchAuth } from '@/lib/api/browser';
 import { formatUserFacingApiError, formatUserFacingFetchError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { CRAIDB_PROFILE_CHANGED_EVENT } from '@/lib/profile-sync-event';
-import { getAccessToken, setSession } from '@/lib/auth/token';
-import { isStrongPassword, isValidEmail, isValidVietnamPhone, passwordRuleMessage } from '@/lib/validation/account';
+import { getAccessToken, setSession, setUserHasPin } from '@/lib/auth/token';
+import { isNumericPin, isStrongPassword, isValidEmail, isValidVietnamPhone, passwordRuleMessage } from '@/lib/validation/account';
 
 type ProfileMe = {
   user_id: number;
@@ -28,6 +28,7 @@ type ProfileMe = {
   role: string;
   status?: string | null;
   is_email_verified?: boolean;
+  has_pin?: boolean;
 };
 
 export default function ProfilePage() {
@@ -47,6 +48,12 @@ export default function ProfilePage() {
   const [expiresInSeconds, setExpiresInSeconds] = useState<number | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [pinCurrent, setPinCurrent] = useState('');
+  const [pinNew, setPinNew] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [pinInitial, setPinInitial] = useState('');
+  const [pinInitialConfirm, setPinInitialConfirm] = useState('');
+  const [savingPin, setSavingPin] = useState(false);
   const [sendingEmailCode, setSendingEmailCode] = useState(false);
   const [confirmingEmailCode, setConfirmingEmailCode] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -117,6 +124,13 @@ export default function ProfilePage() {
   };
 
   const changePassword = async () => {
+    if (newPassword.trim() === currentPassword.trim()) {
+      const msg = isVi
+        ? 'Mật khẩu mới không được trùng với mật khẩu hiện tại.'
+        : 'New password must be different from the current password.';
+      notifyError(isVi ? 'Đổi mật khẩu thất bại.' : 'Failed to change password.', msg);
+      return;
+    }
     if (!isStrongPassword(newPassword)) {
       const msg = passwordRuleMessage(isVi);
       notifyError(isVi ? 'Đổi mật khẩu thất bại.' : 'Failed to change password.', msg);
@@ -150,6 +164,14 @@ export default function ProfilePage() {
 
   const requestEmailChange = async () => {
     if (!newEmail.trim()) return;
+    const currentEmail = (profile?.email ?? '').trim().toLowerCase();
+    if (newEmail.trim().toLowerCase() === currentEmail) {
+      const msg = isVi
+        ? 'Email mới không được trùng với email hiện tại.'
+        : 'New email must be different from the current email.';
+      notifyError(isVi ? 'Không thể gửi mã xác minh.' : 'Failed to send verification code.', msg);
+      return;
+    }
     if (!isValidEmail(newEmail)) {
       const msg = isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.';
       notifyError(isVi ? 'Không thể gửi mã xác minh.' : 'Failed to send verification code.', msg);
@@ -198,6 +220,72 @@ export default function ProfilePage() {
       notifyError(isVi ? 'Xác minh mã thất bại.' : 'Failed to verify code.', msg);
     } finally {
       setConfirmingEmailCode(false);
+    }
+  };
+
+  const changeAccountPin = async () => {
+    if (!isNumericPin(pinCurrent, 6) || !isNumericPin(pinNew, 6) || !isNumericPin(pinConfirm, 6)) {
+      const msg = isVi ? 'Mỗi mã PIN phải gồm đúng 6 chữ số.' : 'Each PIN must be exactly 6 digits.';
+      notifyError(isVi ? 'Đổi mã PIN thất bại.' : 'Failed to change PIN.', msg);
+      return;
+    }
+    if (pinNew.trim() === pinCurrent.trim()) {
+      const msg = isVi
+        ? 'Mã PIN mới không được trùng với mã PIN hiện tại.'
+        : 'New PIN must be different from the current PIN.';
+      notifyError(isVi ? 'Đổi mã PIN thất bại.' : 'Failed to change PIN.', msg);
+      return;
+    }
+    if (pinNew !== pinConfirm) {
+      const msg = isVi ? 'Mã PIN xác nhận không khớp.' : 'PIN confirmation does not match.';
+      notifyError(isVi ? 'Đổi mã PIN thất bại.' : 'Failed to change PIN.', msg);
+      return;
+    }
+    setSavingPin(true);
+    try {
+      await browserApiFetchAuth<{ message: string }>('/auth/pin/change', {
+        method: 'POST',
+        body: { old_pin: pinCurrent.trim(), new_pin: pinNew.trim() },
+      });
+      setPinCurrent('');
+      setPinNew('');
+      setPinConfirm('');
+      notifySuccess(isVi ? 'Đổi mã PIN thành công.' : 'PIN changed successfully.');
+      window.dispatchEvent(new Event(CRAIDB_PROFILE_CHANGED_EVENT));
+    } catch (err) {
+      notifyError(isVi ? 'Đổi mã PIN thất bại.' : 'Failed to change PIN.', apiErr(err));
+    } finally {
+      setSavingPin(false);
+    }
+  };
+
+  const setInitialAccountPin = async () => {
+    if (!isNumericPin(pinInitial, 6) || !isNumericPin(pinInitialConfirm, 6)) {
+      const msg = isVi ? 'Mã PIN phải gồm đúng 6 chữ số.' : 'PIN must be exactly 6 digits.';
+      notifyError(isVi ? 'Thiết lập mã PIN thất bại.' : 'Failed to set PIN.', msg);
+      return;
+    }
+    if (pinInitial !== pinInitialConfirm) {
+      const msg = isVi ? 'Mã PIN xác nhận không khớp.' : 'PIN confirmation does not match.';
+      notifyError(isVi ? 'Thiết lập mã PIN thất bại.' : 'Failed to set PIN.', msg);
+      return;
+    }
+    setSavingPin(true);
+    try {
+      await browserApiFetchAuth<{ message: string }>('/auth/pin/set', {
+        method: 'POST',
+        body: { pin: pinInitial.trim() },
+      });
+      setPinInitial('');
+      setPinInitialConfirm('');
+      setUserHasPin(true);
+      setProfile((prev) => (prev ? { ...prev, has_pin: true } : prev));
+      notifySuccess(isVi ? 'Đã thiết lập mã PIN.' : 'PIN has been set.');
+      window.dispatchEvent(new Event(CRAIDB_PROFILE_CHANGED_EVENT));
+    } catch (err) {
+      notifyError(isVi ? 'Thiết lập mã PIN thất bại.' : 'Failed to set PIN.', apiErr(err));
+    } finally {
+      setSavingPin(false);
     }
   };
 
@@ -397,14 +485,14 @@ export default function ProfilePage() {
                   <Badge
                     variant="outline"
                     className={
-                      profile?.is_email_verified
+                      profile?.has_pin
                         ? 'border-sky-300 bg-sky-50 text-sky-700'
                         : 'border-amber-300 bg-amber-50 text-amber-800'
                     }
                   >
-                    {profile?.is_email_verified
-                      ? (isVi ? 'Email đã xác minh' : 'Email verified')
-                      : (isVi ? 'Email chưa xác minh' : 'Email unverified')}
+                    {profile?.has_pin
+                      ? (isVi ? 'Đã có mã PIN' : 'PIN is set')
+                      : (isVi ? 'Chưa có mã PIN' : 'No PIN yet')}
                   </Badge>
                 </div>
               </div>
@@ -571,6 +659,99 @@ export default function ProfilePage() {
                 {savingPassword ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {t('profile.security.change')}
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/80 bg-card shadow-sm">
+            <CardHeader>
+              <CardTitle>{isVi ? 'Mã PIN bảo mật' : 'Security PIN'}</CardTitle>
+              <CardDescription>
+                {isVi
+                  ? 'Mã PIN 6 số dùng khi quên mật khẩu hoặc xác nhận đổi email.'
+                  : 'Your 6-digit PIN is used for password reset and email change verification.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {profile?.has_pin ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="pin-current">{isVi ? 'Mã PIN hiện tại' : 'Current PIN'}</Label>
+                    <Input
+                      id="pin-current"
+                      value={pinCurrent}
+                      onChange={(e) => setPinCurrent(e.target.value)}
+                      maxLength={6}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder={isVi ? 'Nhập PIN hiện tại' : 'Enter current PIN'}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pin-new">{isVi ? 'Mã PIN mới' : 'New PIN'}</Label>
+                    <Input
+                      id="pin-new"
+                      value={pinNew}
+                      onChange={(e) => setPinNew(e.target.value)}
+                      maxLength={6}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder={isVi ? 'Nhập PIN mới 6 số' : 'Enter new 6-digit PIN'}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pin-confirm">{isVi ? 'Xác nhận mã PIN mới' : 'Confirm new PIN'}</Label>
+                    <Input
+                      id="pin-confirm"
+                      value={pinConfirm}
+                      onChange={(e) => setPinConfirm(e.target.value)}
+                      maxLength={6}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder={isVi ? 'Nhập lại PIN mới' : 'Re-enter new PIN'}
+                    />
+                  </div>
+                  <Button onClick={() => void changeAccountPin()} disabled={savingPin}>
+                    {savingPin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {isVi ? 'Đổi mã PIN' : 'Change PIN'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {isVi
+                      ? 'Bạn chưa có mã PIN. Thiết lập ngay để bảo vệ tài khoản khi đặt lại mật khẩu hoặc đổi email.'
+                      : 'You have not set a PIN yet. Set one to protect account recovery and email changes.'}
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="pin-init">{isVi ? 'Mã PIN 6 chữ số' : '6-digit PIN'}</Label>
+                    <Input
+                      id="pin-init"
+                      value={pinInitial}
+                      onChange={(e) => setPinInitial(e.target.value)}
+                      maxLength={6}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder={isVi ? 'Nhập PIN 6 số' : 'Enter 6-digit PIN'}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pin-init-confirm">{isVi ? 'Xác nhận mã PIN' : 'Confirm PIN'}</Label>
+                    <Input
+                      id="pin-init-confirm"
+                      value={pinInitialConfirm}
+                      onChange={(e) => setPinInitialConfirm(e.target.value)}
+                      maxLength={6}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder={isVi ? 'Nhập lại PIN 6 số' : 'Re-enter 6-digit PIN'}
+                    />
+                  </div>
+                  <Button onClick={() => void setInitialAccountPin()} disabled={savingPin}>
+                    {savingPin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {isVi ? 'Lưu mã PIN' : 'Save PIN'}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

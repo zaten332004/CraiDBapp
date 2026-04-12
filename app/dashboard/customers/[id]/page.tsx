@@ -57,6 +57,8 @@ export default function CustomerDetailPage() {
   }, [returnToParam]);
   const role = getUserRole();
   const canManageProfile = role !== 'viewer';
+  /** Duyệt / từ chối hồ sơ: manager & admin; analyst chỉ sửa & xóa. */
+  const canReviewCustomer = canManageProfile && role !== 'analyst';
   const [customer, setCustomer] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -284,7 +286,7 @@ export default function CustomerDetailPage() {
   };
 
   const handleReview = async (nextStatus: 'approved' | 'rejected', reason?: string) => {
-    if (!customer || !canManageProfile) return;
+    if (!customer || !canReviewCustomer) return;
     setIsSaving(true);
     try {
       const payload: Record<string, unknown> = { application_status: nextStatus };
@@ -356,7 +358,7 @@ export default function CustomerDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isPending && canManageProfile ? (
+          {isPending && canReviewCustomer ? (
             <>
               <Button variant="outline" onClick={handleOpenRejectDialog} disabled={isSaving}>
                 {isVi ? 'Từ chối' : 'Reject'}
