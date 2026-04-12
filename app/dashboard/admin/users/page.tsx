@@ -17,6 +17,7 @@ import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/forma
 import { ListPagination } from '@/components/list-pagination';
 import { downloadCsvFile } from '@/lib/export/csv';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { badgeTone } from '@/lib/dashboard-badge-tones';
 
 type LocalePin = 'vi' | 'en';
 
@@ -92,17 +93,15 @@ function normalizeUser(item: any): AdminUser | null {
 
 function getRoleBadgeClass(role: string) {
   const normalized = String(role || '').toLowerCase();
-  if (normalized === 'admin') return 'border-violet-300 bg-violet-50 text-violet-700';
-  if (normalized === 'manager') return 'border-sky-300 bg-sky-50 text-sky-700';
-  if (normalized === 'analyst') return 'border-indigo-300 bg-indigo-50 text-indigo-700';
-  if (normalized === 'viewer') return 'border-slate-300 bg-slate-50 text-slate-700';
-  return 'border-slate-300 bg-slate-50 text-slate-700';
+  if (normalized === 'admin') return badgeTone.violet;
+  if (normalized === 'manager') return badgeTone.sky;
+  if (normalized === 'analyst') return badgeTone.indigo;
+  if (normalized === 'viewer') return badgeTone.slate;
+  return badgeTone.slate;
 }
 
 function getStatusBadgeClass(isActive: boolean) {
-  return isActive
-    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-    : 'border-amber-300 bg-amber-50 text-amber-700';
+  return isActive ? badgeTone.emerald : badgeTone.amber;
 }
 
 export default function AdminUsersPage() {

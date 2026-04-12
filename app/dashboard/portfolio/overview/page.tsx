@@ -168,10 +168,16 @@ export default function PortfolioOverviewPage() {
               </LineChart>
             </ResponsiveContainer>
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700">
+              <Badge
+                variant="outline"
+                className="border-teal-300 bg-teal-50 text-teal-900 dark:border-teal-400/60 dark:bg-teal-500/32 dark:text-teal-50"
+              >
                 {t('portfolio.overview.chart_badge_portfolio_value')}
               </Badge>
-              <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">
+              <Badge
+                variant="outline"
+                className="border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-400/60 dark:bg-indigo-500/32 dark:text-indigo-50"
+              >
                 {t('portfolio.overview.chart_badge_avg_score')}
               </Badge>
             </div>

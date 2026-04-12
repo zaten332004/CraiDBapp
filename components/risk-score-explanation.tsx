@@ -81,11 +81,15 @@ export function riskExplanationFrameClass(level: string) {
 
 export function riskBadgeOutlineClass(level: string) {
   return cn(
-    'text-base px-4 py-2 font-semibold bg-background shadow-none',
-    level === 'low' && 'border-2 border-emerald-600 text-emerald-800 dark:text-emerald-200',
-    level === 'medium' && 'border-2 border-amber-500 text-amber-900 dark:text-amber-200',
-    level === 'high' && 'border-2 border-rose-600 text-rose-800 dark:text-rose-200',
-    !['low', 'medium', 'high'].includes(level) && 'border-2 border-muted-foreground text-foreground',
+    'text-base px-4 py-2 font-semibold shadow-none',
+    level === 'low' &&
+      'border-2 border-emerald-600 bg-emerald-50 text-emerald-900 dark:border-emerald-400/60 dark:bg-emerald-500/30 dark:text-emerald-50',
+    level === 'medium' &&
+      'border-2 border-amber-500 bg-amber-50 text-amber-950 dark:border-amber-400/65 dark:bg-amber-500/30 dark:text-amber-50',
+    level === 'high' &&
+      'border-2 border-rose-600 bg-rose-50 text-rose-900 dark:border-rose-400/60 dark:bg-rose-500/32 dark:text-rose-50',
+    !['low', 'medium', 'high'].includes(level) &&
+      'border-2 border-muted-foreground bg-background text-foreground dark:bg-zinc-600/35 dark:text-zinc-50',
   );
 }
 

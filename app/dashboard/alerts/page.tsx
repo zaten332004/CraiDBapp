@@ -36,6 +36,7 @@ import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/forma
 import { ListPagination } from '@/components/list-pagination';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
+import { badgeTone } from '@/lib/dashboard-badge-tones';
 
 const ALERTS_LIST_PATH = '/dashboard/alerts';
 
@@ -72,19 +73,19 @@ const getSeverityVariant = (severity: string): 'default' | 'destructive' | 'outl
 
 const getSeverityClass = (severity: string) => {
   const normalized = String(severity || '').toLowerCase();
-  if (normalized === 'critical') return 'border-rose-200 bg-rose-50 text-rose-700';
-  if (normalized === 'high') return 'border-amber-200 bg-amber-50 text-amber-700';
-  if (normalized === 'medium') return 'border-blue-200 bg-blue-50 text-blue-700';
-  if (normalized === 'low') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  return 'border-slate-200 bg-slate-50 text-slate-700';
+  if (normalized === 'critical') return badgeTone.rose;
+  if (normalized === 'high') return badgeTone.amber;
+  if (normalized === 'medium') return badgeTone.blue;
+  if (normalized === 'low') return badgeTone.emerald;
+  return badgeTone.slate;
 };
 
 const getStatusClass = (status: string) => {
   const normalized = String(status || '').toLowerCase();
-  if (normalized === 'open') return 'border-rose-200 bg-rose-50 text-rose-700';
-  if (normalized === 'resolved') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (normalized === 'pending') return 'border-slate-200 bg-slate-50 text-slate-700';
-  return 'border-slate-200 bg-slate-50 text-slate-700';
+  if (normalized === 'open') return badgeTone.rose;
+  if (normalized === 'resolved') return badgeTone.emerald;
+  if (normalized === 'pending') return badgeTone.slate;
+  return badgeTone.slate;
 };
 
 const normalizeAlertStatus = (input: unknown, isResolved?: boolean): 'open' | 'resolved' | 'pending' => {

@@ -17,6 +17,7 @@ import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/forma
 import { ListPagination } from '@/components/list-pagination';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { badgeTone } from '@/lib/dashboard-badge-tones';
 
 type RegistrationType = 'manager' | 'analyst';
 
@@ -74,9 +75,17 @@ function formatStatusLabel(value: unknown, locale: string) {
 }
 
 function statusBadgeClass(status: string) {
-  if (status === 'approved') return 'border-emerald-300 bg-emerald-50 text-emerald-700';
-  if (status === 'rejected') return 'border-red-300 bg-red-50 text-red-700';
-  return 'border-amber-300 bg-amber-50 text-amber-800';
+  if (status === 'approved') return badgeTone.emerald;
+  if (status === 'rejected') return badgeTone.rose;
+  return badgeTone.amber;
+}
+
+function registrationRoleBadgeClass(type: string) {
+  const n = String(type || '').toLowerCase();
+  if (n === 'admin') return badgeTone.violet;
+  if (n === 'manager') return badgeTone.sky;
+  if (n === 'analyst') return badgeTone.indigo;
+  return badgeTone.slate;
 }
 
 export default function AdminRegistrationsPage() {
@@ -331,7 +340,9 @@ export default function AdminRegistrationsPage() {
                       <TableCell className="py-1.5 text-[12px] font-medium">{reg.name}</TableCell>
                       <TableCell className="py-1.5 text-[12px]">{reg.email}</TableCell>
                       <TableCell className="py-1.5">
-                        <Badge variant="outline">{t(`role.${reg.type}`)}</Badge>
+                        <Badge variant="outline" className={registrationRoleBadgeClass(reg.type)}>
+                          {t(`role.${reg.type}`)}
+                        </Badge>
                       </TableCell>
                       <TableCell className="py-1.5 text-[12px] text-muted-foreground whitespace-nowrap">{reg.requestedAt || '—'}</TableCell>
                       <TableCell className="py-1.5 text-right">

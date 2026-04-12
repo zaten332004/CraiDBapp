@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Upload, CheckCircle, AlertCircle, File, Loader2 } from 'lucide-react';
+import { ArrowLeft, Upload, CheckCircle, AlertCircle, File, Loader2 } from 'lucide-react';
 import { authHeaders } from '@/lib/auth/token';
 import { getUserRole } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
@@ -40,6 +41,7 @@ function normalizeJobErrorRow(item: any) {
 }
 
 export default function UploadPage() {
+  const router = useRouter();
   const { t, locale } = useI18n();
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
@@ -342,7 +344,13 @@ export default function UploadPage() {
     <div className="flex flex-col gap-8 p-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('upload.title')}</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('upload.title')}</h1>
+          <Button type="button" variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            {t('upload.back')}
+          </Button>
+        </div>
         <p className="text-muted-foreground mt-2">
           {t('upload.desc')}
         </p>

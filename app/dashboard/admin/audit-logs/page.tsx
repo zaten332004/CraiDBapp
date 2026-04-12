@@ -15,6 +15,7 @@ import { Clock3, Download, Hash, Loader2, RefreshCw, ShieldCheck, User } from 'l
 import { ListPagination } from '@/components/list-pagination';
 import { downloadCsvFile } from '@/lib/export/csv';
 import { formatDateTimeVietnam, formatDateVietnam } from '@/lib/datetime';
+import { badgeTone } from '@/lib/dashboard-badge-tones';
 
 type AuditLogRow = {
   id: string;
@@ -396,78 +397,78 @@ function getActionBadgeClass(row: AuditLogRow): string {
   const normalized = String(row.action || '').toLowerCase().replace(/_/g, ' ');
 
   if (action === 'APPROVE_CUSTOMER' || normalized.includes('approve customer')) {
-    return '!border-emerald-300 !bg-emerald-50 !text-emerald-700';
+    return badgeTone.emerald;
   }
   if (action === 'REJECT_CUSTOMER' || (normalized.includes('reject') && normalized.includes('customer'))) {
-    return '!border-rose-300 !bg-rose-50 !text-rose-700';
+    return badgeTone.rose;
   }
   if (action === 'INSERT' && et === 'Customer') {
-    return '!border-teal-300 !bg-teal-50 !text-teal-800';
+    return badgeTone.teal;
   }
   if (action === 'UPDATE' && et === 'Customer') {
-    return '!border-indigo-300 !bg-indigo-50 !text-indigo-800';
+    return badgeTone.indigo;
   }
   if (action === 'DELETE' && et === 'Customer') {
-    return '!border-red-300 !bg-red-50 !text-red-800';
+    return badgeTone.red;
   }
   if (action === 'RESOLVE_ALERT' || normalized.includes('resolve alert')) {
-    return '!border-sky-300 !bg-sky-50 !text-sky-800';
+    return badgeTone.sky;
   }
   if (action === 'SET_PIN' || action === 'CHANGE_PIN' || action === 'ADMIN_SET_USER_PIN') {
-    return '!border-violet-300 !bg-violet-50 !text-violet-800';
+    return badgeTone.violet;
   }
   if (action === 'RESET_PASSWORD_WITH_PIN' || action === 'REQUEST_PASSWORD_RESET' || normalized.includes('reset password')) {
-    return '!border-amber-300 !bg-amber-50 !text-amber-900';
+    return badgeTone.amber;
   }
   if (action === 'CHANGE_EMAIL_WITH_PIN' || normalized.includes('request email change') || normalized.includes('change email')) {
-    return '!border-cyan-300 !bg-cyan-50 !text-cyan-800';
+    return badgeTone.cyan;
   }
   if (action === 'CHANGE_PASSWORD' || normalized.includes('change password')) {
-    return '!border-orange-300 !bg-orange-50 !text-orange-900';
+    return badgeTone.orange;
   }
   if (action === 'CREATE_USER' || normalized.includes('register user')) {
-    return '!border-lime-300 !bg-lime-50 !text-lime-900';
+    return badgeTone.lime;
   }
   if (action === 'DELETE_USER' || (normalized.includes('delete') && normalized.includes('user'))) {
-    return '!border-red-300 !bg-red-50 !text-red-800';
+    return badgeTone.red;
   }
   if (action === 'UPDATE_USER_ROLE') {
-    return '!border-blue-300 !bg-blue-50 !text-blue-800';
+    return badgeTone.blue;
   }
   if (action === 'UPDATE_USER_STATUS' || normalized.includes('update user') || normalized.includes('user status')) {
-    return '!border-amber-300 !bg-amber-50 !text-amber-900';
+    return badgeTone.amber;
   }
   if (action === 'UPDATE_PROFILE' || action === 'UPDATE_AVATAR' || normalized.includes('update profile') || normalized.includes('update avatar')) {
-    return '!border-indigo-200 !bg-indigo-50/80 !text-indigo-800';
+    return badgeTone.indigo;
   }
   if (action === 'IMPORT_CUSTOMERS_FAILED' || action === 'UPLOAD_FAILED' || normalized.includes('import customers failed') || normalized.includes('upload failed')) {
-    return '!border-rose-300 !bg-rose-50 !text-rose-700';
+    return badgeTone.rose;
   }
   if (action === 'IMPORT_CUSTOMERS' || normalized.includes('import customers')) {
-    return '!border-blue-300 !bg-blue-50 !text-blue-700';
+    return badgeTone.blue;
   }
   if (normalized.includes('verify email') || normalized.includes('resend verification email')) {
-    return '!border-purple-300 !bg-purple-50 !text-purple-800';
+    return badgeTone.purple;
   }
   if (action === 'APPROVE_REGISTRATION' || normalized.includes('approve registration') || normalized.includes('approve user')) {
-    return '!border-emerald-300 !bg-emerald-50 !text-emerald-700';
+    return badgeTone.emerald;
   }
   if (action === 'REJECT_REGISTRATION' || normalized.includes('reject registration') || normalized.includes('reject user')) {
-    return '!border-rose-300 !bg-rose-50 !text-rose-700';
+    return badgeTone.rose;
   }
   if (normalized.includes('reject')) {
-    return '!border-rose-300 !bg-rose-50 !text-rose-700';
+    return badgeTone.rose;
   }
   if (normalized.includes('delete')) {
-    return '!border-red-300 !bg-red-50 !text-red-700';
+    return badgeTone.red;
   }
   if (normalized.includes('update')) {
-    return '!border-indigo-300 !bg-indigo-50 !text-indigo-700';
+    return badgeTone.indigo;
   }
   if (normalized.includes('insert') || normalized.includes('create')) {
-    return '!border-emerald-300 !bg-emerald-50 !text-emerald-700';
+    return badgeTone.emerald;
   }
-  return '!border-slate-200 !bg-slate-50 !text-slate-700';
+  return badgeTone.slate;
 }
 
 function parseAuditPayload(value: unknown): Record<string, any> {

@@ -357,6 +357,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "risk.level.high": "Rủi ro cao",
 
     "upload.title": "Tải dữ liệu",
+    "upload.back": "Quay về",
     "upload.desc": "Tải dữ liệu khách hàng và danh mục để cập nhật hồ sơ",
     "upload.viewer_notice_prefix": "Bạn đang đăng nhập với vai trò",
     "upload.viewer_notice_suffix": "Tính năng tải lên bị tắt (chỉ xem).",
@@ -1482,6 +1483,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "risk.level.high": "High Risk",
 
     "upload.title": "Data Upload",
+    "upload.back": "Go back",
     "upload.desc": "Upload customer and portfolio data to update your records",
     "upload.viewer_notice_prefix": "You are signed in as",
     "upload.viewer_notice_suffix": "Upload is disabled (read-only).",

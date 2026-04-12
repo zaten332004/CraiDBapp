@@ -17,6 +17,7 @@ import { notifyError, notifySuccess } from '@/lib/notify';
 import { CRAIDB_PROFILE_CHANGED_EVENT } from '@/lib/profile-sync-event';
 import { getAccessToken, setSession, setUserHasPin } from '@/lib/auth/token';
 import { isNumericPin, isStrongPassword, isValidEmail, isValidVietnamPhone, passwordRuleMessage } from '@/lib/validation/account';
+import { badgeTone } from '@/lib/dashboard-badge-tones';
 
 type ProfileMe = {
   user_id: number;
@@ -479,17 +480,10 @@ export default function ProfilePage() {
                 <p className="text-xl font-semibold truncate">{displayName}</p>
                 <p className="text-sm text-muted-foreground truncate">{profile?.email}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">
+                  <Badge variant="outline" className={badgeTone.emerald}>
                     {profile?.status?.toLowerCase() === 'inactive' ? (isVi ? 'Ngừng hoạt động' : 'Inactive') : (isVi ? 'Hoạt động' : 'Active')}
                   </Badge>
-                  <Badge
-                    variant="outline"
-                    className={
-                      profile?.has_pin
-                        ? 'border-sky-300 bg-sky-50 text-sky-700'
-                        : 'border-amber-300 bg-amber-50 text-amber-800'
-                    }
-                  >
+                  <Badge variant="outline" className={profile?.has_pin ? badgeTone.sky : badgeTone.amber}>
                     {profile?.has_pin
                       ? (isVi ? 'Đã có mã PIN' : 'PIN is set')
                       : (isVi ? 'Chưa có mã PIN' : 'No PIN yet')}

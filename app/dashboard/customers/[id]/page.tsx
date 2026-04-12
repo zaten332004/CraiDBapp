@@ -28,6 +28,7 @@ import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/forma
 import { formatDateTimeVietnam } from '@/lib/datetime';
 import { formatVnd } from '@/lib/money';
 import { getUserRole } from '@/lib/auth/token';
+import { badgeTone } from '@/lib/dashboard-badge-tones';
 
 function sanitizeDashboardReturnTo(raw: string | null): string | null {
   if (!raw) return null;
@@ -156,10 +157,10 @@ export default function CustomerDetailPage() {
 
   const riskBadgeClass = useMemo(() => {
     const level = String(customer?.risk_level || '').toLowerCase();
-    if (level === 'high') return 'border-rose-200 bg-rose-50 text-rose-700';
-    if (level === 'medium') return 'border-blue-200 bg-blue-50 text-blue-700';
-    if (level === 'low') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-    return 'border-slate-200 bg-slate-50 text-slate-700';
+    if (level === 'high') return badgeTone.rose;
+    if (level === 'medium') return badgeTone.blue;
+    if (level === 'low') return badgeTone.emerald;
+    return badgeTone.slate;
   }, [customer?.risk_level]);
 
   const riskBadgeLabel = useMemo(() => {
@@ -172,11 +173,11 @@ export default function CustomerDetailPage() {
 
   const statusBadgeClass = useMemo(() => {
     const status = String(customer?.application_status || '').toLowerCase();
-    if (status === 'disbursed') return 'border-blue-200 bg-blue-50 text-blue-700';
-    if (status === 'approved') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-    if (status === 'rejected') return 'border-rose-200 bg-rose-50 text-rose-700';
-    if (status === 'pending') return 'border-slate-200 bg-slate-50 text-slate-700';
-    return 'border-slate-200 bg-slate-50 text-slate-700';
+    if (status === 'disbursed') return badgeTone.sky;
+    if (status === 'approved') return badgeTone.emerald;
+    if (status === 'rejected') return badgeTone.rose;
+    if (status === 'pending') return badgeTone.slate;
+    return badgeTone.slate;
   }, [customer?.application_status]);
 
   const statusBadgeLabel = useMemo(() => {

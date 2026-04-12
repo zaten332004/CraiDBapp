@@ -4,17 +4,13 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, BarChart3, MessageSquare, Layers } from "lucide-react";
 import { useI18n } from "@/components/i18n-provider";
 import { CRAIDB_SET_DEMO_TAB_EVENT } from "@/lib/home-events";
-
-function scrollToSection(elementId: string) {
-  if (typeof document === "undefined") return;
-  document.getElementById(elementId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
+import { scrollToSectionWithSlide } from "@/lib/scroll-section-cta";
 
 function setDemoTabThenScroll(tab: "dashboard" | "chatbot") {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(CRAIDB_SET_DEMO_TAB_EVENT, { detail: { tab } }));
   }
-  scrollToSection("demo");
+  scrollToSectionWithSlide("demo");
 }
 
 export function HeroSection() {
@@ -55,7 +51,7 @@ export function HeroSection() {
               type="button"
               size="lg"
               className="gap-2 w-full sm:w-auto"
-              onClick={() => scrollToSection("architecture")}
+              onClick={() => scrollToSectionWithSlide("architecture")}
             >
               {t("home.hero.cta.arch")}
               <ArrowRight className="w-4 h-4" />

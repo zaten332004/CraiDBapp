@@ -33,16 +33,14 @@ import { ListPagination } from '@/components/list-pagination';
 import { getAccessToken } from '@/lib/auth/token';
 import { formatVnd } from '@/lib/money';
 import { CRAIDB_UPLOAD_COMPLETED_EVENT } from '@/lib/profile-sync-event';
+import { badgeTone } from '@/lib/dashboard-badge-tones';
 
 function getRiskBadgeClass(level: string) {
   const normalized = String(level || '').toLowerCase();
-  if (normalized === 'low')
-    return 'border-emerald-200/90 bg-emerald-50 text-emerald-800 dark:border-emerald-600/50 dark:bg-emerald-950/55 dark:text-emerald-200';
-  if (normalized === 'medium')
-    return 'border-blue-200/90 bg-blue-50 text-blue-800 dark:border-blue-600/50 dark:bg-blue-950/55 dark:text-blue-200';
-  if (normalized === 'high')
-    return 'border-rose-200/90 bg-rose-50 text-rose-800 dark:border-rose-600/50 dark:bg-rose-950/55 dark:text-rose-200';
-  return 'border-slate-200/90 bg-slate-50 text-slate-800 dark:border-slate-500/50 dark:bg-slate-900/60 dark:text-slate-200';
+  if (normalized === 'low') return badgeTone.emerald;
+  if (normalized === 'medium') return badgeTone.blue;
+  if (normalized === 'high') return badgeTone.rose;
+  return badgeTone.slate;
 }
 
 function normalizeStatusKey(status: string) {
@@ -57,17 +55,12 @@ function normalizeStatusKey(status: string) {
 
 function getStatusBadgeClass(status: string) {
   const normalized = String(status || '').toLowerCase();
-  if (normalized === 'approved')
-    return 'border-emerald-200/90 bg-emerald-50 text-emerald-800 dark:border-emerald-600/50 dark:bg-emerald-950/55 dark:text-emerald-200';
-  if (normalized === 'rejected')
-    return 'border-rose-200/90 bg-rose-50 text-rose-800 dark:border-rose-600/50 dark:bg-rose-950/55 dark:text-rose-200';
-  if (normalized === 'pending')
-    return 'border-slate-200/90 bg-slate-50 text-slate-800 dark:border-slate-500/50 dark:bg-slate-900/60 dark:text-slate-200';
-  if (normalized === 'active')
-    return 'border-emerald-200/90 bg-emerald-50 text-emerald-800 dark:border-emerald-600/50 dark:bg-emerald-950/55 dark:text-emerald-200';
-  if (normalized === 'inactive')
-    return 'border-slate-200/90 bg-slate-50 text-slate-800 dark:border-slate-500/50 dark:bg-slate-900/60 dark:text-slate-200';
-  return 'border-slate-200/90 bg-slate-50 text-slate-800 dark:border-slate-500/50 dark:bg-slate-900/60 dark:text-slate-200';
+  if (normalized === 'approved') return badgeTone.emerald;
+  if (normalized === 'rejected') return badgeTone.rose;
+  if (normalized === 'pending') return badgeTone.slate;
+  if (normalized === 'active') return badgeTone.emerald;
+  if (normalized === 'inactive') return badgeTone.slate;
+  return badgeTone.slate;
 }
 
 /** Backend có thể trả `items`, `customers`, `data` hoặc `results`. */

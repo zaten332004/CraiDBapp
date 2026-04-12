@@ -51,49 +51,49 @@
 
 .dark {
   /*
-   * Soft-dark / “charcoal–teal” (Discord-adjacent): no pure black, cool organic tint.
-   * Nền chìm nhẹ, chữ off-white, phụ trợ xám lạnh — đọc bảng & chat lâu dễ chịu hơn.
+   * Discord-style charcoal (reference ~#2B2D31): một nền xám đậm, không đen tuyệt đối.
+   * Chữ chính #F2F3F5, phụ #949BA4, icon/muted #80848E — áp dụng thống nhất body, card, sidebar.
    */
-  --background: #101816;
-  --foreground: #e8ecea;
-  --card: #161f1d;
-  --card-foreground: #e8ecea;
-  --popover: #1b2523;
-  --popover-foreground: #e8ecea;
-  --primary: #a8c9c4;
-  --primary-foreground: #0a1110;
-  --secondary: #1f2926;
-  --secondary-foreground: #e4e9e7;
-  --muted: #252f2d;
-  --muted-foreground: #a7b5b1;
-  --accent: #8fb8b0;
-  --accent-foreground: #071010;
-  --destructive: #d48992;
-  --destructive-foreground: #1c1214;
-  --border: #2d3a37;
-  --input: #1c2624;
-  --ring: color-mix(in srgb, #8fb8b0, transparent 42%);
-  --chart-1: #8fb8b0;
-  --chart-2: #a8c9c4;
-  --chart-3: #7aa8cf;
-  --chart-4: #b8c9c2;
-  --chart-5: #7d8f8a;
-  --sidebar: #0d1412;
-  --sidebar-foreground: #e4e9e7;
-  --sidebar-primary: #a8c9c4;
-  --sidebar-primary-foreground: #0a1110;
-  --sidebar-accent: #1c2624;
-  --sidebar-accent-foreground: #e8ecea;
-  --sidebar-border: #2a3633;
-  --sidebar-ring: color-mix(in srgb, #8fb8b0, transparent 40%);
+  --background: #2b2d31;
+  --foreground: #f2f3f5;
+  --card: #313338;
+  --card-foreground: #f2f3f5;
+  --popover: #35373c;
+  --popover-foreground: #f2f3f5;
+  --primary: #6d9ed6;
+  --primary-foreground: #111214;
+  --secondary: #3f4248;
+  --secondary-foreground: #f2f3f5;
+  --muted: #3f4248;
+  --muted-foreground: #949ba4;
+  --accent: #404249;
+  --accent-foreground: #f2f3f5;
+  --destructive: #f38b8f;
+  --destructive-foreground: #1e1516;
+  --border: #3f4147;
+  --input: #1e1f22;
+  --ring: color-mix(in srgb, #6d9ed6, transparent 45%);
+  --chart-1: #6d9ed6;
+  --chart-2: #9bb4d6;
+  --chart-3: #7eb8d6;
+  --chart-4: #b8c2d6;
+  --chart-5: #80848e;
+  --sidebar: #2b2d31;
+  --sidebar-foreground: #f2f3f5;
+  --sidebar-primary: #6d9ed6;
+  --sidebar-primary-foreground: #111214;
+  --sidebar-accent: #35373c;
+  --sidebar-accent-foreground: #f2f3f5;
+  --sidebar-border: #3f4147;
+  --sidebar-ring: color-mix(in srgb, #6d9ed6, transparent 42%);
   --app-bg: radial-gradient(
-      1200px 600px at 12% 0%,
-      rgba(110, 150, 138, 0.07),
+      1200px 600px at 15% 0%,
+      rgba(255, 255, 255, 0.03),
       transparent 58%
     ),
     radial-gradient(
-      900px 520px at 88% 18%,
-      rgba(80, 118, 112, 0.06),
+      900px 520px at 85% 20%,
+      rgba(255, 255, 255, 0.025),
       transparent 55%
     );
 }
@@ -335,7 +335,28 @@
   animation: scroll-target-flash 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+/* Hero / CTA: section settles with a short slide-down after smooth scroll */
+@keyframes cta-section-slide-down {
+  from {
+    opacity: 0.7;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cta-section-slide {
+  animation: cta-section-slide-down 0.58s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .cta-section-slide {
+    animation: none;
+    will-change: auto;
+  }
   .page-transition {
     animation: none;
   }
