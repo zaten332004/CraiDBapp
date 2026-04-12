@@ -44,9 +44,7 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [emailCode, setEmailCode] = useState('');
-  const [pendingEmail, setPendingEmail] = useState('');
-  const [expiresInSeconds, setExpiresInSeconds] = useState<number | null>(null);
+  const [emailPin, setEmailPin] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [pinCurrent, setPinCurrent] = useState('');
@@ -55,8 +53,7 @@ export default function ProfilePage() {
   const [pinInitial, setPinInitial] = useState('');
   const [pinInitialConfirm, setPinInitialConfirm] = useState('');
   const [savingPin, setSavingPin] = useState(false);
-  const [sendingEmailCode, setSendingEmailCode] = useState(false);
-  const [confirmingEmailCode, setConfirmingEmailCode] = useState(false);
+  const [changingEmailWithPin, setChangingEmailWithPin] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const [cropPreviewUrl, setCropPreviewUrl] = useState('');
@@ -163,64 +160,55 @@ export default function ProfilePage() {
     }
   };
 
-  const requestEmailChange = async () => {
-    if (!newEmail.trim()) return;
+  const changeEmailWithPin = async () => {
+    const trimmed = newEmail.trim();
+    if (!trimmed) return;
     const currentEmail = (profile?.email ?? '').trim().toLowerCase();
-    if (newEmail.trim().toLowerCase() === currentEmail) {
+    if (trimmed.toLowerCase() === currentEmail) {
       const msg = isVi
         ? 'Email mới không được trùng với email hiện tại.'
         : 'New email must be different from the current email.';
-      notifyError(isVi ? 'Không thể gửi mã xác minh.' : 'Failed to send verification code.', msg);
+      notifyError(isVi ? 'Không thể đổi email.' : 'Could not change email.', msg);
       return;
     }
-    if (!isValidEmail(newEmail)) {
+    if (!isValidEmail(trimmed)) {
       const msg = isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.';
-      notifyError(isVi ? 'Không thể gửi mã xác minh.' : 'Failed to send verification code.', msg);
+      notifyError(isVi ? 'Không thể đổi email.' : 'Could not change email.', msg);
       return;
     }
-    setSendingEmailCode(true);
-    try {
-      const res = await browserApiFetchAuth<{ message: string; pending_email: string; expires_in_seconds: number }>(
-        '/profile/change-email/request',
-        {
-          method: 'POST',
-          body: { new_email: newEmail.trim() },
-        },
-      );
-      setPendingEmail(res.pending_email);
-      setExpiresInSeconds(res.expires_in_seconds);
-      notifySuccess(isVi ? 'Đã gửi mã xác minh tới email mới.' : 'Verification code sent to new email.');
-    } catch (err) {
-      const msg = apiErr(err);
-      notifyError(isVi ? 'Không thể gửi mã xác minh.' : 'Failed to send verification code.', msg);
-    } finally {
-      setSendingEmailCode(false);
+    if (!profile?.has_pin) {
+      const msg = isVi
+        ? 'Vui lòng thiết lập mã PIN ở tab Bảo mật trước khi đổi email.'
+        : 'Please set a security PIN in the Security tab before changing your email.';
+      notifyError(isVi ? 'Không thể đổi email.' : 'Could not change email.', msg);
+      return;
     }
-  };
-
-  const confirmEmailChange = async () => {
-    if (!emailCode.trim()) return;
-    setConfirmingEmailCode(true);
+    if (!isNumericPin(emailPin, 6)) {
+      const msg = isVi ? 'Mã PIN phải gồm đúng 6 chữ số.' : 'PIN must be exactly 6 digits.';
+      notifyError(isVi ? 'Không thể đổi email.' : 'Could not change email.', msg);
+      return;
+    }
+    setChangingEmailWithPin(true);
     try {
       const res = await browserApiFetchAuth<{ message: string; email: string; access_token: string; role: string }>(
-        '/profile/change-email/confirm',
+        '/profile/change-email/pin',
         {
           method: 'POST',
-          body: { code: emailCode.trim() },
+          body: { new_email: trimmed, pin: emailPin.trim() },
         },
       );
       setSession({ accessToken: res.access_token, role: res.role });
+      setUserHasPin(true);
       setProfile((prev) => (prev ? { ...prev, email: res.email } : prev));
       setNewEmail('');
-      setEmailCode('');
-      setPendingEmail('');
-      setExpiresInSeconds(null);
+      setEmailPin('');
+      window.dispatchEvent(new Event(CRAIDB_PROFILE_CHANGED_EVENT));
       notifySuccess(isVi ? 'Cập nhật email thành công.' : 'Email updated successfully.');
     } catch (err) {
       const msg = apiErr(err);
-      notifyError(isVi ? 'Xác minh mã thất bại.' : 'Failed to verify code.', msg);
+      notifyError(isVi ? 'Đổi email thất bại.' : 'Failed to change email.', msg);
     } finally {
-      setConfirmingEmailCode(false);
+      setChangingEmailWithPin(false);
     }
   };
 
@@ -579,6 +567,11 @@ export default function ProfilePage() {
           <Card className="border-border/80 bg-card shadow-sm">
             <CardHeader>
               <CardTitle>{isVi ? 'Đổi email' : 'Change email'}</CardTitle>
+              <CardDescription>
+                {isVi
+                  ? 'Nhập email mới và mã PIN 6 số của bạn để xác nhận. Không gửi mã qua email.'
+                  : 'Enter your new email and your 6-digit security PIN to confirm. No code is sent by email.'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -597,34 +590,35 @@ export default function ProfilePage() {
                   placeholder={t('profile.new_email_ph')}
                 />
               </div>
-              <Button onClick={requestEmailChange} disabled={sendingEmailCode || !newEmail.trim()}>
-                {sendingEmailCode ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {isVi ? 'Gửi mã xác minh' : 'Send verification code'}
-              </Button>
-
-              {pendingEmail ? (
-                <div className="rounded-lg border p-3 space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {isVi ? 'Mã đã gửi tới:' : 'Code sent to:'} <span className="font-medium text-foreground">{pendingEmail}</span>
-                    {expiresInSeconds ? ` (${isVi ? 'hết hạn sau' : 'expires in'} ${Math.max(1, Math.floor(expiresInSeconds / 60))} ${isVi ? 'phút' : 'minutes'})` : ''}
-                  </p>
-                  <div className="space-y-2">
-                    <Label htmlFor="email-code" required>
-                      {isVi ? 'Mã xác minh' : 'Verification code'}
-                    </Label>
-                    <Input
-                      id="email-code"
-                      value={emailCode}
-                      onChange={(e) => setEmailCode(e.target.value)}
-                      placeholder={t('profile.verify_code_ph')}
-                    />
-                  </div>
-                  <Button onClick={confirmEmailChange} disabled={confirmingEmailCode || !emailCode.trim()}>
-                    {confirmingEmailCode ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {isVi ? 'Xác nhận đổi email' : 'Confirm email change'}
-                  </Button>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="email-pin" required>
+                  {isVi ? 'Mã PIN (6 chữ số)' : 'Security PIN (6 digits)'}
+                </Label>
+                <Input
+                  id="email-pin"
+                  value={emailPin}
+                  onChange={(e) => setEmailPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  maxLength={6}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder={isVi ? 'Nhập mã PIN' : 'Enter your PIN'}
+                  disabled={!profile?.has_pin}
+                />
+              </div>
+              {!profile?.has_pin ? (
+                <p className="text-sm text-muted-foreground">
+                  {isVi
+                    ? 'Bạn cần thiết lập mã PIN ở tab Bảo mật trước khi có thể đổi email.'
+                    : 'Set a security PIN in the Security tab before you can change your email.'}
+                </p>
               ) : null}
+              <Button
+                onClick={() => void changeEmailWithPin()}
+                disabled={changingEmailWithPin || !newEmail.trim() || emailPin.length !== 6 || !profile?.has_pin}
+              >
+                {changingEmailWithPin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isVi ? 'Xác nhận đổi email' : 'Confirm email change'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
