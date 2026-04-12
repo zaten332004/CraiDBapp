@@ -55,7 +55,14 @@ type PowerBiSchemaResponse = {
   ok?: boolean;
   tables?: string[];
   table_list_source?: string;
-  schemas?: Array<{ name: string; columns: string[]; sample_rows?: unknown[] }>;
+  schema_row_sample_max?: number;
+  schemas?: Array<{
+    name: string;
+    columns: string[];
+    sample_rows?: unknown[];
+    row_count?: number | null;
+    column_count?: number | null;
+  }>;
   errors?: Record<string, string>;
   message?: string;
   requires_table_hints?: boolean;
@@ -555,16 +562,36 @@ export default function PowerBIConfigPage() {
                 const err = p.errors?.[sch.name];
                 const cols = Array.isArray(sch.columns) ? sch.columns : [];
                 const samples = Array.isArray(sch.sample_rows) ? sch.sample_rows.length : 0;
+                const colNum =
+                  typeof sch.column_count === 'number' && sch.column_count >= 0
+                    ? sch.column_count
+                    : cols.length;
+                const rowTotal = typeof sch.row_count === 'number' && sch.row_count >= 0 ? sch.row_count : null;
+                const sampleCap =
+                  typeof p.schema_row_sample_max === 'number' && p.schema_row_sample_max > 0
+                    ? p.schema_row_sample_max
+                    : null;
+                const namesJoined = cols.join(', ');
+                const namesPreview =
+                  namesJoined.length > 200 ? `${namesJoined.slice(0, 200).trimEnd()}…` : namesJoined;
                 return (
                   <div key={sch.name} className="rounded-md border border-border bg-background/80 p-2.5 text-sm">
                     <p className="font-mono font-semibold text-foreground">{sch.name}</p>
                     <p className="mt-1 break-words text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">{t('powerbi.table_data_columns_label')}:</span>{' '}
-                      {cols.length ? cols.join(', ') : '—'}
+                      <span className="font-medium text-foreground">{t('powerbi.table_data_column_count_label')}:</span>{' '}
+                      {colNum > 0 ? colNum : '—'}
+                    </p>
+                    {namesPreview ? (
+                      <p className="mt-0.5 break-words font-mono text-[11px] text-muted-foreground/90">{namesPreview}</p>
+                    ) : null}
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{t('powerbi.table_data_total_rows')}:</span>{' '}
+                      {rowTotal != null ? rowTotal.toLocaleString() : '—'}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       <span className="font-medium text-foreground">{t('powerbi.table_data_sample_count')}:</span>{' '}
-                      {samples}
+                      {samples.toLocaleString()}
+                      {sampleCap != null ? ` (${t('powerbi.table_data_sample_cap_suffix')}${sampleCap.toLocaleString()})` : ''}
                     </p>
                     {err ? (
                       <p className="mt-1 break-words text-xs text-destructive">
