@@ -1,55 +1,7 @@
 "use client";
 
-import { Server, BarChart3, Monitor, Sparkles, Cloud, Shield } from "lucide-react";
 import { useI18n } from "@/components/i18n-provider";
-
-const technologies = [
-  {
-    categoryKey: "home.tech.cat.backend",
-    icon: Server,
-    items: [
-      "FastAPI",
-      "Uvicorn",
-      "Pydantic",
-      "SQLAlchemy",
-      "PyMySQL",
-      "pandas",
-      "scikit-learn",
-      "NumPy",
-    ],
-    descriptionKey: "home.tech.cat.backend_desc",
-  },
-  {
-    categoryKey: "home.tech.cat.dashboard",
-    icon: BarChart3,
-    items: ["Power BI REST API", "DAX", "Service Principal", "Semantic model"],
-    descriptionKey: "home.tech.cat.dashboard_desc",
-  },
-  {
-    categoryKey: "home.tech.cat.frontend",
-    icon: Monitor,
-    items: ["Next.js", "React", "TypeScript", "Tailwind CSS", "shadcn/ui"],
-    descriptionKey: "home.tech.cat.frontend_desc",
-  },
-  {
-    categoryKey: "home.tech.cat.chatbot",
-    icon: Sparkles,
-    items: ["Google Gemini", "google-genai", "REST / JSON", "Power BI context"],
-    descriptionKey: "home.tech.cat.chatbot_desc",
-  },
-  {
-    categoryKey: "home.tech.cat.cloud",
-    icon: Cloud,
-    items: ["boto3 (AWS SDK)", "HTTPX", "pytest"],
-    descriptionKey: "home.tech.cat.cloud_desc",
-  },
-  {
-    categoryKey: "home.tech.cat.security",
-    icon: Shield,
-    items: ["JWT (python-jose)", "bcrypt", "OAuth (Google)", "Audit logs", "RBAC"],
-    descriptionKey: "home.tech.cat.security_desc",
-  },
-];
+import { technologyCategories } from "@/lib/landing-tech-stack";
 
 export function TechnologySection() {
   const { t } = useI18n();
@@ -67,7 +19,7 @@ export function TechnologySection() {
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {technologies.map((tech) => (
+          {technologyCategories.map((tech) => (
             <div
               key={tech.categoryKey}
               className="p-6 rounded-xl bg-secondary border border-border hover:border-accent/30 transition-all duration-300"

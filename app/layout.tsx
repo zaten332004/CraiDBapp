@@ -26,12 +26,13 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   const cookieStore = await cookies()
-  const initialLocale = normalizeLocale(cookieStore.get('locale')?.value) ?? 'vi'
+  /* Chưa có cookie locale = lần đầu (hoặc đã xóa cookie) → luôn EN; lần sau theo cookie đã lưu. */
+  const initialLocale = normalizeLocale(cookieStore.get('locale')?.value) ?? 'en'
 
   return (
     <html lang={initialLocale} suppressHydrationWarning>
       <body className={`font-sans antialiased`} suppressHydrationWarning>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <I18nProvider initialLocale={initialLocale}>
             <RouteTransitionListener />
             <SessionActivityTracker />

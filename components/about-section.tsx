@@ -67,8 +67,8 @@ export function AboutSection() {
                   <p className="text-sm text-muted-foreground">{t("home.about.hl.shap")}</p>
                 </div>
                 <div className="text-center p-4 rounded-lg bg-secondary">
-                  <p className="text-3xl font-bold text-accent mb-1">AWS</p>
-                  <p className="text-sm text-muted-foreground">{t("home.about.hl.aws")}</p>
+                  <p className="text-3xl font-bold text-accent mb-1">{t("home.about.hl.cloud_brand")}</p>
+                  <p className="text-sm text-muted-foreground">{t("home.about.hl.cloud_tagline")}</p>
                 </div>
               </div>
             </div>

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, ListChecks, RefreshCw, Trash2, Unplug, PlugZap } from 'lucide-react';
+import { ExternalLink, Loader2, ListChecks, RefreshCw, Trash2, Unplug, PlugZap } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { useI18n } from '@/components/i18n-provider';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
@@ -864,6 +864,17 @@ export default function PowerBIConfigPage() {
               <section className="rounded-lg border border-amber-200/90 bg-amber-50/70 p-3 dark:border-amber-900/60 dark:bg-amber-950/25">
                 <p className="font-medium text-foreground">{t('powerbi.hints_prereq_label')}</p>
                 <p className="mt-2 whitespace-pre-line text-[13px] leading-relaxed">{t('powerbi.hints_prereq_body')}</p>
+                <p className="mt-2 text-[13px]">
+                  <a
+                    href="https://app.powerbi.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-primary underline underline-offset-2 hover:opacity-90"
+                  >
+                    {t('powerbi.hints_prereq_powerbi_service_link')}
+                    <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                  </a>
+                </p>
               </section>
               <section className="rounded-lg border border-border bg-muted/40 p-3">
                 <p className="font-medium text-foreground">{t('powerbi.hints_sp_label')}</p>
@@ -886,9 +897,10 @@ export default function PowerBIConfigPage() {
                     href="https://entra.microsoft.com/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-medium text-primary underline underline-offset-2"
+                    className="inline-flex items-center gap-1 font-medium text-primary underline underline-offset-2"
                   >
                     {t('powerbi.hints_tenant_link')}
+                    <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
                   </a>
                   {t('powerbi.hints_tenant_after')}
                 </p>

@@ -3,6 +3,19 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, BarChart3, MessageSquare, Layers } from "lucide-react";
 import { useI18n } from "@/components/i18n-provider";
+import { CRAIDB_SET_DEMO_TAB_EVENT } from "@/lib/home-events";
+
+function scrollToSection(elementId: string) {
+  if (typeof document === "undefined") return;
+  document.getElementById(elementId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function setDemoTabThenScroll(tab: "dashboard" | "chatbot") {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(CRAIDB_SET_DEMO_TAB_EVENT, { detail: { tab } }));
+  }
+  scrollToSection("demo");
+}
 
 export function HeroSection() {
   const { t } = useI18n();
@@ -10,8 +23,8 @@ export function HeroSection() {
     <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
       {/* Background gradient effect */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-accent/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-accent/10 rounded-full blur-[100px]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-primary/6 rounded-full blur-[100px]" />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
@@ -38,15 +51,32 @@ export function HeroSection() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <Button size="lg" className="gap-2 w-full sm:w-auto">
+            <Button
+              type="button"
+              size="lg"
+              className="gap-2 w-full sm:w-auto"
+              onClick={() => scrollToSection("architecture")}
+            >
               {t("home.hero.cta.arch")}
               <ArrowRight className="w-4 h-4" />
             </Button>
-            <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto bg-transparent">
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              className="gap-2 w-full sm:w-auto bg-transparent"
+              onClick={() => setDemoTabThenScroll("dashboard")}
+            >
               <Play className="w-4 h-4" />
               {t("home.hero.cta.dashboard")}
             </Button>
-            <Button size="lg" variant="ghost" className="gap-2 w-full sm:w-auto">
+            <Button
+              type="button"
+              size="lg"
+              variant="ghost"
+              className="gap-2 w-full sm:w-auto"
+              onClick={() => setDemoTabThenScroll("chatbot")}
+            >
               {t("home.hero.cta.chatbot")}
             </Button>
           </div>

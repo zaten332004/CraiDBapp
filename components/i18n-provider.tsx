@@ -15,7 +15,7 @@ type I18nContextValue = {
 const I18nContext = React.createContext<I18nContextValue | null>(null);
 
 function getDictionary(locale: Locale): Dictionary {
-  return dictionaries[locale] ?? dictionaries.vi;
+  return dictionaries[locale] ?? dictionaries.en;
 }
 
 export function I18nProvider({

@@ -1,4 +1,4 @@
-import { UserCheck, TrendingUp, Search, GraduationCap } from "lucide-react";
+import { UserCheck, TrendingUp, Search } from "lucide-react";
 import { useI18n } from "@/components/i18n-provider";
 
 const useCases = [
@@ -41,19 +41,6 @@ const useCases = [
       en: ["Transparent insights", "Regulatory compliance", "Stakeholder reports"],
     },
   },
-  {
-    icon: GraduationCap,
-    title: { vi: "Sinh viên & nhà nghiên cứu", en: "Students & Researchers" },
-    subtitle: { vi: "Học rủi ro tín dụng", en: "Learning Credit Risk" },
-    description: {
-      vi: "Nền tảng thực hành học phân tích rủi ro tín dụng, mô hình ML và AI giải thích trong bối cảnh thực tế.",
-      en: "Hands-on platform for learning credit risk analytics, ML modeling, and explainable AI in a real-world context.",
-    },
-    benefits: {
-      vi: ["Trải nghiệm thực tế", "Kỹ năng sát ngành", "Ứng dụng nghiên cứu"],
-      en: ["Practical experience", "Industry-relevant skills", "Research applications"],
-    },
-  },
 ];
 
 export function UseCasesSection() {
@@ -71,21 +58,21 @@ export function UseCasesSection() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-3">
           {useCases.map((useCase) => (
             <div
               key={useCase.title.en}
-              className="p-6 rounded-xl bg-secondary border border-border hover:border-accent/30 transition-all duration-300"
+              className="flex h-full flex-col p-6 rounded-xl bg-secondary border border-border hover:border-accent/30 transition-all duration-300"
             >
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
                   <useCase.icon className="w-6 h-6 text-accent" />
                 </div>
-                <div className="flex-1">
+                <div className="flex min-h-0 flex-1 flex-col">
                   <h3 className="text-lg font-semibold text-foreground">{useCase.title[locale]}</h3>
                   <p className="text-sm text-accent mb-2">{useCase.subtitle[locale]}</p>
-                  <p className="text-sm text-muted-foreground mb-4">{useCase.description[locale]}</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="text-sm text-muted-foreground mb-4 flex-1">{useCase.description[locale]}</p>
+                  <div className="mt-auto flex flex-wrap gap-2">
                     {useCase.benefits[locale].map((benefit) => (
                       <span
                         key={benefit}

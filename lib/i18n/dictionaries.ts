@@ -116,7 +116,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
       "CRAI DB cung cấp phân tích rủi ro tín dụng tự động, minh bạch và theo thời gian thực dựa trên machine learning, dashboard tương tác và AI hội thoại.",
     "home.hero.cta.arch": "Xem kiến trúc",
     "home.hero.cta.dashboard": "Khám phá Dashboard",
-    "home.hero.cta.chatbot": "Thử demo Chatbot",
+    "home.hero.cta.chatbot": "Xem demo Chatbot",
     "home.hero.hl.ml": "Chấm điểm bằng ML",
     "home.hero.hl.shap": "Giải thích SHAP",
     "home.hero.hl.llm": "Chatbot LLM",
@@ -161,43 +161,70 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "home.arch.layer.5.desc": "Flutter đa nền tảng",
     "home.arch.layer.5.details": "UI responsive cho web, mobile và desktop.",
     "home.arch.layer.6.title": "Hạ tầng cloud",
-    "home.arch.layer.6.desc": "AWS (EC2, S3, Lambda, RDS)",
+    "home.arch.layer.6.desc": "Railway (PaaS, MySQL plugin, biến môi trường)",
     "home.arch.layer.6.details": "Triển khai cloud an toàn, mở rộng với pipeline tự động và dịch vụ quản lý.",
 
     "home.features.kicker": "Năng lực",
     "home.features.title": "Tính năng cốt lõi",
     "home.features.desc":
-      "Bộ công cụ toàn diện cho quản lý rủi ro tín dụng hiện đại: từ chấm điểm, giải thích đến hành động.",
+      "Nền tảng CRAI DB (Next.js + FastAPI): chấm điểm heuristic, dashboard nội bộ, tích hợp Power BI, trợ lý Google Gemini và nhật ký vận hành.",
     "home.feature.1.title": "Chấm điểm rủi ro tín dụng",
-    "home.feature.1.desc": "Ước lượng PD và phân loại mức rủi ro cho từng khách hàng dựa trên ML.",
-    "home.feature.2.title": "AI giải thích với SHAP",
-    "home.feature.2.desc": "Minh bạch yếu tố tác động đến quyết định tín dụng bằng SHAP values.",
+    "home.feature.1.desc":
+      "Mô hình heuristic đa nhân tố trên backend (DTI, tuổi, lịch sử tín dụng, việc làm…): tính điểm R, phân loại mức rủi ro và đồng bộ với hồ sơ khách hàng.",
+    "home.feature.2.title": "Giải thích theo nhân tố",
+    "home.feature.2.desc":
+      "Bóc tách đóng góp từng kênh (trọng số minh bạch, gợi ý SHAP) đi kèm kết quả chấm điểm — dễ trình bày nội bộ và học thuật.",
     "home.feature.3.title": "Giám sát danh mục",
-    "home.feature.3.desc": "Dashboard thời gian thực, drill-down theo phân khúc và theo dõi hiệu suất.",
+    "home.feature.3.desc":
+      "Dashboard trong ứng dụng (portfolio, xu hướng) và kết nối Power BI (REST API, DAX, semantic model) khi được cấu hình.",
     "home.feature.4.title": "Cảnh báo nợ xấu",
-    "home.feature.4.desc": "Hệ thống cảnh báo sớm tự động cho tài khoản rủi ro và can thiệp kịp thời.",
-    "home.feature.5.title": "Phân tích hội thoại",
-    "home.feature.5.desc": "Chatbot ngôn ngữ tự nhiên để truy vấn dữ liệu và tạo insight.",
-    "home.feature.6.title": "Audit & phiên bản",
-    "home.feature.6.desc": "Theo vết đầy đủ với version mô hình, log quyết định và hỗ trợ tuân thủ.",
+    "home.feature.4.desc":
+      "Luồng cảnh báo theo ngưỡng và trạng thái hồ sơ: theo dõi tài khoản rủi ro, ưu tiên xử lý sớm.",
+    "home.feature.5.title": "Trợ lý AI (Gemini)",
+    "home.feature.5.desc":
+      "Chat đa phương thức với Google Gemini (google-genai): truy vấn ngôn ngữ tự nhiên, gợi ý kèm ngữ cảnh dữ liệu và Power BI khi bật.",
+    "home.feature.6.title": "Audit & quyền truy cập",
+    "home.feature.6.desc":
+      "JWT, OAuth Google, RBAC theo vai trò, nhật ký audit và xuất dữ liệu — hỗ trợ vận hành an toàn và truy vết thao tác.",
 
     "home.tech.kicker": "Tech Stack",
     "home.tech.title": "Công nghệ sử dụng",
-    "home.tech.desc": "Xây dựng bằng các công nghệ chuẩn ngành cho hiệu năng, mở rộng và dễ bảo trì.",
+    "home.tech.desc":
+      "Khớp với mã nguồn hiện tại: API FastAPI + MySQL, web Next.js 16, Gemini (google-genai), Power BI, cùng JWT/RBAC và audit.",
 
     "home.demo.kicker": "Xem trước",
     "home.demo.title": "Demo & Ảnh minh hoạ",
     "home.demo.desc": "Khám phá các giao diện và năng lực chính của nền tảng CRAI DB.",
     "home.demo.tab.dashboard": "Dashboard",
     "home.demo.tab.chatbot": "Chatbot",
-    "home.demo.tab.shap": "Phân tích SHAP",
+    "home.demo.tab.shap": "Phân tích rủi ro",
     "home.demo.window.dashboard": "Power BI Dashboard - Tổng quan danh mục khoản vay",
     "home.demo.window.chatbot": "CRAI Assistant - Phân tích hội thoại",
-    "home.demo.window.shap": "SHAP Explainability - Phân tích yếu tố rủi ro",
+    "home.demo.window.shap": "Phân tích rủi ro — dữ liệu mẫu",
+    "home.demo.risk.sample_note":
+      "Giao diện giống trang Phân tích rủi ro trong ứng dụng — chỉ số minh họa, không phải dữ liệu thật.",
+    "home.demo.sample_note":
+      "Bố cục giống trang Dashboard trong ứng dụng — số liệu minh họa, không phải dữ liệu thật.",
+    "home.demo.dashboard.kpi_portfolio": "Điểm danh mục",
+    "home.demo.dashboard.kpi_customers": "Khách hàng",
+    "home.demo.dashboard.kpi_open_alerts": "Cảnh báo mở",
+    "home.demo.dashboard.kpi_system_health": "Sức khỏe hệ thống",
+    "home.demo.dashboard.health_good": "Tốt",
+    "home.demo.dashboard.alerts_desc": "Vài cảnh báo mẫu — không liên kết hệ thống thật.",
+    "home.demo.dashboard.alert1_customer": "TNHH Đầu tư Minh An",
+    "home.demo.dashboard.alert1_message": "Tỷ lệ nợ/thu nhập tăng — đề nghị rà soát hồ sơ.",
+    "home.demo.dashboard.alert1_time": "Hôm nay, 14:32",
+    "home.demo.dashboard.alert2_customer": "Khách hàng #4021",
+    "home.demo.dashboard.alert2_message": "Điểm rủi ro trung bình sau cập nhật KYC.",
+    "home.demo.dashboard.alert2_time": "Hôm nay, 11:05",
+    "home.demo.dashboard.alert3_customer": "Công ty logistics Hưng Thịnh",
+    "home.demo.dashboard.alert3_message": "Số dư quá hạn 15+ ngày.",
+    "home.demo.dashboard.alert3_time": "Hôm qua",
 
     "home.use_cases.kicker": "Ứng dụng",
     "home.use_cases.title": "Tình huống sử dụng",
-    "home.use_cases.desc": "CRAI DB phục vụ nhiều nhóm người dùng trong hệ sinh thái rủi ro tín dụng.",
+    "home.use_cases.desc":
+      "CRAI DB hỗ trợ cán bộ tín dụng, quản lý rủi ro và chuyên viên phân tích trong vận hành rủi ro tín dụng tại tổ chức tài chính.",
 
     "home.about.kicker": "Giới thiệu",
     "home.about.title": "Về dự án",
@@ -215,7 +242,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "home.about.hl.layers": "Tầng tích hợp",
     "home.about.hl.ml": "Chấm điểm",
     "home.about.hl.shap": "Giải thích",
-    "home.about.hl.aws": "Cloud",
+    "home.about.hl.cloud_brand": "Railway",
+    "home.about.hl.cloud_tagline": "Cloud",
 
     "home.footer.nav": "Điều hướng",
     "home.footer.tech": "Công nghệ",
@@ -783,6 +811,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "powerbi.hints_prereq_label": "Trước khi cấu hình (bắt buộc — cần quản trị)",
     "powerbi.hints_prereq_body":
       "1) Microsoft Entra admin center → App registrations → chọn ứng dụng backend (ví dụ CreditRisk_Backend, cùng Application (client) ID với máy chủ) → API permissions: thêm quyền Microsoft Power BI Service theo hướng dẫn triển khai → Grant admin consent cho tổ chức (bắt buộc; cần Global Administrator / Application Administrator hoặc tương đương) để ứng dụng được phép gọi API Power BI.\n\n2) Power BI → Settings (bánh răng) → Admin portal → Tenant settings: bật cho phép Service Principal / ứng dụng gọi Power BI / Fabric APIs (ví dụ “Allow service principals to use Power BI APIs”) — cần vai trò Power BI Administrator.\n\n3) Trên app.powerbi.com, mở workspace nhóm (không dùng My workspace) → Manage access → Add → thêm ứng dụng CreditRisk_Backend hoặc dán Application (client) ID 53a7db35-5f93-4e5d-beba-34d0437ef94c → gán ít nhất Member (hoặc Admin nếu cần quản trị workspace). My workspace không thêm được ứng dụng.\n\nSau các bước trên, Hệ thống mới kết nối và đọc được dữ liệu từ PowerBi.",
+    "powerbi.hints_prereq_powerbi_service_link": "Truy cập Power BI Service (app.powerbi.com)",
     "powerbi.hints_sp_label": "Service principal gán vào workspace",
     "powerbi.hints_sp_app_name": "Tên ứng dụng (App name):",
     "powerbi.hints_sp_client_id": "Application (client) ID:",
@@ -790,7 +819,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
       "Trong Manage access của workspace nhóm, thêm ứng dụng bằng tên hoặc client ID ở trên và cấp quyền phù hợp (Member/Admin).",
     "powerbi.hints_tenant_label": "Tenant ID",
     "powerbi.hints_tenant_before": "Đăng nhập bằng tài khoản cùng tổ chức với Power BI. Mở ",
-    "powerbi.hints_tenant_link": "entra.microsoft.com",
+    "powerbi.hints_tenant_link": "Microsoft Entra",
     "powerbi.hints_tenant_after":
       " → Microsoft Entra ID → Tổng quan (Overview) → mục Tenant information → sao chép Tenant ID (GUID). Cùng giá trị thường xuất hiện trong URL Power BI dưới dạng tham số ctid= trên thanh địa chỉ.",
     "powerbi.hints_workspace_label": "Workspace ID",
@@ -1051,17 +1080,23 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "api_docs.auth.admin": "Quản trị",
 
     "home.tech.cat.backend": "Backend & Data",
-    "home.tech.cat.backend_desc": "Hạ tầng dữ liệu vững chắc với khả năng ML nâng cao",
+    "home.tech.cat.backend_desc":
+      "REST API FastAPI + Uvicorn; MySQL qua SQLAlchemy/PyMySQL; pandas/NumPy; nhập Excel (openpyxl); scikit-learn trong requirements cho pipeline/demo.",
     "home.tech.cat.dashboard": "Dashboard",
-    "home.tech.cat.dashboard_desc": "BI & trực quan hóa theo chuẩn doanh nghiệp",
+    "home.tech.cat.dashboard_desc":
+      "Microsoft Power BI: REST API, DAX ExecuteQueries, đăng nhập service principal và semantic model — dùng cho báo cáo và ngữ cảnh AI.",
     "home.tech.cat.frontend": "Frontend",
-    "home.tech.cat.frontend_desc": "Phát triển ứng dụng đa nền tảng",
+    "home.tech.cat.frontend_desc":
+      "Ứng dụng CRAI DB: Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui, biểu đồ Recharts, Zod & Sonner.",
     "home.tech.cat.chatbot": "Chatbot",
-    "home.tech.cat.chatbot_desc": "AI hội thoại với hiểu ngôn ngữ tự nhiên",
-    "home.tech.cat.cloud": "Cloud",
-    "home.tech.cat.cloud_desc": "Hạ tầng cloud mở rộng, ổn định",
+    "home.tech.cat.chatbot_desc":
+      "Google Gemini qua SDK google-genai & google-generativeai; hội thoại REST/JSON; ngữ cảnh Power BI, file/CSV đính kèm và FAQ ngân hàng (cấu hình).",
+    "home.tech.cat.cloud": "Cloud & DevOps",
+    "home.tech.cat.cloud_desc":
+      "HTTPX & pytest trong requirements; triển khai trên Railway (PaaS) với MySQL plugin; python-dotenv cho cấu hình môi trường.",
     "home.tech.cat.security": "Bảo mật",
-    "home.tech.cat.security_desc": "Chuẩn bảo mật và quản trị cấp doanh nghiệp",
+    "home.tech.cat.security_desc":
+      "JWT (python-jose), passlib với bcrypt, đăng nhập OAuth Google, RBAC theo vai trò và nhật ký audit trên backend.",
 
     "home.demo.kpi.total_loans": "Tổng khoản vay",
     "home.demo.kpi.total_loans_delta": "+5.2% tháng này",
@@ -1078,6 +1113,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "home.demo.chat.a2":
       "Dưới đây là top 5 khách hàng có điểm PD cao nhất:\n\n1. Acme Corp (ID: 12847) - PD: 0.78\n2. Beta Industries (ID: 9234) - PD: 0.71\n3. Gamma Solutions (ID: 5621) - PD: 0.68\n\nBạn có muốn xem phân tích SHAP cho khách hàng nào không?",
     "home.demo.chat.placeholder": "Đặt câu hỏi về rủi ro tín dụng...",
+    "home.demo.chat.sample_note": "Giao diện giống trang CRAI Assistant — hội thoại minh họa, không gửi tin nhắn thật.",
     "home.demo.shap.customer_id": "Mã khách hàng",
     "home.demo.shap.predicted_pd": "PD dự báo",
     "home.demo.shap.title": "Tầm quan trọng của đặc trưng (SHAP)",
@@ -1200,7 +1236,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
       "CRAI DB delivers automated, explainable, and real-time credit risk analysis powered by machine learning, interactive dashboards, and conversational AI.",
     "home.hero.cta.arch": "View Architecture",
     "home.hero.cta.dashboard": "Explore Dashboard",
-    "home.hero.cta.chatbot": "Try Chatbot Demo",
+    "home.hero.cta.chatbot": "View chatbot demo",
     "home.hero.hl.ml": "ML-Powered Scoring",
     "home.hero.hl.shap": "SHAP Explainability",
     "home.hero.hl.llm": "LLM Chatbot",
@@ -1245,42 +1281,70 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "home.arch.layer.5.desc": "Flutter Cross-Platform",
     "home.arch.layer.5.details": "Responsive user interface accessible on web, mobile, and desktop platforms.",
     "home.arch.layer.6.title": "Cloud Infrastructure",
-    "home.arch.layer.6.desc": "AWS (EC2, S3, Lambda, RDS)",
+    "home.arch.layer.6.desc": "Railway (PaaS, MySQL plugin, environment variables)",
     "home.arch.layer.6.details": "Scalable, secure cloud deployment with automated pipelines and managed services.",
 
     "home.features.kicker": "Capabilities",
     "home.features.title": "Core Features",
-    "home.features.desc": "Comprehensive tools for modern credit risk management, from scoring to explanation to action.",
-    "home.feature.1.title": "Credit Risk Scoring",
-    "home.feature.1.desc": "ML-powered probability of default (PD) estimation and risk level classification for every borrower.",
-    "home.feature.2.title": "Explainable AI with SHAP",
-    "home.feature.2.desc": "Transparent model explanations showing which factors drive each credit decision using SHAP values.",
-    "home.feature.3.title": "Portfolio Monitoring",
-    "home.feature.3.desc": "Real-time loan portfolio dashboards with drill-down analytics and performance tracking.",
-    "home.feature.4.title": "Delinquency Alerts",
-    "home.feature.4.desc": "Automated early warning system for identifying at-risk accounts and triggering timely interventions.",
-    "home.feature.5.title": "Conversational Analytics",
-    "home.feature.5.desc": "Natural language chatbot for querying risk data, generating insights, and answering complex questions.",
-    "home.feature.6.title": "Audit & Versioning",
-    "home.feature.6.desc": "Complete audit trails with model versioning, decision logging, and regulatory compliance support.",
+    "home.features.desc":
+      "CRAI DB is built with Next.js and FastAPI: transparent heuristic scoring, in-app dashboards, optional Power BI analytics, Google Gemini assistant, and operational audit trails.",
+    "home.feature.1.title": "Credit risk scoring",
+    "home.feature.1.desc":
+      "Multi-factor heuristic engine on the API (DTI, age, credit history, employment, etc.): produces an R score, risk labels, and ties back to customer records.",
+    "home.feature.2.title": "Factor-level explanations",
+    "home.feature.2.desc":
+      "Channel contributions and clear weights alongside each score (SHAP-style views) for internal review, demos, and research storytelling.",
+    "home.feature.3.title": "Portfolio monitoring",
+    "home.feature.3.desc":
+      "First-party dashboards for trends and exposure, plus Power BI integration (REST, DAX, semantic models) when workspace credentials are configured.",
+    "home.feature.4.title": "Delinquency alerts",
+    "home.feature.4.desc":
+      "Threshold- and status-driven alerts so teams can spot deteriorating cases earlier and prioritise follow-up.",
+    "home.feature.5.title": "Gemini AI assistant",
+    "home.feature.5.desc":
+      "Conversational analytics powered by Google Gemini (google-genai): natural-language Q&A with optional data and Power BI context when enabled.",
+    "home.feature.6.title": "Audit & access control",
+    "home.feature.6.desc":
+      "JWT sessions, Google OAuth, role-based access, structured audit logs, and exports—built for safer day-to-day operations and traceability.",
 
     "home.tech.kicker": "Tech Stack",
     "home.tech.title": "Technology Stack",
-    "home.tech.desc": "Built with industry-standard technologies for performance, scalability, and maintainability.",
+    "home.tech.desc":
+      "Aligned with the current codebase: FastAPI + MySQL APIs, Next.js 16 web app, Gemini (google-genai), Power BI, plus JWT/RBAC and audit logging.",
 
     "home.demo.kicker": "Preview",
     "home.demo.title": "Demo & Screenshots",
     "home.demo.desc": "Explore the key interfaces and capabilities of the CRAI DB platform.",
     "home.demo.tab.dashboard": "Dashboard",
     "home.demo.tab.chatbot": "Chatbot",
-    "home.demo.tab.shap": "SHAP Analysis",
+    "home.demo.tab.shap": "Risk analysis",
     "home.demo.window.dashboard": "Power BI Dashboard - Loan Portfolio Overview",
     "home.demo.window.chatbot": "CRAI Assistant - Conversational Analytics",
-    "home.demo.window.shap": "SHAP Explainability - Risk Factor Analysis",
+    "home.demo.window.shap": "Risk analysis — sample data",
+    "home.demo.risk.sample_note":
+      "Same UI as in-app Risk Analysis — illustrative metrics only, not live data.",
+    "home.demo.sample_note":
+      "Same layout as the in-app Dashboard — illustrative figures, not live data.",
+    "home.demo.dashboard.kpi_portfolio": "Portfolio score",
+    "home.demo.dashboard.kpi_customers": "Customers",
+    "home.demo.dashboard.kpi_open_alerts": "Open alerts",
+    "home.demo.dashboard.kpi_system_health": "System health",
+    "home.demo.dashboard.health_good": "Good",
+    "home.demo.dashboard.alerts_desc": "Sample alerts — not connected to your environment.",
+    "home.demo.dashboard.alert1_customer": "Minh An Investment Co., Ltd.",
+    "home.demo.dashboard.alert1_message": "Debt-to-income ratio increased — please review the file.",
+    "home.demo.dashboard.alert1_time": "Today, 14:32",
+    "home.demo.dashboard.alert2_customer": "Customer #4021",
+    "home.demo.dashboard.alert2_message": "Medium risk score after KYC update.",
+    "home.demo.dashboard.alert2_time": "Today, 11:05",
+    "home.demo.dashboard.alert3_customer": "Hung Thinh Logistics",
+    "home.demo.dashboard.alert3_message": "Balance overdue 15+ days.",
+    "home.demo.dashboard.alert3_time": "Yesterday",
 
     "home.use_cases.kicker": "Applications",
     "home.use_cases.title": "Use Cases",
-    "home.use_cases.desc": "CRAI DB serves diverse users across the credit risk ecosystem.",
+    "home.use_cases.desc":
+      "CRAI DB supports credit officers, risk managers, and analysts running credit risk operations at financial institutions.",
 
     "home.about.kicker": "About",
     "home.about.title": "About the Project",
@@ -1298,7 +1362,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "home.about.hl.layers": "Integrated Layers",
     "home.about.hl.ml": "Powered Scoring",
     "home.about.hl.shap": "Explainability",
-    "home.about.hl.aws": "Cloud Native",
+    "home.about.hl.cloud_brand": "Railway",
+    "home.about.hl.cloud_tagline": "Cloud",
 
     "home.footer.nav": "Navigation",
     "home.footer.tech": "Technologies",
@@ -1867,6 +1932,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "powerbi.hints_prereq_label": "Before you configure (required — admin steps)",
     "powerbi.hints_prereq_body":
       "1) Microsoft Entra admin center → App registrations → select the backend app (e.g. CreditRisk_Backend, same Application (client) ID as the server) → API permissions: add Microsoft Power BI Service as required → Grant admin consent for the organization (required; needs Global Administrator / Application Administrator or equivalent) so the app may call Power BI APIs.\n\n2) Power BI → Settings (gear) → Admin portal → Tenant settings: enable service principals / apps to use Power BI / Fabric APIs (e.g. “Allow service principals to use Power BI APIs”) — requires Power BI Administrator.\n\n3) On app.powerbi.com, open a team workspace (not My workspace) → Manage access → Add → add app CreditRisk_Backend or paste Application (client) ID 53a7db35-5f93-4e5d-beba-34d0437ef94c → assign at least Member (or Admin for workspace administration). You cannot add apps to My workspace.\n\nAfter these steps, the system can connect and read data from Power BI.",
+    "powerbi.hints_prereq_powerbi_service_link": "Open Power BI Service (app.powerbi.com)",
     "powerbi.hints_sp_label": "Service principal for the workspace",
     "powerbi.hints_sp_app_name": "App name:",
     "powerbi.hints_sp_client_id": "Application (client) ID:",
@@ -1874,7 +1940,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
       "In the team workspace Manage access, add the app using the name or client ID above and assign Member/Admin as needed.",
     "powerbi.hints_tenant_label": "Tenant ID",
     "powerbi.hints_tenant_before": "Sign in with the same organization account as Power BI. Open ",
-    "powerbi.hints_tenant_link": "entra.microsoft.com",
+    "powerbi.hints_tenant_link": "Microsoft Entra",
     "powerbi.hints_tenant_after":
       " → Microsoft Entra ID → Overview → Tenant information → copy Tenant ID (GUID). The same value often appears in Power BI URLs as the ctid= query parameter.",
     "powerbi.hints_workspace_label": "Workspace ID",
@@ -2135,17 +2201,23 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "api_docs.auth.admin": "Admin",
 
     "home.tech.cat.backend": "Backend & Data",
-    "home.tech.cat.backend_desc": "Robust data infrastructure with advanced ML capabilities",
+    "home.tech.cat.backend_desc":
+      "FastAPI + Uvicorn APIs; MySQL via SQLAlchemy/PyMySQL; pandas/NumPy; openpyxl spreadsheet ingestion; scikit-learn shipped for pipelines and demos.",
     "home.tech.cat.dashboard": "Dashboard",
-    "home.tech.cat.dashboard_desc": "Enterprise-grade business intelligence and visualization",
+    "home.tech.cat.dashboard_desc":
+      "Microsoft Power BI integration: REST APIs, DAX ExecuteQueries, service-principal auth, and semantic models for reporting and AI context.",
     "home.tech.cat.frontend": "Frontend",
-    "home.tech.cat.frontend_desc": "Cross-platform application development",
+    "home.tech.cat.frontend_desc":
+      "CRAI DB web client: Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui, Recharts, Zod validation, and Sonner toasts.",
     "home.tech.cat.chatbot": "Chatbot",
-    "home.tech.cat.chatbot_desc": "Conversational AI with natural language understanding",
-    "home.tech.cat.cloud": "Cloud",
-    "home.tech.cat.cloud_desc": "Scalable and reliable cloud infrastructure",
+    "home.tech.cat.chatbot_desc":
+      "Google Gemini through google-genai and google-generativeai SDKs; JSON/REST chat; Power BI context, CSV/file uploads, and optional bank FAQ grounding.",
+    "home.tech.cat.cloud": "Cloud & DevOps",
+    "home.tech.cat.cloud_desc":
+      "HTTPX and pytest in requirements; Railway (PaaS) deployment with MySQL plugin; python-dotenv for twelve-factor configuration.",
     "home.tech.cat.security": "Security",
-    "home.tech.cat.security_desc": "Enterprise security and governance standards",
+    "home.tech.cat.security_desc":
+      "python-jose JWTs, passlib with bcrypt hashing, Google OAuth sign-in, role-based access control, and structured audit logs on the API.",
 
     "home.demo.kpi.total_loans": "Total Loans",
     "home.demo.kpi.total_loans_delta": "+5.2% this month",
@@ -2162,6 +2234,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "home.demo.chat.a2":
       "Here are the top 5 customers with the highest PD scores:\n\n1. Acme Corp (ID: 12847) - PD: 0.78\n2. Beta Industries (ID: 9234) - PD: 0.71\n3. Gamma Solutions (ID: 5621) - PD: 0.68\n\nWould you like me to show the SHAP analysis for any of these customers?",
     "home.demo.chat.placeholder": "Ask a question about credit risk...",
+    "home.demo.chat.sample_note":
+      "Same UI as CRAI Assistant — sample conversation only; messages are not sent.",
     "home.demo.shap.customer_id": "Customer ID",
     "home.demo.shap.predicted_pd": "Predicted PD",
     "home.demo.shap.title": "Feature Importance (SHAP Values)",
