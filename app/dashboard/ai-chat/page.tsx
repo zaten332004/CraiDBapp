@@ -35,7 +35,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { browserApiFetchAuth } from '@/lib/api/browser';
@@ -51,7 +50,6 @@ import {
   Bell,
   CircleX,
   FileText,
-  LayoutDashboard,
   Loader2,
   MessageSquarePlus,
   MoreHorizontal,
@@ -121,7 +119,7 @@ type UploadedFileCtx = {
   [key: string]: unknown;
 };
 
-type AiDataSource = 'portfolio' | 'customer' | 'upload' | 'powerbi' | 'alerts';
+type AiDataSource = 'customer' | 'upload' | 'powerbi' | 'alerts';
 
 function normalizeCustomerSearchResponse(data: unknown): Array<{ customer_id: number; label: string }> {
   if (data == null || typeof data !== 'object') return [];
@@ -465,7 +463,7 @@ export default function AIChatPage() {
     }
   }, [t, apiErr]);
 
-  const [aiDataSource, setAiDataSource] = useState<AiDataSource>('portfolio');
+  const [aiDataSource, setAiDataSource] = useState<AiDataSource>('powerbi');
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [customerListLoading, setCustomerListLoading] = useState(false);
   const [customerListFull, setCustomerListFull] = useState<Array<{ customer_id: number; label: string }>>([]);
@@ -612,7 +610,7 @@ export default function AIChatPage() {
   useEffect(() => {
     if (aiDataSource !== 'alerts') return;
     if (!canUseAlertsAiDataSource(userRole)) {
-      setAiDataSource('portfolio');
+      setAiDataSource('powerbi');
     }
   }, [userRole, aiDataSource]);
 
@@ -886,7 +884,7 @@ export default function AIChatPage() {
     setMessages([]);
     setInput('');
     setPendingFiles([]);
-    setAiDataSource('portfolio');
+    setAiDataSource('powerbi');
     setSelectedCustomerIds([]);
     setPickerDraftIds([]);
     setCustomerPickerOpen(false);
@@ -1328,16 +1326,6 @@ export default function AIChatPage() {
             {t('ai_chat.data_source_alerts')}
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => {
-            setAiDataSource('portfolio');
-            setSelectedCustomerIds([]);
-          }}
-        >
-          <LayoutDashboard className="mr-2 h-4 w-4 shrink-0 opacity-80" />
-          {t('ai_chat.data_source_portfolio')}
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -1354,13 +1342,11 @@ export default function AIChatPage() {
           <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">
             {aiDataSource === 'customer'
               ? t('ai_chat.data_source_customer')
-              : aiDataSource === 'portfolio'
-                ? t('ai_chat.data_source_portfolio')
-                : aiDataSource === 'upload'
-                  ? t('ai_chat.data_source_upload')
-                  : aiDataSource === 'alerts'
-                    ? t('ai_chat.data_source_alerts')
-                    : t('ai_chat.data_source_powerbi')}
+              : aiDataSource === 'upload'
+                ? t('ai_chat.data_source_upload')
+                : aiDataSource === 'alerts'
+                  ? t('ai_chat.data_source_alerts')
+                  : t('ai_chat.data_source_powerbi')}
           </span>
         </>
       )}

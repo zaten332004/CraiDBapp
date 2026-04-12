@@ -393,7 +393,7 @@ function ChatbotDemo() {
                 />
                 <div className="mt-3 border-t border-border/50 pt-2.5 text-xs">
                   <span className="text-muted-foreground">{t("ai_chat.data_source_active")}: </span>
-                  <span className="font-semibold text-foreground">{t("ai_chat.data_source_portfolio")}</span>
+                  <span className="font-semibold text-foreground">{t("ai_chat.data_source_powerbi")}</span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 border-t border-border/50 pt-3">
                   <Button
