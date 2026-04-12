@@ -239,7 +239,7 @@ export default function AlertsPage() {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-72px)] flex-col gap-4 bg-[#f4f7fc] p-6">
+    <div className="flex min-h-[calc(100vh-72px)] flex-col gap-4 bg-background p-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('alerts.title')}</h1>
@@ -279,11 +279,10 @@ export default function AlertsPage() {
                 placeholder={t('common.search')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-white"
               />
             </div>
             <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-full bg-white sm:w-40 sm:shrink-0">
+              <SelectTrigger className="w-full sm:w-40 sm:shrink-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -297,17 +296,17 @@ export default function AlertsPage() {
         </CardHeader>
         <CardContent className="pt-0 pb-3">
           {isLoading && alerts.length === 0 ? (
-            <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-black/70 bg-white py-12 text-muted-foreground">
+            <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-border bg-card py-12 text-muted-foreground">
               {t('common.loading')}
             </div>
           ) : !isLoading && filteredAlerts.length === 0 ? (
-            <div className="flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-xl border border-black/70 bg-white py-12">
+            <div className="flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card py-12">
               <CheckCircle className="h-16 w-16 shrink-0 text-emerald-500" strokeWidth={1.75} aria-hidden />
               <p className="text-center text-[15px] text-muted-foreground">{t('alerts.empty_list')}</p>
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto rounded-xl border border-black/70 bg-white">
+              <div className="overflow-x-auto rounded-xl border border-border bg-card">
                 <Table className="w-full table-fixed">
                   <colgroup>
                     <col className="w-[4%]" />
@@ -340,7 +339,7 @@ export default function AlertsPage() {
                       <TableRow
                         key={alert.alert_id}
                         className={cn(
-                          'border-b border-black/15 hover:bg-muted/30',
+                          'border-b border-border/70 hover:bg-muted/35',
                           rowOpensProfile && 'cursor-pointer',
                         )}
                         onClick={() => {

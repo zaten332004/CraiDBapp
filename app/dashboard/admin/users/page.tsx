@@ -363,7 +363,7 @@ export default function AdminUsersPage() {
   }, [selectedUser, selectedRole, pinNew, pinConfirm]);
 
   return (
-    <div className="flex flex-col gap-6 p-6 bg-[#f4f7fc]">
+    <div className="flex flex-col gap-6 bg-background p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('admin.users.title')}</h1>
@@ -438,7 +438,7 @@ export default function AdminUsersPage() {
         </CardHeader>
 
         <CardContent className="pt-0">
-          <div className="overflow-x-auto rounded-xl border border-black/70 bg-white">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <Table className="min-w-[820px] w-full">
               <TableHeader>
                 <TableRow className="bg-muted/35 hover:bg-muted/35">
@@ -453,7 +453,7 @@ export default function AdminUsersPage() {
                 {paged.map((user) => (
                   <TableRow
                     key={user.id}
-                    className="cursor-pointer border-b border-black/15 hover:bg-muted/30"
+                    className="cursor-pointer border-b border-border/70 hover:bg-muted/35"
                     onClick={() => setSelectedUser(user)}
                   >
                     <TableCell className="py-1.5 font-medium">

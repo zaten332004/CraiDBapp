@@ -659,7 +659,7 @@ export default function AdminAuditLogsPage() {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-72px)] flex-col gap-4 p-6 bg-[#f4f7fc]">
+    <div className="flex min-h-[calc(100vh-72px)] flex-col gap-4 bg-background p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('admin.audit.title')}</h1>
@@ -687,7 +687,7 @@ export default function AdminAuditLogsPage() {
           </div>
         </CardHeader>
         <CardContent className="pt-0 pb-3">
-          <div className="overflow-x-auto rounded-xl border border-black/70 bg-white min-h-[620px]">
+          <div className="min-h-[620px] overflow-x-auto rounded-xl border border-border bg-card">
             <Table className="w-full min-w-[1280px] table-fixed">
               <colgroup>
                 <col className="w-[11%]" />
@@ -709,7 +709,7 @@ export default function AdminAuditLogsPage() {
               </TableHeader>
               <TableBody>
                 {paged.map((r) => (
-                  <TableRow key={r.id} className="border-b border-black/15 hover:bg-muted/30">
+                  <TableRow key={r.id} className="border-b border-border/70 hover:bg-muted/35">
                     <TableCell className="px-6 py-3 whitespace-nowrap text-[13px]">{formatAuditDateOnly(r.ts, locale)}</TableCell>
                     <TableCell className="px-6 py-3 whitespace-nowrap text-[13px]">{formatAuditTimeOnly(r.ts, locale)}</TableCell>
                     <TableCell className="px-6 py-3 text-[13px] font-medium">

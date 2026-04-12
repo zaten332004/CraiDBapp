@@ -583,9 +583,9 @@ export default function UploadPage() {
             {isLoadingFileDetail ? (
               <p className="text-sm text-muted-foreground">{t('upload.file_detail_loading')}</p>
             ) : historyFileDetail ? (
-              <div className="h-full w-full rounded-md border bg-slate-50 p-3">
-                <div className="h-full w-full overflow-scroll rounded-md border bg-white">
-                  <table className="w-max min-w-[1600px] table-fixed border-separate border-spacing-0 text-xs leading-5">
+              <div className="h-full w-full rounded-md border border-border bg-muted/25 p-3 dark:bg-muted/35">
+                <div className="h-full w-full overflow-scroll rounded-md border border-border bg-card">
+                  <table className="w-max min-w-[1600px] table-fixed border-separate border-spacing-0 text-xs leading-5 text-foreground">
                     <colgroup>
                       <col className="w-[56px]" />
                       {historyFileDetail.columns.map((col) => (
@@ -594,24 +594,28 @@ export default function UploadPage() {
                     </colgroup>
                     <thead>
                       <tr>
-                        <th className="sticky top-0 z-20 bg-slate-100 px-2 py-2 text-left font-semibold w-14 shadow-[0_1px_0_0_rgba(0,0,0,0.08)]">#</th>
+                        <th className="sticky top-0 z-20 w-14 bg-muted px-2 py-2 text-left font-semibold shadow-[0_1px_0_0_var(--border)]">#</th>
                         {historyFileDetail.columns.map((col) => (
                           <th
                             key={col}
                             title={col}
-                            className="sticky top-0 z-20 bg-slate-100 px-2 py-2 text-left font-semibold shadow-[0_1px_0_0_rgba(0,0,0,0.08)]"
+                            className="sticky top-0 z-20 bg-muted px-2 py-2 text-left font-semibold shadow-[0_1px_0_0_var(--border)]"
                           >
                             <span className="block truncate">{col}</span>
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="bg-white">
+                    <tbody className="bg-card">
                       {historyFileDetail.rows.map((row, idx) => (
-                        <tr key={`${idx}-${historyFileDetail.jobId}`} className="border-t">
-                          <td className="px-2 py-1.5 text-muted-foreground align-top bg-white">{idx + 1}</td>
+                        <tr key={`${idx}-${historyFileDetail.jobId}`} className="border-t border-border/80">
+                          <td className="bg-card px-2 py-1.5 align-top text-muted-foreground">{idx + 1}</td>
                           {historyFileDetail.columns.map((col) => (
-                            <td key={`${idx}-${col}`} title={row?.[col] == null ? '-' : String(row[col])} className="px-2 py-1.5 align-top bg-white">
+                            <td
+                              key={`${idx}-${col}`}
+                              title={row?.[col] == null ? '-' : String(row[col])}
+                              className="bg-card px-2 py-1.5 align-top"
+                            >
                               <span className="block truncate">{row?.[col] == null ? '-' : String(row[col])}</span>
                             </td>
                           ))}

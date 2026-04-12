@@ -50,46 +50,50 @@
 }
 
 .dark {
-  --background: #1a1f2e;
-  --foreground: #e7eaf0;
-  --card: #222836;
-  --card-foreground: #e7eaf0;
-  --popover: #222836;
-  --popover-foreground: #e7eaf0;
-  --primary: #9eb6d4;
-  --primary-foreground: #141a24;
-  --secondary: #2a3142;
-  --secondary-foreground: #e7eaf0;
-  --muted: #343b4d;
-  --muted-foreground: #98a3b8;
-  --accent: #7fa8cf;
-  --accent-foreground: #0f141d;
-  --destructive: #c97a82;
-  --destructive-foreground: #3d2428;
-  --border: #343d52;
-  --input: #343d52;
-  --ring: color-mix(in srgb, #7fa8cf, transparent 55%);
-  --chart-1: #7fa8cf;
-  --chart-2: #9eb6d4;
-  --chart-3: #6b8cbd;
-  --chart-4: #b8c9df;
-  --chart-5: #5a6d8a;
-  --sidebar: #1e2433;
-  --sidebar-foreground: #e7eaf0;
-  --sidebar-primary: #9eb6d4;
-  --sidebar-primary-foreground: #141a24;
-  --sidebar-accent: #2a3142;
-  --sidebar-accent-foreground: #e7eaf0;
-  --sidebar-border: #343d52;
-  --sidebar-ring: color-mix(in srgb, #7fa8cf, transparent 50%);
+  /*
+   * Soft-dark / “charcoal–teal” (Discord-adjacent): no pure black, cool organic tint.
+   * Nền chìm nhẹ, chữ off-white, phụ trợ xám lạnh — đọc bảng & chat lâu dễ chịu hơn.
+   */
+  --background: #101816;
+  --foreground: #e8ecea;
+  --card: #161f1d;
+  --card-foreground: #e8ecea;
+  --popover: #1b2523;
+  --popover-foreground: #e8ecea;
+  --primary: #a8c9c4;
+  --primary-foreground: #0a1110;
+  --secondary: #1f2926;
+  --secondary-foreground: #e4e9e7;
+  --muted: #252f2d;
+  --muted-foreground: #a7b5b1;
+  --accent: #8fb8b0;
+  --accent-foreground: #071010;
+  --destructive: #d48992;
+  --destructive-foreground: #1c1214;
+  --border: #2d3a37;
+  --input: #1c2624;
+  --ring: color-mix(in srgb, #8fb8b0, transparent 42%);
+  --chart-1: #8fb8b0;
+  --chart-2: #a8c9c4;
+  --chart-3: #7aa8cf;
+  --chart-4: #b8c9c2;
+  --chart-5: #7d8f8a;
+  --sidebar: #0d1412;
+  --sidebar-foreground: #e4e9e7;
+  --sidebar-primary: #a8c9c4;
+  --sidebar-primary-foreground: #0a1110;
+  --sidebar-accent: #1c2624;
+  --sidebar-accent-foreground: #e8ecea;
+  --sidebar-border: #2a3633;
+  --sidebar-ring: color-mix(in srgb, #8fb8b0, transparent 40%);
   --app-bg: radial-gradient(
-      1200px 600px at 15% 0%,
-      rgba(127, 168, 207, 0.08),
+      1200px 600px at 12% 0%,
+      rgba(110, 150, 138, 0.07),
       transparent 58%
     ),
     radial-gradient(
-      900px 520px at 85% 15%,
-      rgba(90, 120, 168, 0.07),
+      900px 520px at 88% 18%,
+      rgba(80, 118, 112, 0.06),
       transparent 55%
     );
 }
@@ -411,7 +415,7 @@
 
 .dark .app-toaster [data-sonner-toast][data-type='error'] {
   border-color: color-mix(in srgb, var(--destructive), transparent 45%) !important;
-  background: color-mix(in srgb, var(--destructive), #0f172a 82%) !important;
+  background: color-mix(in srgb, var(--destructive), var(--background) 82%) !important;
   color: #fecdd3 !important;
 }
 

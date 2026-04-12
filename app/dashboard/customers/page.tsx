@@ -36,10 +36,13 @@ import { CRAIDB_UPLOAD_COMPLETED_EVENT } from '@/lib/profile-sync-event';
 
 function getRiskBadgeClass(level: string) {
   const normalized = String(level || '').toLowerCase();
-  if (normalized === 'low') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (normalized === 'medium') return 'border-blue-200 bg-blue-50 text-blue-700';
-  if (normalized === 'high') return 'border-rose-200 bg-rose-50 text-rose-700';
-  return 'border-slate-200 bg-slate-50 text-slate-700';
+  if (normalized === 'low')
+    return 'border-emerald-200/90 bg-emerald-50 text-emerald-800 dark:border-emerald-600/50 dark:bg-emerald-950/55 dark:text-emerald-200';
+  if (normalized === 'medium')
+    return 'border-blue-200/90 bg-blue-50 text-blue-800 dark:border-blue-600/50 dark:bg-blue-950/55 dark:text-blue-200';
+  if (normalized === 'high')
+    return 'border-rose-200/90 bg-rose-50 text-rose-800 dark:border-rose-600/50 dark:bg-rose-950/55 dark:text-rose-200';
+  return 'border-slate-200/90 bg-slate-50 text-slate-800 dark:border-slate-500/50 dark:bg-slate-900/60 dark:text-slate-200';
 }
 
 function normalizeStatusKey(status: string) {
@@ -54,12 +57,17 @@ function normalizeStatusKey(status: string) {
 
 function getStatusBadgeClass(status: string) {
   const normalized = String(status || '').toLowerCase();
-  if (normalized === 'approved') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (normalized === 'rejected') return 'border-rose-200 bg-rose-50 text-rose-700';
-  if (normalized === 'pending') return 'border-slate-200 bg-slate-50 text-slate-700';
-  if (normalized === 'active') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (normalized === 'inactive') return 'border-slate-200 bg-slate-50 text-slate-700';
-  return 'border-slate-200 bg-slate-50 text-slate-700';
+  if (normalized === 'approved')
+    return 'border-emerald-200/90 bg-emerald-50 text-emerald-800 dark:border-emerald-600/50 dark:bg-emerald-950/55 dark:text-emerald-200';
+  if (normalized === 'rejected')
+    return 'border-rose-200/90 bg-rose-50 text-rose-800 dark:border-rose-600/50 dark:bg-rose-950/55 dark:text-rose-200';
+  if (normalized === 'pending')
+    return 'border-slate-200/90 bg-slate-50 text-slate-800 dark:border-slate-500/50 dark:bg-slate-900/60 dark:text-slate-200';
+  if (normalized === 'active')
+    return 'border-emerald-200/90 bg-emerald-50 text-emerald-800 dark:border-emerald-600/50 dark:bg-emerald-950/55 dark:text-emerald-200';
+  if (normalized === 'inactive')
+    return 'border-slate-200/90 bg-slate-50 text-slate-800 dark:border-slate-500/50 dark:bg-slate-900/60 dark:text-slate-200';
+  return 'border-slate-200/90 bg-slate-50 text-slate-800 dark:border-slate-500/50 dark:bg-slate-900/60 dark:text-slate-200';
 }
 
 /** Backend có thể trả `items`, `customers`, `data` hoặc `results`. */
@@ -242,7 +250,7 @@ export default function CustomersPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 bg-[#f4f7fc]">
+    <div className="flex flex-col gap-6 bg-background p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -317,10 +325,10 @@ export default function CustomersPage() {
           <CardTitle>{t('customers.list_title')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-xl border border-black/70 bg-white">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <Table className="min-w-[980px] w-full">
               <TableHeader>
-                <TableRow className="bg-muted/35 hover:bg-muted/35">
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="py-1.5">{t('common.name')}</TableHead>
                   <TableHead className="py-1.5">{t('customers.loan_type')}</TableHead>
                   <TableHead className="py-1.5">{t('customers.loan_amount')}</TableHead>
@@ -338,7 +346,7 @@ export default function CustomersPage() {
                 ) : customers.map((customer, rowIdx) => (
                   <TableRow
                     key={customer.id ? customer.id : `row-${rowIdx}`}
-                    className="cursor-pointer border-b border-black/15 hover:bg-muted/30"
+                    className="cursor-pointer border-b border-border/70 hover:bg-muted/35"
                     onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
                   >
                     <TableCell className="py-1.5 font-medium">

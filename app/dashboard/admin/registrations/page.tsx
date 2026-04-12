@@ -232,7 +232,7 @@ export default function AdminRegistrationsPage() {
   const selected = registrations.find((r) => r.id === selectedId) ?? null;
 
   return (
-    <div className="flex flex-col gap-4 p-6 bg-[#f4f7fc]">
+    <div className="flex flex-col gap-4 bg-background p-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('admin.reg.title')}</h1>
         <p className="text-muted-foreground mt-2">{t('admin.reg.desc')}</p>
@@ -310,7 +310,7 @@ export default function AdminRegistrationsPage() {
               <p className="text-muted-foreground mt-1">{t('admin.reg.none_desc')}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-black/70 bg-white">
+            <div className="overflow-x-auto rounded-xl border border-border bg-card">
               <Table className="min-w-[760px] w-full">
                 <TableHeader>
                   <TableRow className="bg-muted/35 hover:bg-muted/35">
@@ -325,7 +325,7 @@ export default function AdminRegistrationsPage() {
                   {paged.map((reg) => (
                     <TableRow
                       key={reg.id}
-                      className="cursor-pointer border-b border-black/15 hover:bg-muted/30"
+                      className="cursor-pointer border-b border-border/70 hover:bg-muted/35"
                       onClick={() => void openRegistrationDetails(reg.id)}
                     >
                       <TableCell className="py-1.5 text-[12px] font-medium">{reg.name}</TableCell>

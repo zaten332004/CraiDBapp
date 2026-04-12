@@ -2,7 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { AlertCircle, BarChart3, MessageSquare, PieChart, Plus, Send, TrendingUp, Users } from "lucide-react";
+import {
+  AlertCircle,
+  BarChart3,
+  ChevronDown,
+  FileText,
+  MessageSquare,
+  MoreHorizontal,
+  PieChart,
+  Plus,
+  RefreshCw,
+  Send,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -93,7 +106,12 @@ export function DemoSection() {
           </div>
 
           {/* Demo area */}
-          <div className={cn("p-6 sm:p-8", activeTab === "shap" ? "min-h-[640px]" : "min-h-[480px]")}>
+          <div
+            className={cn(
+              "p-6 sm:p-8",
+              activeTab === "shap" ? "min-h-[640px]" : activeTab === "chatbot" ? "min-h-[560px]" : "min-h-[480px]",
+            )}
+          >
             {activeTab === "dashboard" && <DashboardDemo />}
             {activeTab === "chatbot" && <ChatbotDemo />}
             {activeTab === "shap" && <RiskAnalyzeDemo />}
@@ -261,6 +279,14 @@ function ChatbotDemo() {
     return [0, 1, 2, 3].map((i) => new Date(base.getTime() + i * 90_000));
   }, []);
 
+  const historyItems = useMemo(
+    () =>
+      (["home.demo.chat.history_1", "home.demo.chat.history_2", "home.demo.chat.history_3", "home.demo.chat.history_4"] as const).map(
+        (key) => t(key),
+      ),
+    [t],
+  );
+
   const messages = useMemo(
     () => [
       { id: "d1", sender: "user" as const, text: t("home.demo.chat.q1") },
@@ -271,89 +297,153 @@ function ChatbotDemo() {
     [t],
   );
 
+  const promptKeys = useMemo(() => ["ai_chat.prompt_1", "ai_chat.prompt_2", "ai_chat.prompt_3", "ai_chat.prompt_4"] as const, []);
+
   return (
-    <Card className="mx-auto flex max-w-4xl flex-col overflow-hidden border shadow-sm">
-      <CardHeader className="space-y-1">
-        <CardTitle>{t("ai_chat.title")}</CardTitle>
-        <CardDescription>{t("ai_chat.desc")}</CardDescription>
-        <p className="pt-1 text-xs text-muted-foreground">{t("home.demo.chat.sample_note")}</p>
-      </CardHeader>
-      <CardContent className="flex min-h-0 flex-col gap-0 pb-4 pt-0">
-        <ScrollArea className="max-h-[min(52vh,420px)] pr-4">
-          <div className="space-y-4 pb-2">
-            {messages.map((message, i) => (
+    <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-xl border border-border/70 bg-[#f4f6f9] shadow-sm dark:border-border dark:bg-muted/25">
+      <p className="border-b border-border/60 bg-card/80 px-4 py-2.5 text-center text-[11px] text-muted-foreground sm:text-left">
+        {t("home.demo.chat.sample_note")}
+      </p>
+
+      <div className="flex min-h-[420px] flex-col gap-3 p-3 sm:p-4 lg:flex-row lg:gap-4">
+        {/* Sidebar — lịch sử */}
+        <aside className="flex w-full shrink-0 flex-col gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm lg:w-56 xl:w-64">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
+              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="truncate">{t("home.demo.chat.sidebar_title")}</span>
+            </div>
+            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground" disabled aria-hidden>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full justify-center gap-2 rounded-full border-sky-200/80 bg-sky-50/80 text-sky-800 hover:bg-sky-100/90 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:bg-sky-950/60"
+            disabled
+          >
+            <Plus className="h-4 w-4" />
+            {t("ai_chat.new_draft")}
+          </Button>
+          <div className="flex flex-col gap-2">
+            {historyItems.map((label, idx) => (
               <div
-                key={message.id}
-                className={cn("flex", message.sender === "user" ? "justify-end" : "justify-start")}
+                key={idx}
+                className="flex items-center gap-2 rounded-lg border border-border/50 bg-background px-2.5 py-2 text-left shadow-sm"
               >
-                <div className="min-w-0 max-w-4xl">
-                  <div
-                    className={cn(
-                      "rounded-lg px-4 py-3",
-                      message.sender === "user"
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-secondary text-foreground",
-                    )}
-                  >
-                    {message.sender === "assistant" ? (
-                      <ChatMarkdown text={message.text} />
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap break-words">{message.text}</p>
-                    )}
-                    <span className="mt-3 block text-xs opacity-70">
-                      {demoTimes[i].toLocaleTimeString(locale === "vi" ? "vi-VN" : "en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
-                </div>
+                <p className="min-w-0 flex-1 truncate text-xs leading-snug text-foreground">{label}</p>
+                <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground" disabled aria-hidden>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
               </div>
             ))}
           </div>
-        </ScrollArea>
+        </aside>
 
-        <form
-          className="mt-4 flex flex-col gap-2 rounded-2xl border border-border/80 bg-muted/15 p-3 shadow-sm dark:bg-muted/20"
-          onSubmit={(e) => e.preventDefault()}
-        >
-          <Textarea
-            readOnly
-            tabIndex={-1}
-            rows={1}
-            placeholder={t("ai_chat.placeholder")}
-            value=""
-            className="min-h-[48px] w-full cursor-default resize-none overflow-y-auto border-0 bg-transparent px-1 py-2 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
-          />
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
-            <span className="shrink-0">{t("ai_chat.data_source_active")}:</span>
-            <span className="max-w-full min-w-0 truncate font-medium text-foreground/90">
-              {t("ai_chat.data_source_portfolio")}
-            </span>
-          </div>
-          <div className="flex flex-wrap items-end justify-between gap-2 border-t border-border/60 pt-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-10 w-10 shrink-0 rounded-full"
-              disabled
-              aria-hidden
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              <div className="flex h-10 min-w-[140px] items-center rounded-full border border-input bg-background px-3 text-sm text-muted-foreground">
-                <span className="truncate">{t("ai_chat.model.fast")}</span>
-              </div>
-              <Button type="button" size="icon" className="h-10 w-10 shrink-0 rounded-full" disabled aria-hidden>
-                <Send className="h-4 w-4" />
-              </Button>
+        {/* Main */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
+          <header className="border-b border-border/60 px-4 py-3 sm:px-5">
+            <h3 className="text-lg font-bold tracking-tight text-foreground">{t("ai_chat.title")}</h3>
+            <p className="mt-0.5 text-sm text-muted-foreground">{t("ai_chat.desc")}</p>
+          </header>
+
+          <ScrollArea className="min-h-[200px] max-h-[min(42vh,360px)] flex-1">
+            <div className="space-y-4 px-4 py-4 sm:px-5">
+              {messages.map((message, i) => (
+                <div key={message.id} className={cn("flex", message.sender === "user" ? "justify-end" : "justify-start")}>
+                  <div className={cn("min-w-0 max-w-[min(100%,34rem)]", message.sender === "user" ? "pl-8" : "pr-6")}>
+                    <div
+                      className={cn(
+                        "rounded-2xl px-4 py-3 text-sm shadow-sm",
+                        message.sender === "user"
+                          ? "border border-border/80 bg-background text-foreground"
+                          : "bg-[#EEF2F6] text-foreground dark:bg-slate-800/90 dark:text-slate-100",
+                      )}
+                    >
+                      {message.sender === "assistant" ? (
+                        <ChatMarkdown text={message.text} className="[&_p]:my-2 [&_li]:my-0.5" />
+                      ) : (
+                        <p className="whitespace-pre-wrap break-words leading-relaxed">{message.text}</p>
+                      )}
+                      <span className="mt-2 block text-[11px] text-muted-foreground">
+                        {demoTimes[i].toLocaleTimeString(locale === "vi" ? "vi-VN" : "en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
+          </ScrollArea>
+
+          <div className="border-t border-border/60 bg-muted/10 px-3 py-3 sm:px-4 sm:py-4 dark:bg-muted/5">
+            <form className="space-y-3" onSubmit={(e) => e.preventDefault()}>
+              <div className="rounded-2xl border border-border/70 bg-background p-3 shadow-sm dark:border-border">
+                <Textarea
+                  readOnly
+                  tabIndex={-1}
+                  rows={2}
+                  placeholder={t("ai_chat.placeholder")}
+                  value=""
+                  className="min-h-[52px] w-full cursor-default resize-none border-0 bg-transparent p-0 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
+                />
+                <div className="mt-3 border-t border-border/50 pt-2.5 text-xs">
+                  <span className="text-muted-foreground">{t("ai_chat.data_source_active")}: </span>
+                  <span className="font-semibold text-foreground">{t("ai_chat.data_source_portfolio")}</span>
+                </div>
+                <div className="mt-3 flex items-center gap-2 border-t border-border/50 pt-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 shrink-0 rounded-full border-border/80"
+                    disabled
+                    aria-hidden
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <div className="min-w-0 flex-1" aria-hidden />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 shrink-0 gap-1 rounded-full border-border/80 px-3 text-sm font-normal text-muted-foreground"
+                    disabled
+                  >
+                    <span>{t("ai_chat.model.thinking")}</span>
+                    <ChevronDown className="h-4 w-4 opacity-60" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    className="h-10 w-10 shrink-0 rounded-full border-0 bg-sky-100 text-sky-600 shadow-none hover:bg-sky-200/90 dark:bg-sky-900/50 dark:text-sky-300 dark:hover:bg-sky-900/70"
+                    disabled
+                    aria-hidden
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {promptKeys.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled
+                    className="rounded-full border border-border/70 bg-background px-3 py-1.5 text-left text-xs text-muted-foreground shadow-sm transition-colors hover:bg-muted/40 dark:border-border"
+                  >
+                    {t(key)}
+                  </button>
+                ))}
+              </div>
+            </form>
           </div>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      </div>
+    </div>
   );
 }
 

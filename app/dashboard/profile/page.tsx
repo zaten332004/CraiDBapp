@@ -447,7 +447,7 @@ export default function ProfilePage() {
     .join('');
 
   return (
-    <div className="flex flex-col gap-6 p-6 bg-[#f4f7fc]">
+    <div className="flex flex-col gap-6 bg-background p-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('profile.title')}</h1>
         <p className="text-muted-foreground mt-2">
