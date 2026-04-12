@@ -49,7 +49,6 @@ export default function NewCustomerPage() {
   const router = useRouter();
   const role = getUserRole();
   const isViewer = role === 'viewer';
-  const isVi = locale === 'vi';
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -163,48 +162,34 @@ export default function NewCustomerPage() {
       const age = getAgeFromDateOfBirth(formData.date_of_birth);
 
       if (!trimmedFullName) {
-        throw new Error(isVi ? 'Vui lòng nhập họ và tên khách hàng.' : 'Please enter customer full name.');
+        throw new Error(t('customers.new.err.full_name'));
       }
       if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
-        throw new Error(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
+        throw new Error(t('customers.new.err.email'));
       }
       if (!isValidVietnamNationalId(normalizedNationalId)) {
-        throw new Error(
-          isVi
-            ? 'CCCD phải gồm đúng 12 chữ số. Không được nhập chữ hoặc ký tự đặc biệt.'
-            : 'National ID must contain exactly 12 digits. Letters and special characters are not allowed.',
-        );
+        throw new Error(t('customers.new.err.national_id'));
       }
       if (formData.date_of_birth.trim() && (age == null || age < 18)) {
-        throw new Error(
-          isVi
-            ? 'Khách hàng phải từ đủ 18 tuổi trở lên.'
-            : 'Customer must be at least 18 years old.',
-        );
+        throw new Error(t('customers.new.err.age'));
       }
       if (!normalizedLoanType) {
-        throw new Error(isVi ? 'Vui lòng chọn hoặc nhập loại vay.' : 'Please select or enter loan type.');
+        throw new Error(t('customers.new.err.loan_type'));
       }
       if (!trimmedLoanPurpose) {
-        throw new Error(isVi ? 'Vui lòng nhập mục đích vay.' : 'Please enter loan purpose.');
+        throw new Error(t('customers.new.err.loan_purpose'));
       }
       if (!Number.isFinite(monthlyIncome) || monthlyIncome <= 0) {
-        throw new Error(isVi ? 'Thu nhập hàng tháng phải lớn hơn 0.' : 'Monthly income must be greater than 0.');
+        throw new Error(t('customers.new.err.income'));
       }
       if (!Number.isFinite(requestedLoanAmount) || requestedLoanAmount <= 0) {
-        throw new Error(isVi ? 'Khoản vay đề nghị phải lớn hơn 0.' : 'Requested loan amount must be greater than 0.');
+        throw new Error(t('customers.new.err.loan_amount'));
       }
       if (!Number.isInteger(requestedTermMonths) || requestedTermMonths <= 0) {
-        throw new Error(
-          isVi ? 'Kỳ hạn vay phải là số tháng hợp lệ (> 0).' : 'Loan term must be a valid month count (> 0).',
-        );
+        throw new Error(t('customers.new.err.term'));
       }
       if (await checkDuplicateNationalId(normalizedNationalId)) {
-        throw new Error(
-          isVi
-            ? 'CCCD này đã tồn tại trong hệ thống. Mỗi khách hàng chỉ được dùng một CCCD duy nhất.'
-            : 'This national ID already exists in the system. Each customer must have a unique national ID.',
-        );
+        throw new Error(t('customers.new.err.duplicate_id'));
       }
 
       const response = await fetch('/api/v1/customers', {
@@ -298,10 +283,8 @@ export default function NewCustomerPage() {
       <div className="grid max-w-6xl grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Thông tin khách hàng</CardTitle>
-            <CardDescription>
-              Các trường định danh và liên hệ cần thiết để tạo khách hàng mới.
-            </CardDescription>
+            <CardTitle>{t('customers.new.card_title')}</CardTitle>
+            <CardDescription>{t('customers.new.card_desc')}</CardDescription>
           </CardHeader>
 
           <CardContent>
@@ -337,11 +320,11 @@ export default function NewCustomerPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="external_customer_ref">Mã tham chiếu ngoài</Label>
+                  <Label htmlFor="external_customer_ref">{t('customers.new.label.external_ref')}</Label>
                   <Input
                     id="external_customer_ref"
                     name="external_customer_ref"
-                    placeholder="VD: CUS-2026-001"
+                    placeholder={t('customers.new.ph.external_ref')}
                     value={formData.external_customer_ref}
                     onChange={handleChange}
                     disabled={isLoading}
@@ -363,7 +346,7 @@ export default function NewCustomerPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="date_of_birth">Ngày sinh</Label>
+                  <Label htmlFor="date_of_birth">{t('customers.new.label.date_of_birth')}</Label>
                   <Input
                     id="date_of_birth"
                     name="date_of_birth"
@@ -375,19 +358,26 @@ export default function NewCustomerPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="gender">Giới tính</Label>
-                  <Input id="gender" name="gender" placeholder="Nam / Nữ / Khác" value={formData.gender} onChange={handleChange} disabled={isLoading} />
+                  <Label htmlFor="gender">{t('customers.new.label.gender')}</Label>
+                  <Input
+                    id="gender"
+                    name="gender"
+                    placeholder={t('customers.new.ph.gender')}
+                    value={formData.gender}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="national_id">Số giấy tờ</Label>
+                  <Label htmlFor="national_id">{t('customers.new.label.national_id')}</Label>
                   <Input
                     id="national_id"
                     name="national_id"
                     inputMode="numeric"
-                    placeholder="Nhập CCCD 12 số"
+                    placeholder={t('customers.new.ph.national_id')}
                     value={formData.national_id}
                     onChange={handleChange}
                     disabled={isLoading}
@@ -396,7 +386,7 @@ export default function NewCustomerPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="id_issue_date">Ngày cấp CCCD</Label>
+                  <Label htmlFor="id_issue_date">{t('customers.new.label.id_issue_date')}</Label>
                   <Input
                     id="id_issue_date"
                     name="id_issue_date"
@@ -410,37 +400,65 @@ export default function NewCustomerPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="id_issue_place">Nơi cấp CCCD</Label>
+                  <Label htmlFor="id_issue_place">{t('customers.new.label.id_issue_place')}</Label>
                   <Input
                     id="id_issue_place"
                     name="id_issue_place"
-                    placeholder="VD: Cục CSQLHC về TTXH"
+                    placeholder={t('customers.new.ph.id_issue_place')}
                     value={formData.id_issue_place}
                     onChange={handleChange}
                     disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="nationality">Quốc tịch</Label>
-                  <Input id="nationality" name="nationality" placeholder="Việt Nam" value={formData.nationality} onChange={handleChange} disabled={isLoading} />
+                  <Label htmlFor="nationality">{t('customers.new.label.nationality')}</Label>
+                  <Input
+                    id="nationality"
+                    name="nationality"
+                    placeholder={t('customers.new.ph.nationality')}
+                    value={formData.nationality}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="marital_status">Tình trạng hôn nhân</Label>
-                  <Input id="marital_status" name="marital_status" placeholder="Độc thân / Đã kết hôn..." value={formData.marital_status} onChange={handleChange} disabled={isLoading} />
+                  <Label htmlFor="marital_status">{t('customers.new.label.marital_status')}</Label>
+                  <Input
+                    id="marital_status"
+                    name="marital_status"
+                    placeholder={t('customers.new.ph.marital_status')}
+                    value={formData.marital_status}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="occupation">Nghề nghiệp</Label>
-                  <Input id="occupation" name="occupation" placeholder="VD: Nhân viên kinh doanh" value={formData.occupation} onChange={handleChange} disabled={isLoading} />
+                  <Label htmlFor="occupation">{t('customers.new.label.occupation')}</Label>
+                  <Input
+                    id="occupation"
+                    name="occupation"
+                    placeholder={t('customers.new.ph.occupation')}
+                    value={formData.occupation}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="employment_status">Tình trạng nghề nghiệp</Label>
-                  <Input id="employment_status" name="employment_status" placeholder="Đang làm việc / Tự kinh doanh..." value={formData.employment_status} onChange={handleChange} disabled={isLoading} />
+                  <Label htmlFor="employment_status">{t('customers.new.label.employment_status')}</Label>
+                  <Input
+                    id="employment_status"
+                    name="employment_status"
+                    placeholder={t('customers.new.ph.employment_status')}
+                    value={formData.employment_status}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="monthly_income">{t('customers.new.income')} *</Label>
@@ -449,13 +467,27 @@ export default function NewCustomerPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="permanent_address">Địa chỉ thường trú</Label>
-                <Input id="permanent_address" name="permanent_address" placeholder="Địa chỉ thường trú" value={formData.permanent_address} onChange={handleChange} disabled={isLoading} />
+                <Label htmlFor="permanent_address">{t('customers.new.label.permanent_address')}</Label>
+                <Input
+                  id="permanent_address"
+                  name="permanent_address"
+                  placeholder={t('customers.new.ph.permanent_address')}
+                  value={formData.permanent_address}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="current_address">Địa chỉ hiện tại</Label>
-                <Input id="current_address" name="current_address" placeholder="Địa chỉ hiện tại" value={formData.current_address} onChange={handleChange} disabled={isLoading} />
+                <Label htmlFor="current_address">{t('customers.new.label.current_address')}</Label>
+                <Input
+                  id="current_address"
+                  name="current_address"
+                  placeholder={t('customers.new.ph.current_address')}
+                  value={formData.current_address}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
               </div>
 
               <div className="space-y-2">
@@ -468,37 +500,37 @@ export default function NewCustomerPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Thông tin hồ sơ vay</CardTitle>
-            <CardDescription>Các trường phục vụ hiển thị danh sách và thẩm định khoản vay.</CardDescription>
+            <CardTitle>{t('customers.new.loan_section_title')}</CardTitle>
+            <CardDescription>{t('customers.new.loan_section_desc')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="loan_type">Loại vay</Label>
+                <Label htmlFor="loan_type">{t('customers.new.label.loan_type')}</Label>
                 <Select
                   value={formData.loan_type}
                   onValueChange={(value) => setFormData((prev) => ({ ...prev, loan_type: value }))}
                   disabled={isLoading}
                 >
                   <SelectTrigger id="loan_type" className="w-full">
-                    <SelectValue placeholder={isVi ? 'Chọn loại vay' : 'Select loan type'} />
+                    <SelectValue placeholder={t('customers.new.loan_type_ph')} />
                   </SelectTrigger>
                   <SelectContent>
                     {LOAN_TYPE_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
-                        {isVi ? opt.labelVi : opt.labelEn}
+                        {locale === 'vi' ? opt.labelVi : opt.labelEn}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="loan_purpose">Mục đích vay</Label>
+                <Label htmlFor="loan_purpose">{t('customers.new.label.loan_purpose')}</Label>
                 <Input
                   id="loan_purpose"
                   name="loan_purpose"
                   form="new-customer-form"
-                  placeholder="Mua nhà, kinh doanh..."
+                  placeholder={t('customers.new.ph.loan_purpose')}
                   value={formData.loan_purpose}
                   onChange={handleChange}
                   disabled={isLoading}
@@ -510,29 +542,75 @@ export default function NewCustomerPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="requested_loan_amount">Khoản vay đề nghị (VND) *</Label>
-                <Input id="requested_loan_amount" name="requested_loan_amount" form="new-customer-form" inputMode="decimal" placeholder="500000000" value={formData.requested_loan_amount} onChange={handleChange} disabled={isLoading} required />
+                <Label htmlFor="requested_loan_amount">{t('customers.new.label.requested_loan_amount')} *</Label>
+                <Input
+                  id="requested_loan_amount"
+                  name="requested_loan_amount"
+                  form="new-customer-form"
+                  inputMode="decimal"
+                  placeholder="500000000"
+                  value={formData.requested_loan_amount}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                  required
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="requested_term_months">Kỳ hạn vay (tháng) *</Label>
-                <Input id="requested_term_months" name="requested_term_months" form="new-customer-form" inputMode="numeric" placeholder="VD: 36" value={formData.requested_term_months} onChange={handleChange} disabled={isLoading} required />
+                <Label htmlFor="requested_term_months">{t('customers.new.label.requested_term_months')} *</Label>
+                <Input
+                  id="requested_term_months"
+                  name="requested_term_months"
+                  form="new-customer-form"
+                  inputMode="numeric"
+                  placeholder={t('customers.new.ph.term_example')}
+                  value={formData.requested_term_months}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                  required
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="annual_interest_rate">Lãi suất năm (%)</Label>
-                <Input id="annual_interest_rate" name="annual_interest_rate" form="new-customer-form" inputMode="decimal" placeholder="VD: 11.5" value={formData.annual_interest_rate} onChange={handleChange} disabled={isLoading} />
+                <Label htmlFor="annual_interest_rate">{t('customers.new.label.annual_interest_rate')}</Label>
+                <Input
+                  id="annual_interest_rate"
+                  name="annual_interest_rate"
+                  form="new-customer-form"
+                  inputMode="decimal"
+                  placeholder={t('customers.new.ph.annual_rate_example')}
+                  value={formData.annual_interest_rate}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="collateral_id">Mã tài sản bảo đảm</Label>
-                <Input id="collateral_id" name="collateral_id" form="new-customer-form" placeholder="VD: TSBD-001" value={formData.collateral_id} onChange={handleChange} disabled={isLoading} />
+                <Label htmlFor="collateral_id">{t('customers.new.label.collateral_id')}</Label>
+                <Input
+                  id="collateral_id"
+                  name="collateral_id"
+                  form="new-customer-form"
+                  placeholder={t('customers.new.ph.collateral_id')}
+                  value={formData.collateral_id}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="collateral_value">Giá trị tài sản bảo đảm</Label>
-              <Input id="collateral_value" name="collateral_value" form="new-customer-form" inputMode="decimal" placeholder="VD: 900000000" value={formData.collateral_value} onChange={handleChange} disabled={isLoading} />
+              <Label htmlFor="collateral_value">{t('customers.new.label.collateral_value')}</Label>
+              <Input
+                id="collateral_value"
+                name="collateral_value"
+                form="new-customer-form"
+                inputMode="decimal"
+                placeholder={t('customers.new.ph.collateral_value')}
+                value={formData.collateral_value}
+                onChange={handleChange}
+                disabled={isLoading}
+              />
             </div>
 
             <div className="flex gap-2 pt-4">

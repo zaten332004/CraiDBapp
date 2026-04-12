@@ -18,7 +18,7 @@ import { clearAccessToken } from '@/lib/auth/token';
 type Step = 'request' | 'confirm';
 
 export default function ForgotPasswordPage() {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const isVi = locale === 'vi';
 
   const [step, setStep] = useState<Step>('request');
@@ -115,7 +115,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-10">
       <div className="absolute left-4 top-4 md:left-6 md:top-6">
-        <Link href="/" aria-label="Go to homepage" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+        <Link href="/" aria-label={t('auth.aria_home')} className="flex items-center gap-2 hover:opacity-90 transition-opacity">
           <Image src="/logo.svg" alt="CRAI DB" width={44} height={44} priority />
           <span className="hidden sm:inline font-semibold tracking-tight text-foreground">CRAI_DB</span>
         </Link>

@@ -248,7 +248,7 @@ export default function RiskSimulationPage() {
             <div className="space-y-2">
               <Label htmlFor="customerIdInput">{t('customers.customer_id')}</Label>
               <div className="flex gap-2">
-                <Input id="customerIdInput" value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder="VD: 123 hoặc CUST0500" />
+                <Input id="customerIdInput" value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder={t('risk.simulation.customer_id_ph')} />
                 <Button type="button" variant="outline" onClick={loadCustomerById} disabled={isLoadingCustomer}>{isLoadingCustomer ? t('common.loading') : t('common.search')}</Button>
               </div>
             </div>

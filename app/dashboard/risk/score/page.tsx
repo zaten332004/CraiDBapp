@@ -644,7 +644,7 @@ export default function RiskScorePage() {
                   <div>
                     <p className="text-sm text-muted-foreground">{t('customers.risk_score')}</p>
                     <p className="text-4xl font-bold text-accent mt-2">
-                      {typeof uiScore === 'number' ? uiScore.toFixed(1) : 'N/A'}
+                      {typeof uiScore === 'number' ? uiScore.toFixed(1) : t('common.na')}
                     </p>
                   </div>
                   <Badge variant="outline" className={riskBadgeOutlineClass(getRiskLevel())}>
@@ -654,7 +654,7 @@ export default function RiskScorePage() {
 
                 {result.cic_score != null && (
                   <div>
-                    <p className="text-sm text-muted-foreground">CIC</p>
+                    <p className="text-sm text-muted-foreground">{t('risk.score.cic_label')}</p>
                     <p className="font-medium mt-1">
                       {String(result.cic_score)} ({String(result.cic_group)})
                     </p>
@@ -673,7 +673,7 @@ export default function RiskScorePage() {
                     onClick={() => setIsExplanationOpen(true)}
                     className="w-full justify-start"
                   >
-                    {locale === 'vi' ? 'Xem chi tiết' : 'View details'}
+                    {t('risk.score.view_details_short')}
                   </Button>
                 ) : null}
                 {isSyncingCustomer ? (

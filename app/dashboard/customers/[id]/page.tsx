@@ -181,7 +181,7 @@ export default function CustomerDetailPage() {
 
   const statusBadgeLabel = useMemo(() => {
     const status = String(customer?.application_status || '').toLowerCase();
-    if (status === 'disbursed') return isVi ? 'Đã giải ngân' : 'Disbursed';
+    if (status === 'disbursed') return t('status.disbursed');
     if (status === 'approved') return t('status.approved');
     if (status === 'rejected') return t('status.rejected');
     if (status === 'pending') return t('status.pending');
@@ -204,7 +204,7 @@ export default function CustomerDetailPage() {
     return normalized;
   };
 
-  const toVietnameseValue = (value: unknown, fieldLabel?: string) => {
+  const toVietnameseValue = (value: unknown, fieldId?: string) => {
     if (value == null) return '-';
     const raw = String(value).trim();
     if (!raw) return '-';
@@ -236,12 +236,12 @@ export default function CustomerDetailPage() {
     };
     if (commonMap[normalized]) return commonMap[normalized];
 
-    if (fieldLabel === 'Giới tính') {
+    if (fieldId === 'gender') {
       if (normalized.startsWith('m')) return 'Nam';
       if (normalized.startsWith('f')) return 'Nữ';
     }
 
-    if (fieldLabel === 'Số điện thoại') return formatPhoneViDisplay(raw);
+    if (fieldId === 'phone') return formatPhoneViDisplay(raw);
     if (/[0-9@._-]/.test(raw)) return raw;
     return raw;
   };
@@ -277,7 +277,7 @@ export default function CustomerDetailPage() {
       });
       setCustomer(updated);
       setIsEditing(false);
-      notifySuccess(isVi ? 'Đã cập nhật hồ sơ.' : 'Profile updated.');
+      notifySuccess(t('customers.detail.toast_updated'));
     } catch (err) {
       notifyError(t('toast.action_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
@@ -297,7 +297,9 @@ export default function CustomerDetailPage() {
       });
       setCustomer(updated);
       setIsEditing(false);
-      notifySuccess(nextStatus === 'approved' ? (isVi ? 'Đã duyệt hồ sơ.' : 'Application approved.') : (isVi ? 'Đã từ chối hồ sơ.' : 'Application rejected.'));
+      notifySuccess(
+        nextStatus === 'approved' ? t('customers.detail.toast_approved') : t('customers.detail.toast_rejected'),
+      );
     } catch (err) {
       notifyError(t('toast.action_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
@@ -313,7 +315,7 @@ export default function CustomerDetailPage() {
   const handleConfirmReject = async () => {
     const trimmed = rejectReason.trim();
     if (!trimmed) {
-      notifyError(isVi ? 'Vui lòng nhập lý do từ chối hồ sơ.' : 'Please provide a rejection reason.');
+      notifyError(t('customers.detail.toast_reject_reason_required'));
       return;
     }
     await handleReview('rejected', trimmed);
@@ -327,7 +329,7 @@ export default function CustomerDetailPage() {
       const response = await browserApiFetchAuth<{ message?: string }>(`/customers/${customerId}`, {
         method: 'DELETE',
       });
-      notifySuccess(response?.message || (isVi ? 'Đã xóa hồ sơ khách hàng.' : 'Customer profile deleted.'));
+      notifySuccess(response?.message || t('customers.detail.toast_deleted'));
       setConfirmDeleteOpen(false);
       router.push('/dashboard/customers');
     } catch (err) {
@@ -338,7 +340,7 @@ export default function CustomerDetailPage() {
   };
 
   if (!customer) {
-    return <div className="p-8 text-sm text-muted-foreground">{isVi ? 'Đang tải dữ liệu khách hàng...' : 'Loading customer data...'}</div>;
+    return <div className="p-8 text-sm text-muted-foreground">{t('customers.detail.loading')}</div>;
   }
 
   return (
@@ -361,20 +363,20 @@ export default function CustomerDetailPage() {
           {isPending && canReviewCustomer ? (
             <>
               <Button variant="outline" onClick={handleOpenRejectDialog} disabled={isSaving}>
-                {isVi ? 'Từ chối' : 'Reject'}
+                {t('customers.detail.reject')}
               </Button>
               <Button onClick={() => void handleReview('approved')} disabled={isSaving}>
-                {isVi ? 'Duyệt' : 'Approve'}
+                {t('customers.detail.approve')}
               </Button>
             </>
           ) : null}
           <Button variant="secondary" onClick={() => setIsEditing((prev) => !prev)} disabled={!isPending || isSaving || !canManageProfile}>
             <Edit className="mr-2 h-4 w-4" />
-            {isEditing ? (isVi ? 'Hủy sửa' : 'Cancel') : t('customers.detail.edit')}
+            {isEditing ? t('customers.detail.cancel_edit') : t('customers.detail.edit')}
           </Button>
           {isEditing && isPending && canManageProfile ? (
             <Button onClick={() => void handleUpdateProfile()} disabled={isSaving || isDeleting}>
-              {isVi ? 'Cập nhật hồ sơ' : 'Update profile'}
+              {t('customers.detail.update_profile')}
             </Button>
           ) : null}
           <Button
@@ -383,7 +385,7 @@ export default function CustomerDetailPage() {
             disabled={!canManageProfile || isSaving || isDeleting}
           >
             <Trash2 className="mr-2 h-4 w-4" />
-            {isVi ? 'Xóa hồ sơ' : 'Delete profile'}
+            {t('customers.detail.delete_profile')}
           </Button>
         </div>
       </div>
@@ -391,146 +393,61 @@ export default function CustomerDetailPage() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Thông tin khách hàng</CardTitle>
-            <CardDescription>Thông tin định danh, liên hệ và hồ sơ cơ bản của khách hàng.</CardDescription>
+            <CardTitle>{t('customers.detail.info_title')}</CardTitle>
+            <CardDescription>{t('customers.detail.identity_desc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                ['Họ và tên', customer.full_name],
-                ['Mã tham chiếu ngoài', customer.external_customer_ref],
-                ['Ngày sinh', customer.date_of_birth],
-                ['Tuổi', customer.age],
-                ['Giới tính', customer.gender],
-                ['Quốc tịch', customer.nationality],
-                ['Số giấy tờ', customer.national_id],
-                ['Ngày cấp', customer.id_issue_date],
-                ['Nơi cấp', customer.id_issue_place],
-                ['Tình trạng hôn nhân', customer.marital_status],
-                ['Số điện thoại', customer.phone_number || customer.phone],
-                ['Email', customer.email],
-                ['Nghề nghiệp', customer.occupation],
-                ['Tình trạng nghề nghiệp', customer.employment_status],
-                ['Thu nhập hàng tháng', customer.monthly_income != null ? formatVnd(Number(customer.monthly_income), locale === 'vi' ? 'vi' : 'en') : '-'],
-                ['Điểm tín dụng', customer.credit_score],
-                ['Địa chỉ thường trú', customer.permanent_address],
-                ['Địa chỉ hiện tại', customer.current_address],
-              ].map(([label, value]) => (
-                <div key={String(label)} className="rounded-lg border p-3">
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                  {isEditing && isPending && ['Số điện thoại', 'Email', 'Nghề nghiệp', 'Tình trạng nghề nghiệp', 'Thu nhập hàng tháng', 'Địa chỉ thường trú', 'Địa chỉ hiện tại'].includes(String(label)) ? (
-                    String(label) === 'Tình trạng nghề nghiệp' ? (
-                      <Select
-                        value={editForm.employment_status || ''}
-                        onValueChange={(v) => setEditForm((p) => ({ ...p, employment_status: v }))}
-                      >
-                        <SelectTrigger className="mt-1 h-9 w-full">
-                          <SelectValue placeholder={isVi ? 'Chọn tình trạng nghề nghiệp' : 'Select employment status'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {EMPLOYMENT_STATUS_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {isVi ? opt.labelVi : opt.labelEn}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        className="mt-1 h-9"
-                        value={
-                          String(label) === 'Số điện thoại' ? editForm.phone_number
-                            : String(label) === 'Email' ? editForm.email
-                            : String(label) === 'Nghề nghiệp' ? editForm.occupation
-                            : String(label) === 'Thu nhập hàng tháng' ? editForm.monthly_income
-                            : String(label) === 'Địa chỉ thường trú' ? editForm.permanent_address
-                            : editForm.current_address
-                        }
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (String(label) === 'Số điện thoại') setEditForm((p) => ({ ...p, phone_number: sanitizePhoneInput(v) }));
-                          else if (String(label) === 'Email') setEditForm((p) => ({ ...p, email: v }));
-                          else if (String(label) === 'Nghề nghiệp') setEditForm((p) => ({ ...p, occupation: v }));
-                          else if (String(label) === 'Thu nhập hàng tháng') setEditForm((p) => ({ ...p, monthly_income: v.replace(/[^\d.]/g, '') }));
-                          else if (String(label) === 'Địa chỉ thường trú') setEditForm((p) => ({ ...p, permanent_address: v }));
-                          else setEditForm((p) => ({ ...p, current_address: v }));
-                        }}
-                      />
-                    )
-                  ) : (
-                    <p className="mt-1 text-sm font-medium break-words">{toVietnameseValue(value, String(label))}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Thông tin hồ sơ vay</CardTitle>
-            <CardDescription>Thông tin khoản vay, nguồn tiếp nhận và tài sản bảo đảm.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-4">
-              {[
-                ['Mã hồ sơ', customer.application_ref_no],
-                ['Ngày nộp hồ sơ', customer.application_date],
-                ['Người tạo hồ sơ', customer.created_by || '-'],
+              {(
                 [
-                  'Người duyệt',
-                  customer.approved_by
-                    ? `${customer.approved_by}${customer.approved_at ? ` (${formatDateTimeVietnam(customer.approved_at, locale)})` : ''}`
-                    : '-',
-                ],
-                ['Loại vay', customer.loan_type ?? customer.product_type ?? customer.loanType ?? customer.productType],
-                ['Mục đích vay', customer.loan_purpose],
-                [
-                  'Khoản vay',
-                  (customer.requested_loan_amount ?? customer.loan_amount) != null
-                    ? formatVnd(Number(customer.requested_loan_amount ?? customer.loan_amount), locale === 'vi' ? 'vi' : 'en')
-                    : '-',
-                ],
-                [
-                  'Thời hạn vay',
-                  (customer.requested_term_months ?? customer.loan_term_months) != null
-                    ? `${customer.requested_term_months ?? customer.loan_term_months} tháng`
-                    : '-',
-                ],
-                [
-                  'Lãi suất',
-                  (customer.annual_interest_rate ?? customer.interest_rate) != null
-                    ? `${customer.annual_interest_rate ?? customer.interest_rate}%/năm`
-                    : '-',
-                ],
-                [
-                  'Điểm rủi ro',
-                  customer.risk_score != null ? Number(customer.risk_score).toFixed(4) : '-',
-                ],
-                ['Mức rủi ro', <Badge key="risk-badge" variant="outline" className={riskBadgeClass}>{riskBadgeLabel}</Badge>],
-                ['Trạng thái hồ sơ', <Badge key="status-badge" variant="outline" className={statusBadgeClass}>{statusBadgeLabel}</Badge>],
-                ['Mã tài sản bảo đảm', customer.collateral_id],
-                [
-                  'Giá trị tài sản bảo đảm',
-                  (customer.collateral_value ?? customer.collateral_amount) != null
-                    ? formatVnd(Number(customer.collateral_value ?? customer.collateral_amount), locale === 'vi' ? 'vi' : 'en')
-                    : '-',
-                ],
-              ].map(([label, value]) => (
-                <div key={String(label)} className="rounded-lg border p-3">
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                  <div className="mt-1 text-sm font-medium break-words">
-                    {isEditing && isPending && ['Loại vay', 'Mục đích vay', 'Khoản vay', 'Thời hạn vay', 'Lãi suất', 'Mã tài sản bảo đảm', 'Giá trị tài sản bảo đảm'].includes(String(label)) ? (
-                      String(label) === 'Loại vay' ? (
+                  ['full_name', 'customers.field.full_name', customer.full_name],
+                  ['external_ref', 'customers.field.external_ref', customer.external_customer_ref],
+                  ['date_of_birth', 'customers.field.date_of_birth', customer.date_of_birth],
+                  ['age', 'customers.field.age', customer.age],
+                  ['gender', 'customers.field.gender', customer.gender],
+                  ['nationality', 'customers.field.nationality', customer.nationality],
+                  ['national_id', 'customers.field.national_id', customer.national_id],
+                  ['id_issue_date', 'customers.field.id_issue_date', customer.id_issue_date],
+                  ['id_issue_place', 'customers.field.id_issue_place', customer.id_issue_place],
+                  ['marital_status', 'customers.field.marital_status', customer.marital_status],
+                  ['phone', 'customers.field.phone', customer.phone_number || customer.phone],
+                  ['email', 'customers.field.email', customer.email],
+                  ['occupation', 'customers.field.occupation', customer.occupation],
+                  ['employment_status', 'customers.field.employment_status', customer.employment_status],
+                  ['monthly_income', 'customers.field.monthly_income', customer.monthly_income],
+                  ['credit_score', 'customers.field.credit_score_internal', customer.credit_score],
+                  ['permanent_address', 'customers.field.permanent_address', customer.permanent_address],
+                  ['current_address', 'customers.field.current_address', customer.current_address],
+                ] as const
+              ).map(([fieldId, labelKey, rawValue]) => {
+                const label = t(labelKey);
+                const editableRow =
+                  isEditing &&
+                  isPending &&
+                  canManageProfile &&
+                  ['phone', 'email', 'occupation', 'employment_status', 'monthly_income', 'permanent_address', 'current_address'].includes(
+                    fieldId,
+                  );
+                const readDisplay =
+                  fieldId === 'monthly_income'
+                    ? customer.monthly_income != null
+                      ? formatVnd(Number(customer.monthly_income), locale === 'vi' ? 'vi' : 'en')
+                      : '-'
+                    : String(toVietnameseValue(rawValue, fieldId));
+                return (
+                  <div key={fieldId} className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    {editableRow ? (
+                      fieldId === 'employment_status' ? (
                         <Select
-                          value={editForm.loan_type || ''}
-                          onValueChange={(v) => setEditForm((p) => ({ ...p, loan_type: v }))}
+                          value={editForm.employment_status || ''}
+                          onValueChange={(v) => setEditForm((p) => ({ ...p, employment_status: v }))}
                         >
-                          <SelectTrigger className="h-9 w-full">
-                            <SelectValue placeholder={isVi ? 'Chọn loại vay' : 'Select loan type'} />
+                          <SelectTrigger className="mt-1 h-9 w-full">
+                            <SelectValue placeholder={t('customers.detail.employment_ph')} />
                           </SelectTrigger>
                           <SelectContent>
-                            {LOAN_TYPE_OPTIONS.map((opt) => (
+                            {EMPLOYMENT_STATUS_OPTIONS.map((opt) => (
                               <SelectItem key={opt.value} value={opt.value}>
                                 {isVi ? opt.labelVi : opt.labelEn}
                               </SelectItem>
@@ -539,34 +456,170 @@ export default function CustomerDetailPage() {
                         </Select>
                       ) : (
                         <Input
-                          className="h-9"
+                          className="mt-1 h-9"
                           value={
-                            String(label) === 'Mục đích vay' ? editForm.loan_purpose
-                              : String(label) === 'Khoản vay' ? editForm.requested_loan_amount
-                              : String(label) === 'Thời hạn vay' ? editForm.requested_term_months
-                              : String(label) === 'Lãi suất' ? editForm.annual_interest_rate
-                              : String(label) === 'Mã tài sản bảo đảm' ? editForm.collateral_id
-                              : editForm.collateral_value
+                            fieldId === 'phone'
+                              ? editForm.phone_number
+                              : fieldId === 'email'
+                                ? editForm.email
+                                : fieldId === 'occupation'
+                                  ? editForm.occupation
+                                  : fieldId === 'monthly_income'
+                                    ? editForm.monthly_income
+                                    : fieldId === 'permanent_address'
+                                      ? editForm.permanent_address
+                                      : editForm.current_address
                           }
                           onChange={(e) => {
                             const v = e.target.value;
-                            if (String(label) === 'Mục đích vay') setEditForm((p) => ({ ...p, loan_purpose: v }));
-                            else if (String(label) === 'Khoản vay') setEditForm((p) => ({ ...p, requested_loan_amount: v.replace(/[^\d.]/g, '') }));
-                            else if (String(label) === 'Thời hạn vay') setEditForm((p) => ({ ...p, requested_term_months: v.replace(/[^\d]/g, '') }));
-                            else if (String(label) === 'Lãi suất') setEditForm((p) => ({ ...p, annual_interest_rate: v.replace(/[^\d.]/g, '') }));
-                            else if (String(label) === 'Mã tài sản bảo đảm') setEditForm((p) => ({ ...p, collateral_id: v }));
-                            else setEditForm((p) => ({ ...p, collateral_value: v.replace(/[^\d.]/g, '') }));
+                            if (fieldId === 'phone') setEditForm((p) => ({ ...p, phone_number: sanitizePhoneInput(v) }));
+                            else if (fieldId === 'email') setEditForm((p) => ({ ...p, email: v }));
+                            else if (fieldId === 'occupation') setEditForm((p) => ({ ...p, occupation: v }));
+                            else if (fieldId === 'monthly_income') setEditForm((p) => ({ ...p, monthly_income: v.replace(/[^\d.]/g, '') }));
+                            else if (fieldId === 'permanent_address') setEditForm((p) => ({ ...p, permanent_address: v }));
+                            else setEditForm((p) => ({ ...p, current_address: v }));
                           }}
                         />
                       )
-                    ) : typeof value === 'string' || typeof value === 'number' ? (
-                      toVietnameseValue(value, String(label))
                     ) : (
-                      (value as any ?? '-')
+                      <p className="mt-1 text-sm font-medium break-words">{readDisplay}</p>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('customers.detail.loan_section_title')}</CardTitle>
+            <CardDescription>{t('customers.detail.loan_section_desc')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4">
+              {(
+                [
+                  ['application_ref', 'customers.field.application_ref', customer.application_ref_no],
+                  ['application_date', 'customers.field.application_date', customer.application_date],
+                  ['created_by', 'customers.field.created_by', customer.created_by || '-'],
+                  [
+                    'approved_by',
+                    'customers.field.approved_by',
+                    customer.approved_by
+                      ? `${customer.approved_by}${customer.approved_at ? ` (${formatDateTimeVietnam(customer.approved_at, locale)})` : ''}`
+                      : '-',
+                  ],
+                  [
+                    'loan_type',
+                    'customers.field.loan_type',
+                    customer.loan_type ?? customer.product_type ?? customer.loanType ?? customer.productType,
+                  ],
+                  ['loan_purpose', 'customers.field.loan_purpose', customer.loan_purpose],
+                  [
+                    'loan_amount',
+                    'customers.field.loan_amount_display',
+                    (customer.requested_loan_amount ?? customer.loan_amount) != null
+                      ? formatVnd(Number(customer.requested_loan_amount ?? customer.loan_amount), locale === 'vi' ? 'vi' : 'en')
+                      : '-',
+                  ],
+                  [
+                    'loan_term',
+                    'customers.field.loan_term_display',
+                    (customer.requested_term_months ?? customer.loan_term_months) != null
+                      ? `${customer.requested_term_months ?? customer.loan_term_months} ${t('common.months')}`
+                      : '-',
+                  ],
+                  [
+                    'interest_rate',
+                    'customers.field.interest_rate_display',
+                    (customer.annual_interest_rate ?? customer.interest_rate) != null
+                      ? `${customer.annual_interest_rate ?? customer.interest_rate}${t('customers.detail.apr_suffix')}`
+                      : '-',
+                  ],
+                  ['risk_score', 'customers.field.risk_score_raw', customer.risk_score != null ? Number(customer.risk_score).toFixed(4) : '-'],
+                  ['risk_level', 'customers.detail.risk_level', '__risk_badge__'],
+                  ['application_status', 'customers.field.application_status', '__status_badge__'],
+                  ['collateral_id', 'customers.field.collateral_id', customer.collateral_id],
+                  [
+                    'collateral_value',
+                    'customers.field.collateral_value',
+                    (customer.collateral_value ?? customer.collateral_amount) != null
+                      ? formatVnd(Number(customer.collateral_value ?? customer.collateral_amount), locale === 'vi' ? 'vi' : 'en')
+                      : '-',
+                  ],
+                ] as const
+              ).map(([fieldId, labelKey, value]) => {
+                const label = t(labelKey);
+                const editableLoan =
+                  isEditing &&
+                  isPending &&
+                  canManageProfile &&
+                  ['loan_type', 'loan_purpose', 'loan_amount', 'loan_term', 'interest_rate', 'collateral_id', 'collateral_value'].includes(
+                    fieldId,
+                  );
+                return (
+                  <div key={fieldId} className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <div className="mt-1 text-sm font-medium break-words">
+                      {editableLoan ? (
+                        fieldId === 'loan_type' ? (
+                          <Select value={editForm.loan_type || ''} onValueChange={(v) => setEditForm((p) => ({ ...p, loan_type: v }))}>
+                            <SelectTrigger className="h-9 w-full">
+                              <SelectValue placeholder={t('customers.detail.loan_type_ph')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {LOAN_TYPE_OPTIONS.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {isVi ? opt.labelVi : opt.labelEn}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            className="h-9"
+                            value={
+                              fieldId === 'loan_purpose'
+                                ? editForm.loan_purpose
+                                : fieldId === 'loan_amount'
+                                  ? editForm.requested_loan_amount
+                                  : fieldId === 'loan_term'
+                                    ? editForm.requested_term_months
+                                    : fieldId === 'interest_rate'
+                                      ? editForm.annual_interest_rate
+                                      : fieldId === 'collateral_id'
+                                        ? editForm.collateral_id
+                                        : editForm.collateral_value
+                            }
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (fieldId === 'loan_purpose') setEditForm((p) => ({ ...p, loan_purpose: v }));
+                              else if (fieldId === 'loan_amount') setEditForm((p) => ({ ...p, requested_loan_amount: v.replace(/[^\d.]/g, '') }));
+                              else if (fieldId === 'loan_term') setEditForm((p) => ({ ...p, requested_term_months: v.replace(/[^\d]/g, '') }));
+                              else if (fieldId === 'interest_rate') setEditForm((p) => ({ ...p, annual_interest_rate: v.replace(/[^\d.]/g, '') }));
+                              else if (fieldId === 'collateral_id') setEditForm((p) => ({ ...p, collateral_id: v }));
+                              else setEditForm((p) => ({ ...p, collateral_value: v.replace(/[^\d.]/g, '') }));
+                            }}
+                          />
+                        )
+                      ) : fieldId === 'risk_level' ? (
+                        <Badge variant="outline" className={riskBadgeClass}>
+                          {riskBadgeLabel}
+                        </Badge>
+                      ) : fieldId === 'application_status' ? (
+                        <Badge variant="outline" className={statusBadgeClass}>
+                          {statusBadgeLabel}
+                        </Badge>
+                      ) : typeof value === 'string' || typeof value === 'number' ? (
+                        toVietnameseValue(value, fieldId)
+                      ) : (
+                        String(value ?? '-')
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -575,16 +628,12 @@ export default function CustomerDetailPage() {
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{isVi ? 'Xóa hồ sơ khách hàng?' : 'Delete customer profile?'}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {isVi
-                ? 'Thao tác này sẽ xóa toàn bộ dữ liệu hồ sơ vay liên quan. Bạn có chắc chắn muốn tiếp tục?'
-                : 'This action deletes the profile and related loan records. Are you sure you want to continue?'}
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('customers.detail.delete_title')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('customers.detail.delete_desc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>
-              {isVi ? 'Hủy' : 'Cancel'}
+              {t('common.cancel')}
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 text-white hover:bg-red-700"
@@ -594,7 +643,7 @@ export default function CustomerDetailPage() {
               }}
               disabled={isDeleting}
             >
-              {isDeleting ? (isVi ? 'Đang xóa...' : 'Deleting...') : (isVi ? 'Xóa hồ sơ' : 'Delete')}
+              {isDeleting ? t('customers.detail.deleting') : t('customers.detail.delete_confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -603,26 +652,24 @@ export default function CustomerDetailPage() {
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isVi ? 'Lý do từ chối hồ sơ' : 'Rejection reason'}</DialogTitle>
+            <DialogTitle>{t('customers.detail.reject_title')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              {isVi ? 'Vui lòng nhập lý do cụ thể trước khi từ chối hồ sơ.' : 'Please provide a specific reason before rejecting this dossier.'}
-            </p>
+            <p className="text-sm text-muted-foreground">{t('customers.detail.reject_hint')}</p>
             <Textarea
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}
-              placeholder={isVi ? 'Nhập lý do từ chối...' : 'Enter rejection reason...'}
+              placeholder={t('customers.detail.reject_ph')}
               rows={4}
               disabled={isSaving}
             />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectDialogOpen(false)} disabled={isSaving}>
-              {isVi ? 'Hủy' : 'Cancel'}
+              {t('common.cancel')}
             </Button>
             <Button variant="destructive" onClick={() => void handleConfirmReject()} disabled={isSaving}>
-              {isVi ? 'Xác nhận từ chối' : 'Confirm reject'}
+              {t('customers.detail.confirm_reject')}
             </Button>
           </DialogFooter>
         </DialogContent>

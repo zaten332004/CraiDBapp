@@ -598,7 +598,7 @@ export default function ProfilePage() {
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="new-email@example.com"
+                  placeholder={t('profile.new_email_ph')}
                 />
               </div>
               <Button onClick={requestEmailChange} disabled={sendingEmailCode || !newEmail.trim()}>
@@ -618,7 +618,7 @@ export default function ProfilePage() {
                       id="email-code"
                       value={emailCode}
                       onChange={(e) => setEmailCode(e.target.value)}
-                      placeholder={isVi ? 'Nhập mã xác minh' : 'Enter verification code'}
+                      placeholder={t('profile.verify_code_ph')}
                     />
                   </div>
                   <Button onClick={confirmEmailChange} disabled={confirmingEmailCode || !emailCode.trim()}>
@@ -683,7 +683,7 @@ export default function ProfilePage() {
                       maxLength={6}
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder={isVi ? 'Nhập PIN hiện tại' : 'Enter current PIN'}
+                      placeholder={t('profile.pin_current_ph')}
                     />
                   </div>
                   <div className="space-y-2">
@@ -695,7 +695,7 @@ export default function ProfilePage() {
                       maxLength={6}
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder={isVi ? 'Nhập PIN mới 6 số' : 'Enter new 6-digit PIN'}
+                      placeholder={t('profile.pin_new_ph')}
                     />
                   </div>
                   <div className="space-y-2">
@@ -707,7 +707,7 @@ export default function ProfilePage() {
                       maxLength={6}
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder={isVi ? 'Nhập lại PIN mới' : 'Re-enter new PIN'}
+                      placeholder={t('profile.pin_reenter_new_ph')}
                     />
                   </div>
                   <Button onClick={() => void changeAccountPin()} disabled={savingPin}>
@@ -731,7 +731,7 @@ export default function ProfilePage() {
                       maxLength={6}
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder={isVi ? 'Nhập PIN 6 số' : 'Enter 6-digit PIN'}
+                      placeholder={t('profile.pin_init_ph')}
                     />
                   </div>
                   <div className="space-y-2">
@@ -743,7 +743,7 @@ export default function ProfilePage() {
                       maxLength={6}
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder={isVi ? 'Nhập lại PIN 6 số' : 'Re-enter 6-digit PIN'}
+                      placeholder={t('profile.pin_init_reenter_ph')}
                     />
                   </div>
                   <Button onClick={() => void setInitialAccountPin()} disabled={savingPin}>
@@ -774,7 +774,7 @@ export default function ProfilePage() {
               {cropPreviewUrl ? (
                 <img
                   src={cropPreviewUrl}
-                  alt="Crop preview"
+                  alt={t('profile.crop_preview_alt')}
                   className="absolute left-1/2 top-1/2 h-full w-full max-w-none object-cover select-none pointer-events-none"
                   draggable={false}
                   onDragStart={(e) => e.preventDefault()}

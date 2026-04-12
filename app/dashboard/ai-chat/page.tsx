@@ -1414,7 +1414,7 @@ export default function AIChatPage() {
                   disabled={isLoading}
                   size="icon"
                   className="shrink-0 rounded-lg h-9 w-9"
-                  aria-label="Refresh sessions"
+                  aria-label={t('ui.a11y.refresh_sessions')}
                 >
                   <RefreshCw className="h-4 w-4" />
                 </Button>

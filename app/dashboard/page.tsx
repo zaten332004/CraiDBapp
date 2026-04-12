@@ -158,12 +158,8 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle>{locale === 'vi' ? 'Xu hướng danh mục' : 'Portfolio trend'}</CardTitle>
-                <CardDescription>
-                  {locale === 'vi'
-                    ? 'Giá trị danh mục theo thời gian và điểm trung bình'
-                    : 'Portfolio value over time and average score'}
-                </CardDescription>
+                <CardTitle>{t('dashboard.chart_portfolio_trend_title')}</CardTitle>
+                <CardDescription>{t('dashboard.chart_portfolio_trend_desc')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -182,9 +178,9 @@ export default function DashboardPage() {
                         name === 'value'
                           ? [
                               formatCompactVnd(Number(value), locale === 'vi' ? 'vi' : 'en'),
-                              locale === 'vi' ? 'Giá trị danh mục' : 'Portfolio value',
+                              t('dashboard.chart_legend_portfolio_value'),
                             ]
-                          : [value, locale === 'vi' ? 'Điểm trung bình' : 'Average score']
+                          : [value, t('dashboard.chart_legend_avg_score')]
                       }
                     />
                     <Legend />
@@ -194,7 +190,7 @@ export default function DashboardPage() {
                       dataKey="value"
                       stroke="#0ea5a6"
                       strokeWidth={2}
-                      name={locale === 'vi' ? 'Giá trị danh mục' : 'Portfolio value'}
+                      name={t('dashboard.chart_legend_portfolio_value')}
                     />
                     <Line
                       yAxisId="right"
@@ -202,7 +198,7 @@ export default function DashboardPage() {
                       dataKey="score"
                       stroke="#6366f1"
                       strokeWidth={2}
-                      name={locale === 'vi' ? 'Điểm rủi ro TB' : 'Avg risk score'}
+                      name={t('dashboard.chart_legend_avg_score')}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -211,17 +207,13 @@ export default function DashboardPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>{locale === 'vi' ? 'Cảnh báo gần đây' : 'Recent Alerts'}</CardTitle>
-                <CardDescription>
-                  {locale === 'vi'
-                    ? '4 cảnh báo mở mới nhất trong hệ thống'
-                    : 'Latest 4 open alerts'}
-                </CardDescription>
+                <CardTitle>{t('dashboard.recent_alerts_title')}</CardTitle>
+                <CardDescription>{t('dashboard.recent_alerts_desc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {recentAlerts.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    {locale === 'vi' ? 'Hiện chưa có cảnh báo mở.' : 'No open alerts yet.'}
+                    {t('dashboard.no_open_alerts')}
                   </p>
                 ) : (
                   recentAlerts.map((item) => (
@@ -232,7 +224,7 @@ export default function DashboardPage() {
                       <div>
                         <p className="font-medium text-foreground">
                           {item.customer_name ||
-                            `${locale === 'vi' ? 'Khách hàng' : 'Customer'} #${item.alert_id}`}
+                            `${t('dashboard.customer_fallback')} #${item.alert_id}`}
                         </p>
                         <p className="text-sm text-muted-foreground">{item.message}</p>
                       </div>

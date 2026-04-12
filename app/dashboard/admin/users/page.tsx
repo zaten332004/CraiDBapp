@@ -370,7 +370,7 @@ export default function AdminUsersPage() {
           <p className="text-muted-foreground mt-2">{t('admin.users.desc')}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={handleExportCsv} aria-label="Export CSV">
+          <Button variant="outline" size="icon" onClick={handleExportCsv} aria-label={t('ui.a11y.export_csv')}>
             <Download className="h-4 w-4" />
           </Button>
           <Button variant="outline" onClick={() => void loadUsers()} disabled={isLoading}>

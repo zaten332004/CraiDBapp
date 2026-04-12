@@ -168,8 +168,12 @@ export default function PortfolioOverviewPage() {
               </LineChart>
             </ResponsiveContainer>
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700">Giá trị danh mục (VND)</Badge>
-              <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">Điểm trung bình (0-100)</Badge>
+              <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700">
+                {t('portfolio.overview.chart_badge_portfolio_value')}
+              </Badge>
+              <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">
+                {t('portfolio.overview.chart_badge_avg_score')}
+              </Badge>
             </div>
           </CardContent>
         </Card>
@@ -192,7 +196,7 @@ export default function PortfolioOverviewPage() {
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
-            <p className="mt-3 text-xs text-muted-foreground">Ghi chú: Màu xanh là rủi ro thấp, vàng là trung bình, đỏ là cao.</p>
+            <p className="mt-3 text-xs text-muted-foreground">{t('portfolio.overview.risk_color_legend')}</p>
           </CardContent>
         </Card>
       </div>

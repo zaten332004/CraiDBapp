@@ -539,14 +539,6 @@ export default function PowerBIConfigPage() {
         <div className="space-y-3 border-t border-border pt-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-foreground">{t('powerbi.table_data_preview_title')}</span>
-            {p.table_list_source ? (
-              <Badge variant="secondary" className="max-w-full whitespace-normal font-normal">
-                {t('powerbi.table_data_source_label')}:{' '}
-                {p.table_list_source === 'saved_hints'
-                  ? t('powerbi.toast.test_tables_source_hints_saved')
-                  : t('powerbi.toast.test_tables_source_api')}
-              </Badge>
-            ) : null}
           </div>
           {schemas.length > 0 ? (
             <div className="max-h-80 space-y-3 overflow-y-auto pr-1">

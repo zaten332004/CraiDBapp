@@ -443,48 +443,58 @@ export default function UploadPage() {
           {/* Import Summary */}
           <Card>
             <CardHeader>
-              <CardTitle>Kết quả import</CardTitle>
+              <CardTitle>{t('upload.import_result_title')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="rounded-md border bg-secondary p-3 text-sm">
-                <p>Tổng số dòng trong file: <span className="font-semibold">{summary.totalRows}</span></p>
-                <p>Dòng import thành công: <span className="font-semibold text-emerald-700">{summary.successRows}</span></p>
-                <p>Dòng import thất bại: <span className="font-semibold text-rose-700">{summary.failedRows}</span></p>
+                <p>
+                  {t('upload.total_rows')}: <span className="font-semibold">{summary.totalRows}</span>
+                </p>
+                <p>
+                  {t('upload.success_rows')}: <span className="font-semibold text-emerald-700">{summary.successRows}</span>
+                </p>
+                <p>
+                  {t('upload.failed_rows')}: <span className="font-semibold text-rose-700">{summary.failedRows}</span>
+                </p>
               </div>
               <div className="rounded-md border bg-secondary p-3 text-sm">
-                <p>Thất bại do trùng ID: <span className="font-semibold text-rose-700">{duplicateCounts.duplicateId}</span></p>
-                <p>Thất bại do trùng email: <span className="font-semibold text-rose-700">{duplicateCounts.duplicateEmail}</span></p>
-                <p>Thất bại do trùng tên: <span className="font-semibold text-rose-700">{duplicateCounts.duplicateName}</span></p>
-                <p className="mt-2 text-muted-foreground text-xs">
-                  Các lỗi khác (thiếu cột, sai kiểu dữ liệu, vi phạm validation…) không nằm trong ba nhóm trên — xem bảng chi tiết bên dưới.
+                <p>
+                  {t('upload.fail_duplicate_id')}: <span className="font-semibold text-rose-700">{duplicateCounts.duplicateId}</span>
                 </p>
+                <p>
+                  {t('upload.fail_duplicate_email')}: <span className="font-semibold text-rose-700">{duplicateCounts.duplicateEmail}</span>
+                </p>
+                <p>
+                  {t('upload.fail_duplicate_name')}: <span className="font-semibold text-rose-700">{duplicateCounts.duplicateName}</span>
+                </p>
+                <p className="mt-2 text-muted-foreground text-xs">{t('upload.fail_other_note')}</p>
               </div>
 
               {isLoadingErrors && summary.failedRows > 0 ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Đang tải chi tiết lỗi từng dòng…
+                  {t('upload.loading_row_errors')}
                 </div>
               ) : null}
 
               {!isLoadingErrors && summary.failedRows > 0 && importErrors.length === 0 && derivedJobId ? (
                 <p className="text-sm text-muted-foreground">
-                  {locale === 'vi'
-                    ? `Có ${summary.failedRows} dòng lỗi nhưng không lấy được danh sách từ API /jobs/${derivedJobId}/errors. Kiểm tra backend hoặc quyền truy cập.`
-                    : `${summary.failedRows} row(s) failed but the error list could not be loaded from /jobs/${derivedJobId}/errors. Check the backend or your permissions.`}
+                  {t('upload.errors_list_failed')
+                    .replace('{count}', String(summary.failedRows))
+                    .replace('{job}', String(derivedJobId))}
                 </p>
               ) : null}
 
               {importErrors.length > 0 ? (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Chi tiết lỗi theo dòng</p>
+                  <p className="text-sm font-medium">{t('upload.row_errors_title')}</p>
                   <div className="max-h-[320px] overflow-auto rounded-md border">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-16">Dòng</TableHead>
-                          <TableHead>Tên / Email</TableHead>
-                          <TableHead>Lý do</TableHead>
+                          <TableHead className="w-16">{t('upload.col_row')}</TableHead>
+                          <TableHead>{t('upload.col_name_email')}</TableHead>
+                          <TableHead>{t('upload.col_reason')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -515,9 +525,7 @@ export default function UploadPage() {
         <Card>
           <CardHeader>
             <CardTitle>{t('upload.history_title')}</CardTitle>
-            <CardDescription>
-              5 lần tải lên gần nhất
-            </CardDescription>
+            <CardDescription>{t('upload.history_recent_count')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {uploadHistory.map((item) => (
@@ -537,7 +545,9 @@ export default function UploadPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-medium text-sm truncate">{item.file_name || '-'}</p>
-                    <p className="text-xs text-muted-foreground">{item.status === 'completed' ? 'Import thành công' : 'Import thất bại'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.status === 'completed' ? t('upload.import_status_ok') : t('upload.import_status_fail')}
+                    </p>
                   </div>
                   <Badge variant="secondary" className="shrink-0">
                     {item.status === 'completed' ? <CheckCircle className="h-3 w-3 mr-1" /> : <AlertCircle className="h-3 w-3 mr-1" />}
@@ -553,7 +563,7 @@ export default function UploadPage() {
               </div>
             ))}
             {uploadHistory.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Chưa có lịch sử tải lên.</p>
+              <p className="text-xs text-muted-foreground">{t('upload.no_history')}</p>
             ) : null}
           </CardContent>
         </Card>
@@ -562,16 +572,16 @@ export default function UploadPage() {
       <Dialog open={isFileDetailOpen} onOpenChange={setIsFileDetailOpen}>
         <DialogContent className="!w-[98vw] !max-w-none h-[92vh] overflow-hidden p-0">
           <DialogHeader className="px-6 pt-5 pb-2">
-            <DialogTitle>Chi tiết file đã tải lên</DialogTitle>
+            <DialogTitle>{t('upload.file_detail_title')}</DialogTitle>
             <DialogDescription>
               {historyFileDetail?.fileName
-                ? `${historyFileDetail.fileName} (${historyFileDetail.rows.length} dòng, ${historyFileDetail.columns.length} cột)`
-                : 'Đang tải chi tiết file...'}
+                ? `${historyFileDetail.fileName} (${historyFileDetail.rows.length} ${t('upload.rows_unit')}, ${historyFileDetail.columns.length} ${t('upload.columns_unit')})`
+                : t('upload.file_detail_loading')}
             </DialogDescription>
           </DialogHeader>
           <div className="h-[calc(92vh-88px)] px-6 pb-5 overflow-hidden">
             {isLoadingFileDetail ? (
-              <p className="text-sm text-muted-foreground">Đang tải chi tiết file...</p>
+              <p className="text-sm text-muted-foreground">{t('upload.file_detail_loading')}</p>
             ) : historyFileDetail ? (
               <div className="h-full w-full rounded-md border bg-slate-50 p-3">
                 <div className="h-full w-full overflow-scroll rounded-md border bg-white">
@@ -612,7 +622,7 @@ export default function UploadPage() {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Không có dữ liệu chi tiết.</p>
+              <p className="text-sm text-muted-foreground">{t('upload.file_detail_empty')}</p>
             )}
           </div>
         </DialogContent>
