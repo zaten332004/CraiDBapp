@@ -24,6 +24,10 @@ import {
   riskExplanationFrameClass,
 } from '@/components/risk-score-explanation';
 
+/** Ô chỉ đọc sau khi load khách: gỡ opacity mờ của `disabled`, chữ rõ và đậm hơn một chút. */
+const RISK_SCORE_LOADED_FIELD_CLASS =
+  'disabled:cursor-not-allowed disabled:opacity-100 disabled:text-foreground font-medium disabled:bg-muted/45';
+
 type ScoreForm = {
   customerLookup: string;
   name: string;
@@ -149,6 +153,7 @@ function VndDigitField(props: {
         onBlur={() => setFocused(false)}
         onChange={(e) => onDigitsChange(sanitizeVndDigitString(e.target.value))}
         disabled={disabled}
+        className={disabled ? RISK_SCORE_LOADED_FIELD_CLASS : undefined}
       />
     </div>
   );
@@ -468,6 +473,7 @@ export default function RiskScorePage() {
                   value={formData.name}
                   onChange={handleChange}
                   disabled
+                  className={RISK_SCORE_LOADED_FIELD_CLASS}
                 />
               </div>
 
@@ -503,6 +509,7 @@ export default function RiskScorePage() {
                     value={formData.age}
                     onChange={handleChange}
                     disabled
+                    className={RISK_SCORE_LOADED_FIELD_CLASS}
                   />
                 </div>
                 <div className="space-y-2">
@@ -516,6 +523,7 @@ export default function RiskScorePage() {
                     value={formData.creditHistory}
                     onChange={handleChange}
                     disabled
+                    className={RISK_SCORE_LOADED_FIELD_CLASS}
                   />
                 </div>
               </div>
@@ -532,6 +540,7 @@ export default function RiskScorePage() {
                   value={formData.creditScore}
                   onChange={handleChange}
                   disabled
+                  className={RISK_SCORE_LOADED_FIELD_CLASS}
                 />
               </div>
 
@@ -543,7 +552,7 @@ export default function RiskScorePage() {
                     onValueChange={(v) => setFormData((p) => ({ ...p, loanType: v === '__none__' ? '' : v }))}
                     disabled
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={cn('w-full', RISK_SCORE_LOADED_FIELD_CLASS)}>
                       <SelectValue placeholder={t('risk.score.loan_type_opt.unspecified')} />
                     </SelectTrigger>
                     <SelectContent>
@@ -565,6 +574,7 @@ export default function RiskScorePage() {
                     value={formData.interestRate}
                     onChange={handleChange}
                     disabled
+                    className={RISK_SCORE_LOADED_FIELD_CLASS}
                   />
                 </div>
               </div>
@@ -581,6 +591,7 @@ export default function RiskScorePage() {
                     value={formData.loanTermMonths}
                     onChange={handleChange}
                     disabled
+                    className={RISK_SCORE_LOADED_FIELD_CLASS}
                   />
                 </div>
                 <VndDigitField
@@ -594,7 +605,7 @@ export default function RiskScorePage() {
 
               <div className="space-y-2">
                 <Label>{t('risk.score.employment')}</Label>
-                <div className="flex min-h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground">
+                <div className="flex min-h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm font-medium text-foreground">
                   {formData.employmentDisplay.trim() ? formData.employmentDisplay : '—'}
                 </div>
               </div>
