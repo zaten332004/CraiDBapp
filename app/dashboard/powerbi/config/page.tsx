@@ -8,12 +8,18 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, RefreshCw, Unplug, PlugZap } from 'lucide-react';
+import { Loader2, ListChecks, RefreshCw, Trash2, Unplug, PlugZap } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { useI18n } from '@/components/i18n-provider';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 import { notifyError, notifyInfo, notifySuccess } from '@/lib/notify';
+import { POWER_BI_REFERENCE_EXTENDED_TABLES } from '@/lib/powerbi/reference-tables';
+import {
+  getDefaultPowerBiTableSuggestions,
+  loadPowerBiTableSuggestions,
+  savePowerBiTableSuggestions,
+} from '@/lib/powerbi/table-suggestions-storage';
 
 type PowerBIWorkspace = { id: string; name: string; raw: unknown };
 type PowerBIDataset = { id: string; name: string; raw: unknown };
@@ -69,6 +75,8 @@ export default function PowerBIConfigPage() {
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('');
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>('');
   const [refreshResult, setRefreshResult] = useState<any>(null);
+  const [tableSuggestions, setTableSuggestions] = useState<string[]>(() => getDefaultPowerBiTableSuggestions());
+  const [newTableName, setNewTableName] = useState('');
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((w) => w.id === selectedWorkspaceId) ?? null,
@@ -338,6 +346,10 @@ export default function PowerBIConfigPage() {
   };
 
   useEffect(() => {
+    setTableSuggestions(loadPowerBiTableSuggestions());
+  }, []);
+
+  useEffect(() => {
     (async () => {
       setIsLoading(true);
       try {
@@ -352,6 +364,38 @@ export default function PowerBIConfigPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const updateTableSuggestions = (next: string[]) => {
+    const cleaned = [...new Set(next.map((s) => s.trim()).filter(Boolean))];
+    setTableSuggestions(cleaned);
+    savePowerBiTableSuggestions(cleaned);
+  };
+
+  const handleAddTableSuggestion = () => {
+    const name = newTableName.trim();
+    if (!name) return;
+    if (tableSuggestions.includes(name)) {
+      setNewTableName('');
+      return;
+    }
+    updateTableSuggestions([...tableSuggestions, name]);
+    setNewTableName('');
+  };
+
+  const handleRemoveTableSuggestion = (name: string) => {
+    updateTableSuggestions(tableSuggestions.filter((x) => x !== name));
+  };
+
+  const handleResetTableSuggestions = () => {
+    const defaults = getDefaultPowerBiTableSuggestions();
+    setTableSuggestions(defaults);
+    savePowerBiTableSuggestions(defaults);
+  };
+
+  const handleAppendExtendedSuggestion = (name: string) => {
+    if (tableSuggestions.includes(name)) return;
+    updateTableSuggestions([...tableSuggestions, name]);
+  };
+
   return (
     <div className="flex flex-col gap-8 p-8">
       <div>
@@ -361,51 +405,89 @@ export default function PowerBIConfigPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('powerbi.config_title')}</CardTitle>
-              <CardDescription>
-                {t('powerbi.config_desc')}
-              </CardDescription>
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 xl:items-stretch">
+          <Card className="flex flex-col">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-xl">{t('powerbi.config_title')}</CardTitle>
+              <CardDescription>{t('powerbi.config_subtitle')}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="tenantId">{t('powerbi.tenant_id')}</Label>
-                <Input
-                  id="tenantId"
-                  placeholder={t('powerbi.tenant_id_ph')}
-                  value={config.tenantId}
-                  onChange={(e) => setConfig({ ...config, tenantId: e.target.value })}
-                  disabled={isConnected === true}
-                />
+            <CardContent className="flex flex-1 flex-col gap-5">
+              <div
+                className="space-y-3 rounded-lg border border-border bg-muted/30 p-4"
+                aria-label={t('powerbi.status_title')}
+              >
+                <p className="text-sm font-semibold text-foreground">{t('powerbi.status_title')}</p>
+                <div className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-muted-foreground">{t('powerbi.status_server_label')}:</span>
+                    <Badge variant={isConnected ? 'secondary' : 'outline'}>
+                      {isConnected ? t('common.connected') : t('common.not_connected')}
+                    </Badge>
+                  </div>
+                  {lastCheckedAt ? (
+                    <p className="text-muted-foreground">
+                      {t('common.last_checked')}:{' '}
+                      <span className="font-medium tabular-nums text-foreground">
+                        {formatDateTimeVietnam(lastCheckedAt, locale)}
+                      </span>
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">{t('powerbi.status_account_label')}:</span>
+                  <Badge variant={accountStatus.connected ? 'secondary' : 'outline'}>
+                    {accountStatus.connected ? t('powerbi.account_configured') : t('powerbi.account_not_configured')}
+                  </Badge>
+                </div>
+                {accountStatus.connected && accountStatus.lastSync ? (
+                  <p className="text-xs text-muted-foreground">
+                    {t('powerbi.last_synced')}:{' '}
+                    <span className="font-medium tabular-nums text-foreground">
+                      {formatDateTimeVietnam(accountStatus.lastSync, locale)}
+                    </span>
+                  </p>
+                ) : null}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="workspaceId">{t('powerbi.workspace_id')}</Label>
-                <Input
-                  id="workspaceId"
-                  placeholder={t('powerbi.workspace_id_ph')}
-                  value={config.workspaceId}
-                  onChange={(e) => setConfig({ ...config, workspaceId: e.target.value })}
-                  disabled={isConnected === true}
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tenantId">{t('powerbi.tenant_id')}</Label>
+                  <Input
+                    id="tenantId"
+                    placeholder={t('powerbi.tenant_id_ph')}
+                    value={config.tenantId}
+                    onChange={(e) => setConfig({ ...config, tenantId: e.target.value })}
+                    disabled={isConnected === true}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="workspaceId">{t('powerbi.workspace_id')}</Label>
+                  <Input
+                    id="workspaceId"
+                    placeholder={t('powerbi.workspace_id_ph')}
+                    value={config.workspaceId}
+                    onChange={(e) => setConfig({ ...config, workspaceId: e.target.value })}
+                    disabled={isConnected === true}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="datasetId">{t('powerbi.dataset_id')}</Label>
+                  <Input
+                    id="datasetId"
+                    placeholder={t('powerbi.dataset_id_ph')}
+                    value={config.datasetId}
+                    onChange={(e) => setConfig({ ...config, datasetId: e.target.value })}
+                    disabled={isConnected === true}
+                  />
+                </div>
+
+                <p className="text-xs leading-relaxed text-muted-foreground">{t('powerbi.guid_paste_hint')}</p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="datasetId">{t('powerbi.dataset_id')}</Label>
-                <Input
-                  id="datasetId"
-                  placeholder={t('powerbi.dataset_id_ph')}
-                  value={config.datasetId}
-                  onChange={(e) => setConfig({ ...config, datasetId: e.target.value })}
-                  disabled={isConnected === true}
-                />
-                <p className="text-xs text-muted-foreground">{t('powerbi.dataset_id_hint')}</p>
-              </div>
-
-              <div className="flex gap-2 pt-4">
+              <div className="mt-auto flex flex-col gap-2 pt-1 sm:flex-row">
                 <Button onClick={handleConnect} disabled={isLoading} className="flex-1">
                   {isLoading ? (
                     <>
@@ -437,206 +519,316 @@ export default function PowerBIConfigPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="flex flex-col">
             <CardHeader>
-              <CardTitle>{t('powerbi.view_workspaces')}</CardTitle>
-              <CardDescription>
-                {t('powerbi.view_datasets')}
-              </CardDescription>
+              <CardTitle className="text-xl">{t('powerbi.hints_title')}</CardTitle>
+              <CardDescription>{t('powerbi.hints_card_desc')}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>{t('powerbi.workspace')}</Label>
-                  <Select
-                    value={selectedWorkspaceId}
-                    onValueChange={(v) => {
-                      setSelectedWorkspaceId(v);
-                      setConfig((prev) => ({ ...prev, workspaceId: v }));
-                    }}
+            <CardContent className="flex-1 space-y-4 text-sm leading-relaxed text-muted-foreground">
+              <section className="rounded-lg border border-amber-200/90 bg-amber-50/70 p-3 dark:border-amber-900/60 dark:bg-amber-950/25">
+                <p className="font-medium text-foreground">{t('powerbi.hints_prereq_label')}</p>
+                <p className="mt-2 whitespace-pre-line text-[13px] leading-relaxed">{t('powerbi.hints_prereq_body')}</p>
+              </section>
+              <section className="rounded-lg border border-border bg-muted/40 p-3">
+                <p className="font-medium text-foreground">{t('powerbi.hints_sp_label')}</p>
+                <ul className="mt-2 list-inside list-disc space-y-1 text-[13px]">
+                  <li>
+                    <span className="font-medium text-foreground">{t('powerbi.hints_sp_app_name')}</span> CreditRisk_Backend
+                  </li>
+                  <li>
+                    <span className="font-medium text-foreground">{t('powerbi.hints_sp_client_id')}</span>{' '}
+                    <code className="rounded bg-background px-1 py-0.5 font-mono text-xs">53a7db35-5f93-4e5d-beba-34d0437ef94c</code>
+                  </li>
+                </ul>
+                <p className="mt-2 text-[13px]">{t('powerbi.hints_sp_workspace_note')}</p>
+              </section>
+              <section>
+                <p className="font-medium text-foreground">{t('powerbi.hints_tenant_label')}</p>
+                <p className="mt-1.5">
+                  {t('powerbi.hints_tenant_before')}
+                  <a
+                    href="https://entra.microsoft.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-primary underline underline-offset-2"
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t('powerbi.workspace_id_ph')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {workspaces.map((w) => (
-                        <SelectItem key={w.id} value={w.id}>
-                          {w.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={async () => {
-                        setIsLoading(true);
-                        try {
-                          await loadWorkspaces();
-                        } catch (err) {
-                          notifyError(t('powerbi.view_workspaces'), { description: formatUserFacingApiError(err, msgLocale), duration: 6500 });
-                        } finally {
-                          setIsLoading(false);
-                        }
-                      }}
-                      disabled={isLoading}
-                    >
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      {t('common.refresh')}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setConfig((prev) => ({ ...prev, workspaceId: selectedWorkspaceId }));
-                      }}
-                      disabled={!selectedWorkspaceId}
-                    >
-                      {t('common.use')}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>{t('powerbi.view_datasets')}</Label>
-                  <Select
-                    value={selectedDatasetId}
-                    onValueChange={(v) => {
-                      setSelectedDatasetId(v);
-                      setConfig((prev) => ({ ...prev, datasetId: v }));
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t('common.select')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {datasets.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={async () => {
-                        setIsLoading(true);
-                        try {
-                          await loadDatasets();
-                        } catch (err) {
-                          notifyError(t('powerbi.view_datasets'), { description: formatUserFacingApiError(err, msgLocale), duration: 6500 });
-                        } finally {
-                          setIsLoading(false);
-                        }
-                      }}
-                      disabled={isLoading}
-                    >
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      {t('common.refresh')}
-                    </Button>
-                    <Button onClick={handleRefreshDataset} disabled={isLoading || !selectedDatasetId}>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      {t('powerbi.refresh_dataset')}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {(workspaces.length > 0 || datasets.length > 0) && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div className="overflow-x-auto border rounded-md">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>ID</TableHead>
-                          <TableHead>{t('common.name')}</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {workspaces.slice(0, 10).map((w) => (
-                          <TableRow
-                            key={w.id}
-                            className={w.id === selectedWorkspaceId ? 'bg-secondary/60' : undefined}
-                          >
-                            <TableCell className="font-mono text-xs">{w.id}</TableCell>
-                            <TableCell>{w.name}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="overflow-x-auto border rounded-md">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>ID</TableHead>
-                          <TableHead>{t('common.name')}</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {datasets.slice(0, 10).map((d) => (
-                          <TableRow key={d.id} className={d.id === selectedDatasetId ? 'bg-secondary/60' : undefined}>
-                            <TableCell className="font-mono text-xs">{d.id}</TableCell>
-                            <TableCell>{d.name}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-
-              {refreshResult && (
-                <div className="rounded-md border bg-secondary p-3">
-                  <p className="text-sm font-medium">{t('powerbi.refresh_result')}</p>
-                  <pre className="mt-2 max-h-64 overflow-auto text-xs text-muted-foreground">
-                    {JSON.stringify(refreshResult, null, 2)}
-                  </pre>
-                </div>
-              )}
+                    {t('powerbi.hints_tenant_link')}
+                  </a>
+                  {t('powerbi.hints_tenant_after')}
+                </p>
+              </section>
+              <section>
+                <p className="font-medium text-foreground">{t('powerbi.hints_workspace_label')}</p>
+                <p className="mt-1.5">{t('powerbi.hints_workspace_body')}</p>
+              </section>
+              <section>
+                <p className="font-medium text-foreground">{t('powerbi.hints_dataset_label')}</p>
+                <p className="mt-1.5">{t('powerbi.hints_dataset_body')}</p>
+              </section>
             </CardContent>
           </Card>
         </div>
 
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t('powerbi.status_title')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">{t('common.status')}</p>
-                <Badge className="mt-2" variant={isConnected ? 'secondary' : 'outline'}>
-                  {isConnected ? t('common.connected') : t('common.not_connected')}
-                </Badge>
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <ListChecks className="h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden />
+                  {t('powerbi.table_suggestions_title')}
+                </CardTitle>
+                <CardDescription>{t('powerbi.table_suggestions_desc')}</CardDescription>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={handleResetTableSuggestions} className="shrink-0">
+                {t('powerbi.table_suggestions_reset')}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {accountStatus.connected ? (
+              <p className="text-sm leading-relaxed text-muted-foreground">{t('powerbi.rules_intro')}</p>
+            ) : null}
+            <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+              <p className="font-medium text-foreground">{t('powerbi.rules_naming_title')}</p>
+              <ul className="list-inside list-disc space-y-1.5 text-muted-foreground">
+                <li>{t('powerbi.rules_naming_dim')}</li>
+                <li>{t('powerbi.rules_naming_fact')}</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="newTableSuggestion">{t('powerbi.table_suggestions_add_label')}</Label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  id="newTableSuggestion"
+                  placeholder={t('powerbi.table_suggestions_placeholder')}
+                  value={newTableName}
+                  onChange={(e) => setNewTableName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTableSuggestion();
+                    }
+                  }}
+                  className="font-mono sm:flex-1"
+                />
+                <Button type="button" variant="secondary" onClick={handleAddTableSuggestion} disabled={!newTableName.trim()}>
+                  {t('powerbi.table_suggestions_add')}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{t('powerbi.table_suggestions_persist_note')}</p>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-medium text-foreground">{t('powerbi.table_suggestions_list_label')}</p>
+              <ul className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-border bg-background/80 p-2 font-mono text-sm">
+                {tableSuggestions.map((name) => (
+                  <li
+                    key={name}
+                    className="flex items-center justify-between gap-2 rounded px-1 py-1 hover:bg-muted/60"
+                  >
+                    <span className="min-w-0 truncate">{name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleRemoveTableSuggestion(name)}
+                      aria-label={`${t('powerbi.table_suggestions_remove')}: ${name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">{t('powerbi.rules_ref_extended')}</p>
+              <p className="text-xs text-muted-foreground">{t('powerbi.table_suggestions_extended_hint')}</p>
+              <div className="flex flex-wrap gap-2">
+                {POWER_BI_REFERENCE_EXTENDED_TABLES.map((name) => (
+                  <Button
+                    key={name}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="font-mono text-xs"
+                    onClick={() => handleAppendExtendedSuggestion(name)}
+                    disabled={tableSuggestions.includes(name)}
+                  >
+                    + {name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-xs leading-relaxed text-muted-foreground">{t('powerbi.rules_ref_note')}</p>
+            <p className="rounded-md border border-dashed border-emerald-300/80 bg-emerald-50/80 px-2.5 py-2 text-xs text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100/90">
+              {t('powerbi.rules_checklist_hint')}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('powerbi.view_workspaces')}</CardTitle>
+            <CardDescription>
+              {t('powerbi.view_datasets')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="space-y-2">
+                <Label>{t('powerbi.workspace')}</Label>
+                <Select
+                  value={selectedWorkspaceId}
+                  onValueChange={(v) => {
+                    setSelectedWorkspaceId(v);
+                    setConfig((prev) => ({ ...prev, workspaceId: v }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('powerbi.workspace_id_ph')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workspaces.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      setIsLoading(true);
+                      try {
+                        await loadWorkspaces();
+                      } catch (err) {
+                        notifyError(t('powerbi.view_workspaces'), { description: formatUserFacingApiError(err, msgLocale), duration: 6500 });
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {t('common.refresh')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setConfig((prev) => ({ ...prev, workspaceId: selectedWorkspaceId }));
+                    }}
+                    disabled={!selectedWorkspaceId}
+                  >
+                    {t('common.use')}
+                  </Button>
+                </div>
               </div>
 
-              {lastCheckedAt && (
-                <div>
-                  <p className="text-sm text-muted-foreground">{t('common.last_checked')}</p>
-                  <p className="font-medium mt-2">{formatDateTimeVietnam(lastCheckedAt, locale)}</p>
+              <div className="space-y-2">
+                <Label>{t('powerbi.view_datasets')}</Label>
+                <Select
+                  value={selectedDatasetId}
+                  onValueChange={(v) => {
+                    setSelectedDatasetId(v);
+                    setConfig((prev) => ({ ...prev, datasetId: v }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('common.select')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {datasets.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      setIsLoading(true);
+                      try {
+                        await loadDatasets();
+                      } catch (err) {
+                        notifyError(t('powerbi.view_datasets'), { description: formatUserFacingApiError(err, msgLocale), duration: 6500 });
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {t('common.refresh')}
+                  </Button>
+                  <Button onClick={handleRefreshDataset} disabled={isLoading || !selectedDatasetId}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {t('powerbi.refresh_dataset')}
+                  </Button>
                 </div>
-              )}
+              </div>
+            </div>
 
-              {accountStatus.connected && (
-                <>
-                  <div>
-                    <p className="text-sm text-muted-foreground">{t('powerbi.workspace')}</p>
-                    <p className="font-medium mt-2">{config.workspaceId || t('common.na')}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">{t('powerbi.last_synced')}</p>
-                    <p className="font-medium mt-2">
-                      {accountStatus.lastSync
-                        ? formatDateTimeVietnam(accountStatus.lastSync, locale)
-                        : t('common.na')}
-                    </p>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+            {(workspaces.length > 0 || datasets.length > 0) && (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>{t('common.name')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {workspaces.slice(0, 10).map((w) => (
+                        <TableRow
+                          key={w.id}
+                          className={w.id === selectedWorkspaceId ? 'bg-secondary/60' : undefined}
+                        >
+                          <TableCell className="font-mono text-xs">{w.id}</TableCell>
+                          <TableCell>{w.name}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>{t('common.name')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {datasets.slice(0, 10).map((d) => (
+                        <TableRow key={d.id} className={d.id === selectedDatasetId ? 'bg-secondary/60' : undefined}>
+                          <TableCell className="font-mono text-xs">{d.id}</TableCell>
+                          <TableCell>{d.name}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {refreshResult && (
+              <div className="rounded-md border bg-secondary p-3">
+                <p className="text-sm font-medium">{t('powerbi.refresh_result')}</p>
+                <pre className="mt-2 max-h-64 overflow-auto text-xs text-muted-foreground">
+                  {JSON.stringify(refreshResult, null, 2)}
+                </pre>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
