@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -20,7 +21,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit, PlusCircle, Trash2 } from 'lucide-react';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -52,6 +53,9 @@ export default function CustomerDetailPage() {
   const searchParams = useSearchParams();
   const params = useParams();
   const customerId = Number(params.id);
+  const applicationIdFromUrl = searchParams.get('application_id');
+  const applicationIdQuery =
+    applicationIdFromUrl && /^\d+$/.test(applicationIdFromUrl.trim()) ? Number(applicationIdFromUrl.trim()) : undefined;
   const returnToParam = searchParams.get('returnTo');
   const backHref = useMemo(() => {
     return sanitizeDashboardReturnTo(returnToParam) ?? '/dashboard/customers';
@@ -61,6 +65,7 @@ export default function CustomerDetailPage() {
   /** Duyệt / từ chối hồ sơ: manager & admin; analyst chỉ sửa & xóa. */
   const canReviewCustomer = canManageProfile && role !== 'analyst';
   const [customer, setCustomer] = useState<any | null>(null);
+  const [loanApplications, setLoanApplications] = useState<any[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -117,7 +122,8 @@ export default function CustomerDetailPage() {
     let cancelled = false;
     const load = async () => {
       try {
-        const customerData = await browserApiFetchAuth<any>(`/customers/${customerId}`, { method: 'GET' });
+        const qs = applicationIdQuery != null ? `?application_id=${applicationIdQuery}` : '';
+        const customerData = await browserApiFetchAuth<any>(`/customers/${customerId}${qs}`, { method: 'GET' });
         if (cancelled) return;
         setCustomer(customerData);
         setEditForm({
@@ -146,7 +152,24 @@ export default function CustomerDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [customerId, msgLocale, t]);
+  }, [customerId, applicationIdQuery, msgLocale, t]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadApps = async () => {
+      if (!Number.isFinite(customerId) || customerId <= 0) return;
+      try {
+        const apps = await browserApiFetchAuth<any[]>(`/customers/${customerId}/loan-applications`, { method: 'GET' });
+        if (!cancelled) setLoanApplications(Array.isArray(apps) ? apps : []);
+      } catch {
+        if (!cancelled) setLoanApplications([]);
+      }
+    };
+    void loadApps();
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId]);
 
   const riskBadgeClass = useMemo(() => {
     const level = String(customer?.risk_level || '').toLowerCase();
@@ -246,6 +269,7 @@ export default function CustomerDetailPage() {
     setIsSaving(true);
     try {
       const payload: Record<string, any> = {
+        application_id: customer.application_id ?? undefined,
         phone_number: sanitizePhoneInput(editForm.phone_number || ''),
         email: editForm.email || null,
         occupation: editForm.occupation || null,
@@ -284,7 +308,10 @@ export default function CustomerDetailPage() {
     if (!customer || !canReviewCustomer) return;
     setIsSaving(true);
     try {
-      const payload: Record<string, unknown> = { application_status: nextStatus };
+      const payload: Record<string, unknown> = {
+        application_status: nextStatus,
+        application_id: customer.application_id ?? undefined,
+      };
       if (nextStatus === 'rejected') payload.rejection_reason = String(reason || '').trim();
       const updated = await browserApiFetchAuth<any>(`/customers/${customerId}/status`, {
         method: 'PATCH',
@@ -354,7 +381,13 @@ export default function CustomerDetailPage() {
             <p className="text-muted-foreground mt-1">{customer.occupation || '-'}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/dashboard/customers/${customerId}/new-loan`}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              {t('customers.detail.new_application')}
+            </Link>
+          </Button>
           {isPending && canReviewCustomer ? (
             <>
               <Button variant="outline" onClick={handleOpenRejectDialog} disabled={isSaving}>
@@ -476,6 +509,26 @@ export default function CustomerDetailPage() {
           <CardHeader>
             <CardTitle>{t('customers.detail.loan_section_title')}</CardTitle>
             <CardDescription>{t('customers.detail.loan_section_desc')}</CardDescription>
+            {loanApplications.length > 1 ? (
+              <div className="mt-4 space-y-2">
+                <Label className="text-xs text-muted-foreground">{t('customers.detail.select_application')}</Label>
+                <Select
+                  value={String(customer.application_id ?? '')}
+                  onValueChange={(v) => router.replace(`/dashboard/customers/${customerId}?application_id=${v}`)}
+                >
+                  <SelectTrigger className="max-w-md">
+                    <SelectValue placeholder={t('customers.detail.select_application')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loanApplications.map((a) => (
+                      <SelectItem key={String(a.application_id)} value={String(a.application_id)}>
+                        {(a.application_ref_no as string) || `#${a.application_id}`} — {String(a.loan_status || '')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4">

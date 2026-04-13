@@ -53,6 +53,7 @@ import {
   ChevronDown,
   BarChart3,
   ScrollText,
+  ClipboardList,
 } from 'lucide-react';
 
 const navigationItems = [
@@ -65,6 +66,11 @@ const navigationItems = [
     titleKey: 'sidebar.customers',
     href: '/dashboard/customers',
     icon: Users,
+  },
+  {
+    titleKey: 'sidebar.loans_workbench',
+    href: '/dashboard/loans/approved-workbench',
+    icon: ClipboardList,
   },
   {
     titleKey: 'sidebar.risk',
@@ -134,6 +140,7 @@ const navigationItems = [
 /** Analyst sidebar: customers, AI Chat, Power BI only (no dashboard, risk, portfolio, alerts). */
 const ANALYST_NAV_TITLE_KEYS = new Set([
   'sidebar.customers',
+  'sidebar.loans_workbench',
   'sidebar.ai_chat',
   'sidebar.powerbi',
 ]);
