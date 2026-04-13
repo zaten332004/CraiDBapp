@@ -262,17 +262,33 @@ export default function ForgotPasswordPage() {
                 <Label htmlFor="code" required>
                   {pendingNewPin ? (isVi ? 'Mã PIN mới' : 'New PIN code') : (isVi ? 'Mã PIN 6 số' : '6-digit PIN')}
                 </Label>
-                <div className="relative">
-                  <Input
-                    id="code"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder={pendingNewPin ? (isVi ? 'Nhập mã PIN mới' : 'Enter new PIN code') : (isVi ? 'Nhập mã PIN 6 số' : 'Enter 6-digit PIN')}
-                    className="pl-10"
-                    required
-                    disabled={loading}
-                  />
-                  <ShieldCheck className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      id="code"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      placeholder={pendingNewPin ? (isVi ? 'Nhập mã PIN mới' : 'Enter new PIN code') : (isVi ? 'Nhập mã PIN 6 số' : 'Enter 6-digit PIN')}
+                      className="pl-10"
+                      required
+                      disabled={loading}
+                    />
+                    <ShieldCheck className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
+                  {pendingNewPin ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-10 shrink-0 px-3 text-xs sm:text-sm"
+                      onClick={() => void handleRefreshPinStatus()}
+                      disabled={loading || refreshingPinStatus}
+                    >
+                      {refreshingPinStatus
+                        ? (isVi ? 'Đang làm mới...' : 'Refreshing...')
+                        : (isVi ? 'Refresh trạng thái PIN mới' : 'Refresh new PIN status')}
+                    </Button>
+                  ) : null}
                 </div>
                 <div className="space-y-2">
                   <Button
@@ -293,18 +309,6 @@ export default function ForgotPasswordPage() {
                       <p className="text-xs text-muted-foreground">
                         {isVi ? 'Đang chờ admin cấp mã PIN mới.' : 'Waiting for admin to issue a new PIN.'}
                       </p>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-xs"
-                        onClick={() => void handleRefreshPinStatus()}
-                        disabled={loading || refreshingPinStatus}
-                      >
-                        {refreshingPinStatus
-                          ? (isVi ? 'Đang làm mới...' : 'Refreshing...')
-                          : (isVi ? 'Refresh trạng thái PIN mới' : 'Refresh new PIN status')}
-                      </Button>
                     </div>
                   ) : null}
                 </div>
