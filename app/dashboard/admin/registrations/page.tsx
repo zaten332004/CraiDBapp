@@ -30,6 +30,13 @@ type RegistrationRow = {
   raw: unknown;
 };
 
+type PinResetRequestRow = {
+  userId: string;
+  fullName: string;
+  email: string;
+  requestedAt: string | null;
+};
+
 function usernameFromEmail(email: unknown) {
   const raw = String(email ?? '').trim();
   if (!raw) return '';
@@ -104,6 +111,13 @@ export default function AdminRegistrationsPage() {
   const [details, setDetails] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [pinResetRequests, setPinResetRequests] = useState<PinResetRequestRow[]>([]);
+  const [pinResetLoading, setPinResetLoading] = useState(false);
+  const [pinResetDialogOpen, setPinResetDialogOpen] = useState(false);
+  const [pinResetAction, setPinResetAction] = useState<'approve' | 'reject' | null>(null);
+  const [pinResetTarget, setPinResetTarget] = useState<PinResetRequestRow | null>(null);
+  const [pinResetPin, setPinResetPin] = useState('');
+  const [pinResetReason, setPinResetReason] = useState('');
 
   const extractList = (data: any) =>
     Array.isArray(data)
@@ -139,6 +153,75 @@ export default function AdminRegistrationsPage() {
       setRegistrations([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadPinResetRequests = async () => {
+    setPinResetLoading(true);
+    try {
+      const data = await browserApiFetchAuth<any[]>('/admin/pin-reset-requests', { method: 'GET' });
+      const rows = (Array.isArray(data) ? data : [])
+        .map((item) => ({
+          userId: String(item?.user_id ?? item?.userId ?? '').trim(),
+          fullName: String(item?.full_name ?? item?.fullName ?? item?.name ?? '').trim() || '—',
+          email: String(item?.email ?? '').trim() || '—',
+          requestedAt: String(item?.requested_at ?? item?.requestedAt ?? '').trim() || null,
+        }))
+        .filter((item) => item.userId);
+      setPinResetRequests(rows);
+    } catch (err) {
+      notifyError(locale === 'vi' ? 'Không tải được yêu cầu quên PIN.' : 'Could not load forgot-PIN requests.', {
+        description: formatUserFacingApiError(err, msgLocale),
+      });
+      setPinResetRequests([]);
+    } finally {
+      setPinResetLoading(false);
+    }
+  };
+
+  const openPinResetAction = (row: PinResetRequestRow, actionType: 'approve' | 'reject') => {
+    setPinResetTarget(row);
+    setPinResetAction(actionType);
+    setPinResetPin('');
+    setPinResetReason('');
+    setPinResetDialogOpen(true);
+  };
+
+  const confirmPinResetAction = async () => {
+    if (!pinResetTarget || !pinResetAction) return;
+    if (pinResetAction === 'approve') {
+      const normalized = pinResetPin.replace(/\D/g, '');
+      if (normalized.length !== 6) {
+        notifyError(locale === 'vi' ? 'PIN mới phải gồm đúng 6 chữ số.' : 'New PIN must be exactly 6 digits.');
+        return;
+      }
+    }
+    setPinResetLoading(true);
+    try {
+      const userId = encodeURIComponent(pinResetTarget.userId);
+      if (pinResetAction === 'approve') {
+        await browserApiFetchAuth(`/admin/pin-reset-requests/${userId}/approve`, {
+          method: 'POST',
+          body: { pin: pinResetPin.replace(/\D/g, '').slice(0, 6) },
+        });
+        notifySuccess(locale === 'vi' ? 'Đã duyệt và cấp PIN mới.' : 'Approved and issued a new PIN.');
+      } else {
+        await browserApiFetchAuth(`/admin/pin-reset-requests/${userId}/reject`, {
+          method: 'POST',
+          body: { reason: pinResetReason.trim() || undefined },
+        });
+        notifySuccess(locale === 'vi' ? 'Đã từ chối yêu cầu quên PIN.' : 'Forgot-PIN request rejected.');
+      }
+      setPinResetDialogOpen(false);
+      setPinResetTarget(null);
+      setPinResetAction(null);
+      await loadPinResetRequests();
+    } catch (err) {
+      notifyError(locale === 'vi' ? 'Không thể xử lý yêu cầu quên PIN.' : 'Could not process forgot-PIN request.', {
+        description: formatUserFacingApiError(err, msgLocale),
+      });
+    } finally {
+      setPinResetLoading(false);
     }
   };
 
@@ -216,6 +299,7 @@ export default function AdminRegistrationsPage() {
 
   useEffect(() => {
     void loadPending(statusFilter);
+    void loadPinResetRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
@@ -416,6 +500,78 @@ export default function AdminRegistrationsPage() {
         </CardContent>
       </Card>
 
+      <Card className="border-border/80 bg-card shadow-sm">
+        <CardHeader className="space-y-2 pb-3">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle>{locale === 'vi' ? 'Yêu cầu quên mã PIN' : 'Forgot PIN requests'}</CardTitle>
+              <CardDescription>
+                {locale === 'vi'
+                  ? 'Người dùng yêu cầu admin cấp mã PIN mới. Duyệt và cấp PIN trực tiếp tại đây.'
+                  : 'Users requested a new PIN. Review and issue a new PIN directly here.'}
+              </CardDescription>
+            </div>
+            <Button variant="outline" onClick={() => void loadPinResetRequests()} disabled={pinResetLoading}>
+              {pinResetLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              {t('common.refresh')}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {pinResetRequests.length === 0 ? (
+            <div className="rounded-xl border border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+              {locale === 'vi' ? 'Không có yêu cầu quên PIN đang chờ.' : 'No pending forgot-PIN requests.'}
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+              <Table className="min-w-[760px] w-full">
+                <TableHeader>
+                  <TableRow className="bg-muted/35 hover:bg-muted/35">
+                    <TableHead className="py-1.5">{locale === 'vi' ? 'Người dùng' : 'User'}</TableHead>
+                    <TableHead className="py-1.5">{t('common.email')}</TableHead>
+                    <TableHead className="py-1.5">{locale === 'vi' ? 'Thời gian yêu cầu' : 'Requested at'}</TableHead>
+                    <TableHead className="py-1.5 text-right">{t('common.actions')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pinResetRequests.map((row) => (
+                    <TableRow key={row.userId} className="border-b border-border/70">
+                      <TableCell className="py-1.5 text-[12px] font-medium">
+                        {row.fullName}
+                        <span className="ml-2 text-xs text-muted-foreground font-mono">#{row.userId}</span>
+                      </TableCell>
+                      <TableCell className="py-1.5 text-[12px]">{row.email}</TableCell>
+                      <TableCell className="py-1.5 text-[12px] text-muted-foreground whitespace-nowrap">
+                        {formatDateTime(row.requestedAt, locale)}
+                      </TableCell>
+                      <TableCell className="py-1.5 text-right">
+                        <div className="inline-flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => openPinResetAction(row, 'approve')}
+                            disabled={pinResetLoading}
+                          >
+                            {locale === 'vi' ? 'Duyệt & cấp PIN' : 'Approve & issue PIN'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openPinResetAction(row, 'reject')}
+                            disabled={pinResetLoading}
+                          >
+                            {t('common.reject')}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -465,6 +621,68 @@ export default function AdminRegistrationsPage() {
               ) : (
                 t('common.reject')
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pinResetDialogOpen} onOpenChange={setPinResetDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {pinResetAction === 'approve'
+                ? (locale === 'vi' ? 'Duyệt yêu cầu quên PIN' : 'Approve forgot-PIN request')
+                : (locale === 'vi' ? 'Từ chối yêu cầu quên PIN' : 'Reject forgot-PIN request')}
+            </DialogTitle>
+            <DialogDescription>
+              {pinResetTarget
+                ? `${pinResetTarget.fullName} (${pinResetTarget.email})`
+                : (locale === 'vi' ? 'Không có dữ liệu.' : 'No data available.')}
+            </DialogDescription>
+          </DialogHeader>
+          {pinResetAction === 'approve' ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">{locale === 'vi' ? 'Mã PIN mới (6 số)' : 'New PIN (6 digits)'}</p>
+              <Input
+                value={pinResetPin}
+                onChange={(e) => setPinResetPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                maxLength={6}
+                placeholder={locale === 'vi' ? 'Nhập PIN mới' : 'Enter new PIN'}
+              />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">{locale === 'vi' ? 'Lý do từ chối (tuỳ chọn)' : 'Rejection reason (optional)'}</p>
+              <Textarea
+                value={pinResetReason}
+                onChange={(e) => setPinResetReason(e.target.value)}
+                placeholder={locale === 'vi' ? 'Nhập lý do từ chối' : 'Enter rejection reason'}
+                rows={3}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPinResetDialogOpen(false);
+                setPinResetTarget(null);
+                setPinResetAction(null);
+              }}
+              disabled={pinResetLoading}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant={pinResetAction === 'approve' ? 'default' : 'destructive'}
+              onClick={() => void confirmPinResetAction()}
+              disabled={pinResetLoading}
+            >
+              {pinResetLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {pinResetAction === 'approve'
+                ? (locale === 'vi' ? 'Duyệt & cấp PIN' : 'Approve & issue PIN')
+                : t('common.reject')}
             </Button>
           </DialogFooter>
         </DialogContent>

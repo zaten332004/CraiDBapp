@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Eye, EyeOff, KeyRound, Mail, ShieldCheck } from 'lucide-react';
@@ -26,6 +26,7 @@ export default function ForgotPasswordPage() {
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [pendingNewPin, setPendingNewPin] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -60,6 +61,7 @@ export default function ForgotPasswordPage() {
       }
       notifySuccess(data?.message || (isVi ? 'Tiếp tục bằng cách nhập mã PIN 6 số của tài khoản.' : 'Continue by entering your account 6-digit PIN.'));
       setStep('confirm');
+      await refreshPinRequestStatus(email);
     } catch (err) {
       notifyError(isVi ? 'Không thể gửi yêu cầu khôi phục mật khẩu.' : 'Could not send password reset request.', err instanceof Error ? err.message : undefined);
     } finally {
@@ -111,6 +113,66 @@ export default function ForgotPasswordPage() {
       setLoading(false);
     }
   };
+
+  const refreshPinRequestStatus = async (targetEmail: string) => {
+    if (!isValidEmail(targetEmail)) return;
+    try {
+      const response = await fetch(`/api/v1/auth/forgot-pin/status?email=${encodeURIComponent(targetEmail.trim())}`, {
+        method: 'GET',
+      });
+      if (!response.ok) return;
+      const data = await response.json().catch(() => ({}));
+      setPendingNewPin(Boolean(data?.has_pending_request));
+    } catch {
+      // best-effort only
+    }
+  };
+
+  const requestForgotPin = async () => {
+    if (!isValidEmail(email)) {
+      notifyError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch('/api/v1/auth/forgot-pin/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.detail || data?.message || (isVi ? 'Không thể gửi yêu cầu quên mã PIN.' : 'Could not submit forgot PIN request.'));
+      }
+      setPendingNewPin(true);
+      notifySuccess(
+        data?.message ||
+          (isVi
+            ? 'Đã gửi yêu cầu cấp mã PIN mới tới admin. Vui lòng chờ duyệt.'
+            : 'Your request for a new PIN has been sent to admin. Please wait for review.'),
+      );
+    } catch (err) {
+      notifyError(
+        isVi ? 'Không thể gửi yêu cầu quên mã PIN.' : 'Could not submit forgot PIN request.',
+        err instanceof Error ? err.message : undefined,
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (step !== 'confirm') return;
+    const target = email.trim();
+    if (!target || !isValidEmail(target)) {
+      setPendingNewPin(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void refreshPinRequestStatus(target);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [step, email]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-10">
@@ -182,19 +244,34 @@ export default function ForgotPasswordPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="code" required>
-                  {isVi ? 'Mã PIN 6 số' : '6-digit PIN'}
+                  {pendingNewPin ? (isVi ? 'Mã PIN mới' : 'New PIN code') : (isVi ? 'Mã PIN 6 số' : '6-digit PIN')}
                 </Label>
                 <div className="relative">
                   <Input
                     id="code"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    placeholder={isVi ? 'Nhập mã PIN 6 số' : 'Enter 6-digit PIN'}
+                    placeholder={pendingNewPin ? (isVi ? 'Nhập mã PIN mới' : 'Enter new PIN code') : (isVi ? 'Nhập mã PIN 6 số' : 'Enter 6-digit PIN')}
                     className="pl-10"
                     required
                     disabled={loading}
                   />
                   <ShieldCheck className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void requestForgotPin()}
+                    className="text-xs font-medium text-accent hover:underline underline-offset-2"
+                    disabled={loading}
+                  >
+                    {isVi ? 'Quên mã PIN?' : 'Forgot PIN?'}
+                  </button>
+                  {pendingNewPin ? (
+                    <span className="text-xs text-muted-foreground">
+                      {isVi ? 'Đang chờ admin cấp mã PIN mới.' : 'Waiting for admin to issue a new PIN.'}
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <div className="space-y-1.5">
