@@ -465,66 +465,74 @@
   color: var(--foreground);
 }
 
-/* Assistant / incoming: nền xám–xanh nhạt (khác hẳn bong bóng user). */
+/*
+ * Viền khép kín: không vẽ border trên ::after (dễ hở chỗ nối).
+ * Dùng filter drop-shadow theo silhouette bubble + đuôi (cùng màu nền, đuôi hơi chồng lên thân).
+ */
+/* AI: xám rất nhạt (gần nền card), viền mờ — vẫn khác tông với user. */
 .ai-chat-bubble.ai-chat-bubble--in {
-  --ai-chat-bubble-fill: color-mix(in srgb, var(--card) 70%, var(--primary) 30%);
-  --ai-chat-bubble-edge: color-mix(in srgb, var(--border), var(--primary) 38%);
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--card) 88%, var(--muted) 12%);
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--border) 78%, transparent 22%);
   background: var(--ai-chat-bubble-fill);
-  border: 1px solid var(--ai-chat-bubble-edge);
+  border: none;
+  filter: drop-shadow(0 0 0 1px var(--ai-chat-bubble-edge)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.04));
 }
 
 .dark .ai-chat-bubble.ai-chat-bubble--in {
-  /* Khối assistant: xám slate, không dùng primary để khỏi lẫn với user (xanh). */
-  --ai-chat-bubble-fill: color-mix(in srgb, var(--muted) 55%, var(--card) 45%);
-  --ai-chat-bubble-edge: color-mix(in srgb, var(--border), var(--muted-foreground) 22%);
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--card) 72%, var(--muted) 28%);
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--border) 65%, transparent 35%);
+  filter: drop-shadow(0 0 0 1px var(--ai-chat-bubble-edge)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.22));
 }
 
-/* User / outgoing: light = viền accent (xanh teal); dark = primary vì accent theme tối gần muted. */
+/* User: xanh pastel (ít accent hơn), viền 1px nhạt — vẫn đọ rõ so với AI. */
 .ai-chat-bubble.ai-chat-bubble--out {
-  --ai-chat-bubble-fill: color-mix(in srgb, var(--accent) 40%, var(--card));
-  --ai-chat-bubble-edge: var(--accent);
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--accent) 22%, #ffffff 78%);
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--accent) 32%, #ffffff 68%);
   background: var(--ai-chat-bubble-fill);
-  border: 2px solid var(--ai-chat-bubble-edge);
-  color: var(--foreground);
+  border: none;
+  filter: drop-shadow(0 0 0 1px var(--ai-chat-bubble-edge)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.045));
 }
 
 .dark .ai-chat-bubble.ai-chat-bubble--out {
-  --ai-chat-bubble-fill: color-mix(in srgb, var(--primary) 36%, var(--card));
-  --ai-chat-bubble-edge: var(--primary);
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--primary) 26%, var(--card) 74%);
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--primary) 38%, transparent 62%);
+  filter: drop-shadow(0 0 0 1px var(--ai-chat-bubble-edge)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.28));
 }
 
-/* Small diamond “hook” continuing the bubble border; points down-left (assistant). */
+/* Đuôi trái (AI): chỉ nền, chồng ~2px lên thân để alpha khít với filter outline */
 .ai-chat-bubble--in::after {
   content: '';
   position: absolute;
-  z-index: 1;
-  left: 1.1rem;
-  bottom: -5px;
-  width: 11px;
-  height: 11px;
+  z-index: 0;
+  left: calc(1.1rem - 1px);
+  bottom: -4px;
+  width: 12px;
+  height: 12px;
   box-sizing: border-box;
   background: var(--ai-chat-bubble-fill);
-  border-left: 1px solid var(--ai-chat-bubble-edge);
-  border-bottom: 1px solid var(--ai-chat-bubble-edge);
-  border-bottom-left-radius: 2px;
+  border: none;
   transform: rotate(45deg);
   pointer-events: none;
 }
 
-/* Mirror: tail at bottom-right (user). */
+/* Đuôi phải (user) */
 .ai-chat-bubble--out::after {
   content: '';
   position: absolute;
-  z-index: 1;
-  right: 1.1rem;
-  bottom: -6px;
-  width: 11px;
-  height: 11px;
+  z-index: 0;
+  right: calc(1.1rem - 1px);
+  bottom: -4px;
+  width: 12px;
+  height: 12px;
   box-sizing: border-box;
   background: var(--ai-chat-bubble-fill);
-  border-right: 2px solid var(--ai-chat-bubble-edge);
-  border-bottom: 2px solid var(--ai-chat-bubble-edge);
-  border-bottom-right-radius: 2px;
+  border: none;
   transform: rotate(-45deg);
   pointer-events: none;
+}
+
+/* Nội dung bong bóng luôn trên đuôi */
+.ai-chat-bubble > * {
+  position: relative;
+  z-index: 1;
 }
