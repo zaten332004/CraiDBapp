@@ -1525,7 +1525,7 @@ export default function AIChatPage() {
         >
           {hasConversation ? (
             <div
-              className="shrink-0 border-b border-border/70 bg-muted/25 py-2.5 text-center -mx-4 px-3 md:-mx-5 md:px-5"
+              className="shrink-0 bg-muted/25 py-2.5 text-center -mx-4 px-3 md:-mx-5 md:px-5"
               role="status"
               aria-live="polite"
             >
@@ -1632,10 +1632,8 @@ export default function AIChatPage() {
                       <div className="max-w-4xl min-w-0 ai-chat-bubble-wrap">
                         <div
                           className={cn(
-                            'ai-chat-bubble border px-4 py-3 bg-background text-foreground shadow-sm',
-                            message.sender === 'user'
-                              ? 'ai-chat-bubble--out border-2 border-accent'
-                              : 'ai-chat-bubble--in border-border',
+                            'ai-chat-bubble px-4 py-3 shadow-sm',
+                            message.sender === 'user' ? 'ai-chat-bubble--out' : 'ai-chat-bubble--in',
                           )}
                         >
                           {message.sender === 'user' && message.attachments && message.attachments.length > 0 && (
@@ -1679,7 +1677,7 @@ export default function AIChatPage() {
                   {isSending && (
                     <div className="flex justify-start">
                       <div className="max-w-4xl min-w-0 ai-chat-bubble-wrap">
-                        <div className="ai-chat-bubble ai-chat-bubble--in border border-border bg-background px-4 py-2 text-foreground shadow-sm">
+                        <div className="ai-chat-bubble ai-chat-bubble--in px-4 py-2 shadow-sm">
                           <Loader2 className="h-4 w-4 animate-spin" />
                         </div>
                       </div>

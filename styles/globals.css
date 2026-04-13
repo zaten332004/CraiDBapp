@@ -451,7 +451,7 @@
 }
 
 /* -------------------------------------------------------------------------- */
-/* AI Chat: speech-bubble tail (outline), direction by sender                 */
+/* AI Chat: distinct bubble fills + speech-bubble tail (matches fill + border) */
 /* -------------------------------------------------------------------------- */
 
 .ai-chat-bubble-wrap {
@@ -462,15 +462,33 @@
 .ai-chat-bubble {
   position: relative;
   border-radius: 1rem;
+  color: var(--foreground);
 }
 
-/* Incoming bubble: default --border on pale card is low-contrast; blend toward foreground. */
+/* Assistant / incoming: neutral muted-lavender slate (clearly not user accent). */
 .ai-chat-bubble.ai-chat-bubble--in {
-  border-color: color-mix(in srgb, var(--border), var(--foreground) 20%);
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--muted) 72%, var(--primary) 10%);
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--border), var(--primary) 22%);
+  background: var(--ai-chat-bubble-fill);
+  border: 1px solid var(--ai-chat-bubble-edge);
 }
 
 .dark .ai-chat-bubble.ai-chat-bubble--in {
-  border-color: color-mix(in srgb, var(--border), var(--foreground) 14%);
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--muted) 58%, var(--background) 28%);
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--border), var(--foreground) 10%);
+}
+
+/* User / outgoing: accent-tinted (visibly different from assistant). */
+.ai-chat-bubble.ai-chat-bubble--out {
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--accent) 26%, var(--background));
+  --ai-chat-bubble-edge: var(--accent);
+  background: var(--ai-chat-bubble-fill);
+  border: 2px solid var(--ai-chat-bubble-edge);
+  color: var(--foreground);
+}
+
+.dark .ai-chat-bubble.ai-chat-bubble--out {
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--accent) 38%, var(--background));
 }
 
 /* Small diamond “hook” continuing the bubble border; points down-left (assistant). */
@@ -483,17 +501,12 @@
   width: 11px;
   height: 11px;
   box-sizing: border-box;
-  background: var(--background);
-  border-left: 1px solid color-mix(in srgb, var(--border), var(--foreground) 20%);
-  border-bottom: 1px solid color-mix(in srgb, var(--border), var(--foreground) 20%);
+  background: var(--ai-chat-bubble-fill);
+  border-left: 1px solid var(--ai-chat-bubble-edge);
+  border-bottom: 1px solid var(--ai-chat-bubble-edge);
   border-bottom-left-radius: 2px;
   transform: rotate(45deg);
   pointer-events: none;
-}
-
-.dark .ai-chat-bubble--in::after {
-  border-left-color: color-mix(in srgb, var(--border), var(--foreground) 14%);
-  border-bottom-color: color-mix(in srgb, var(--border), var(--foreground) 14%);
 }
 
 /* Mirror: tail at bottom-right (user). */
@@ -506,9 +519,9 @@
   width: 11px;
   height: 11px;
   box-sizing: border-box;
-  background: var(--background);
-  border-right: 2px solid var(--accent);
-  border-bottom: 2px solid var(--accent);
+  background: var(--ai-chat-bubble-fill);
+  border-right: 2px solid var(--ai-chat-bubble-edge);
+  border-bottom: 2px solid var(--ai-chat-bubble-edge);
   border-bottom-right-radius: 2px;
   transform: rotate(-45deg);
   pointer-events: none;
