@@ -29,6 +29,7 @@ type WorkbenchRow = {
   loan_term?: number | null;
   facility_id?: number | null;
   next_installment_no?: number | null;
+  next_schedule_id?: number | null;
   next_due_date?: string | null;
   installment_state?: string | null;
   installment_dpd?: number;
@@ -131,7 +132,11 @@ export default function ApprovedLoanWorkbenchPage() {
         : '',
     );
     setPayDate(new Date().toISOString().slice(0, 10));
-    setPayScheduleId('');
+    setPayScheduleId(
+      rowForDialog.next_schedule_id != null && Number.isFinite(Number(rowForDialog.next_schedule_id))
+        ? String(Math.round(Number(rowForDialog.next_schedule_id)))
+        : '',
+    );
     setPayOpen(true);
   };
 
@@ -224,6 +229,8 @@ export default function ApprovedLoanWorkbenchPage() {
                           <TableHead>{t('loans.workbench.col.customer')}</TableHead>
                           <TableHead>{t('loans.workbench.col.ref')}</TableHead>
                           <TableHead>{t('loans.workbench.col.amount')}</TableHead>
+                          <TableHead>{t('loans.workbench.col.period_payment')}</TableHead>
+                          <TableHead>{t('loans.workbench.col.installment_progress')}</TableHead>
                           <TableHead>{t('loans.workbench.col.due')}</TableHead>
                           <TableHead>{t('loans.workbench.col.state')}</TableHead>
                           <TableHead>{t('loans.workbench.col.dpd')}</TableHead>
@@ -241,6 +248,22 @@ export default function ApprovedLoanWorkbenchPage() {
                               {r.loan_amount != null
                                 ? formatVnd(Number(r.loan_amount), locale === 'vi' ? 'vi' : 'en')
                                 : '-'}
+                            </TableCell>
+                            <TableCell className="text-sm tabular-nums font-medium">
+                              {r.next_total_due != null && Number.isFinite(Number(r.next_total_due))
+                                ? formatVnd(Number(r.next_total_due), locale === 'vi' ? 'vi' : 'en')
+                                : '-'}
+                            </TableCell>
+                            <TableCell className="text-sm tabular-nums">
+                              {r.next_total_due != null && Number.isFinite(Number(r.next_total_due)) ? (
+                                <>
+                                  {formatVnd(Number(r.next_paid ?? 0), locale === 'vi' ? 'vi' : 'en')}
+                                  <span className="text-muted-foreground"> / </span>
+                                  {formatVnd(Number(r.next_total_due), locale === 'vi' ? 'vi' : 'en')}
+                                </>
+                              ) : (
+                                '-'
+                              )}
                             </TableCell>
                             <TableCell>{formatDueDate(r.next_due_date, locale)}</TableCell>
                             <TableCell>{installmentStateLabel(t, r.installment_state)}</TableCell>

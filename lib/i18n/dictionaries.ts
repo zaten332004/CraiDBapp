@@ -600,7 +600,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "customers.detail.new_application": "Mở thêm hồ sơ vay",
 
     "loans.workbench.title": "Hồ sơ vay đã duyệt",
-    "loans.workbench.desc": "Theo dõi kỳ đến hạn và ghi nhận thanh toán thủ công.",
+    "loans.workbench.desc":
+      "Theo dõi kỳ đến hạn và ghi nhận thanh toán thủ công. Cột «Giá trị hồ sơ» là số tiền trên đơn vay (không đổi khi trả nợ); tiến độ trả nợ xem ở cột «Kỳ tới».",
     "loans.workbench.search_placeholder": "Tìm theo tên khách hàng hoặc mã hồ sơ…",
     "loans.workbench.no_match": "Không có hồ sơ khớp với từ khóa.",
     "loans.workbench.list_meta": "Hiển thị {shown} / {total} hồ sơ",
@@ -613,7 +614,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "loans.workbench.installment_state.overdue": "Quá hạn",
     "loans.workbench.installment_state.partial": "Thanh toán một phần",
     "loans.workbench.installment_state.paid": "Đã thanh toán",
-    "loans.workbench.col.amount": "Số tiền vay",
+    "loans.workbench.col.amount": "Giá trị hồ sơ",
+    "loans.workbench.col.period_payment": "Số tiền thanh toán kì này",
+    "loans.workbench.col.installment_progress": "Kỳ tới (đã trả / phải trả)",
     "loans.workbench.open_customer": "Mở KH",
     "loans.workbench.record_payment": "Ghi thanh toán",
     "loans.workbench.payment_amount": "Số tiền",
@@ -1818,7 +1821,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "customers.detail.new_application": "Add another loan application",
 
     "loans.workbench.title": "Approved loan applications",
-    "loans.workbench.desc": "Track next due installments and record payments manually.",
+    "loans.workbench.desc":
+      "Track next due installments and record payments manually. “Application value” is the amount on the loan application (unchanged as you pay); installment progress is in the next column.",
     "loans.workbench.search_placeholder": "Search by customer name or application ref…",
     "loans.workbench.no_match": "No records match your search.",
     "loans.workbench.list_meta": "Showing {shown} / {total} records",
@@ -1831,7 +1835,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "loans.workbench.installment_state.overdue": "Overdue",
     "loans.workbench.installment_state.partial": "Partially paid",
     "loans.workbench.installment_state.paid": "Paid",
-    "loans.workbench.col.amount": "Loan amount",
+    "loans.workbench.col.amount": "Application value",
+    "loans.workbench.col.period_payment": "This period payment (due)",
+    "loans.workbench.col.installment_progress": "Next installment (paid / due)",
     "loans.workbench.open_customer": "Open customer",
     "loans.workbench.record_payment": "Record payment",
     "loans.workbench.payment_amount": "Amount",

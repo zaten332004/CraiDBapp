@@ -1518,18 +1518,20 @@ export default function AIChatPage() {
             hasConversation && 'pb-2 pt-0',
           )}
         >
-          <div
-            className="shrink-0 border-b border-border/70 bg-muted/25 py-2.5 text-center -mx-4 px-3 md:-mx-5 md:px-5"
-            role="status"
-            aria-live="polite"
-          >
-            <span
-              className="block truncate text-sm font-semibold tracking-tight text-foreground max-w-[min(100%,36rem)] mx-auto"
-              title={activeSessionBarTitle}
+          {hasConversation ? (
+            <div
+              className="shrink-0 border-b border-border/70 bg-muted/25 py-2.5 text-center -mx-4 px-3 md:-mx-5 md:px-5"
+              role="status"
+              aria-live="polite"
             >
-              {activeSessionBarTitle}
-            </span>
-          </div>
+              <span
+                className="block truncate text-sm font-semibold tracking-tight text-foreground max-w-[min(100%,36rem)] mx-auto"
+                title={activeSessionBarTitle}
+              >
+                {activeSessionBarTitle}
+              </span>
+            </div>
+          ) : null}
           {!hasConversation ? (
             <div
               className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-6 px-1"
