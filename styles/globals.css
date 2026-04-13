@@ -466,44 +466,40 @@
 }
 
 /*
- * Viền khép kín: không vẽ border trên ::after (dễ hở chỗ nối).
- * Dùng filter drop-shadow theo silhouette bubble + đuôi (cùng màu nền, đuôi hơi chồng lên thân).
+ * Viền ổn định: border + box-shadow trên thân (không dùng filter drop-shadow — dễ “mất” viền
+ * khi chồng blur/Shadow hoặc compositor). Đuôi ::after dùng ring box-shadow cùng màu viền.
  */
-/* AI: xám rất nhạt (gần nền card); viền đủ đậm để đuôi / cạnh dưới không bị “mờ”. */
+/* AI */
 .ai-chat-bubble.ai-chat-bubble--in {
   --ai-chat-bubble-fill: color-mix(in srgb, var(--card) 88%, var(--muted) 12%);
-  --ai-chat-bubble-edge: color-mix(in srgb, var(--border) 92%, var(--muted-foreground) 8%);
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--border) 82%, var(--muted-foreground) 18%);
   background: var(--ai-chat-bubble-fill);
-  border: none;
-  filter: drop-shadow(0 0 0 1px var(--ai-chat-bubble-edge)) drop-shadow(0 0 0.35px var(--ai-chat-bubble-edge))
-    drop-shadow(0 1px 2px rgb(0 0 0 / 0.05));
+  border: 1px solid var(--ai-chat-bubble-edge);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
 }
 
 .dark .ai-chat-bubble.ai-chat-bubble--in {
   --ai-chat-bubble-fill: color-mix(in srgb, var(--card) 72%, var(--muted) 28%);
-  --ai-chat-bubble-edge: color-mix(in srgb, var(--border) 88%, var(--muted-foreground) 12%);
-  filter: drop-shadow(0 0 0 1px var(--ai-chat-bubble-edge)) drop-shadow(0 0 0.35px var(--ai-chat-bubble-edge))
-    drop-shadow(0 1px 2px rgb(0 0 0 / 0.22));
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--border) 78%, var(--muted-foreground) 22%);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.22);
 }
 
-/* User: xanh pastel; viền gần accent hơn để tách khỏi nền và đuôi rõ nét. */
+/* User */
 .ai-chat-bubble.ai-chat-bubble--out {
   --ai-chat-bubble-fill: color-mix(in srgb, var(--accent) 22%, #ffffff 78%);
-  --ai-chat-bubble-edge: color-mix(in srgb, var(--accent) 52%, #ffffff 48%);
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--accent) 45%, #ffffff 55%);
   background: var(--ai-chat-bubble-fill);
-  border: none;
-  filter: drop-shadow(0 0 0 1px var(--ai-chat-bubble-edge)) drop-shadow(0 0 0.35px var(--ai-chat-bubble-edge))
-    drop-shadow(0 1px 2px rgb(0 0 0 / 0.06));
+  border: 1px solid var(--ai-chat-bubble-edge);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.07);
 }
 
 .dark .ai-chat-bubble.ai-chat-bubble--out {
   --ai-chat-bubble-fill: color-mix(in srgb, var(--primary) 26%, var(--card) 74%);
-  --ai-chat-bubble-edge: color-mix(in srgb, var(--primary) 55%, transparent 45%);
-  filter: drop-shadow(0 0 0 1px var(--ai-chat-bubble-edge)) drop-shadow(0 0 0.35px var(--ai-chat-bubble-edge))
-    drop-shadow(0 1px 2px rgb(0 0 0 / 0.28));
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--primary) 50%, transparent 50%);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.28);
 }
 
-/* Đuôi trái (AI): chỉ nền, chồng ~2px lên thân để alpha khít với filter outline */
+/* Đuôi trái (AI): chồng ~2px lên thân để khớp nền; viền = box-shadow ring */
 .ai-chat-bubble--in::after {
   content: '';
   position: absolute;
@@ -514,7 +510,7 @@
   height: 12px;
   box-sizing: border-box;
   background: var(--ai-chat-bubble-fill);
-  border: none;
+  box-shadow: 0 0 0 1px var(--ai-chat-bubble-edge);
   transform: rotate(45deg);
   pointer-events: none;
 }
@@ -530,7 +526,7 @@
   height: 12px;
   box-sizing: border-box;
   background: var(--ai-chat-bubble-fill);
-  border: none;
+  box-shadow: 0 0 0 1px var(--ai-chat-bubble-edge);
   transform: rotate(-45deg);
   pointer-events: none;
 }

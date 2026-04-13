@@ -1632,7 +1632,7 @@ export default function AIChatPage() {
                       <div className="max-w-4xl min-w-0 ai-chat-bubble-wrap">
                         <div
                           className={cn(
-                            'ai-chat-bubble px-4 py-3 shadow-sm',
+                            'ai-chat-bubble px-4 py-3',
                             message.sender === 'user' ? 'ai-chat-bubble--out' : 'ai-chat-bubble--in',
                           )}
                         >
@@ -1677,7 +1677,7 @@ export default function AIChatPage() {
                   {isSending && (
                     <div className="flex justify-start">
                       <div className="max-w-4xl min-w-0 ai-chat-bubble-wrap">
-                        <div className="ai-chat-bubble ai-chat-bubble--in px-4 py-2 shadow-sm">
+                        <div className="ai-chat-bubble ai-chat-bubble--in px-4 py-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
                         </div>
                       </div>
