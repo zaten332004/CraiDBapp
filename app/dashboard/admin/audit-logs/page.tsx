@@ -101,8 +101,8 @@ function entityLabelsViEn(entityType: string): { vi: string; en: string } {
   return { vi: human, en: human };
 }
 
-function bilingualDot(viPart: string, enPart: string): string {
-  return `${viPart} · ${enPart}`;
+function localeText(locale: string, viPart: string, enPart: string): string {
+  return locale === 'vi' ? viPart : enPart;
 }
 
 function idPart(entityId: number | null): string {
@@ -163,252 +163,252 @@ function formatAuditTimeOnly(ts: string, locale: string) {
   });
 }
 
-function getActionLabel(row: AuditLogRow, _locale: string): string {
+function getActionLabel(row: AuditLogRow, locale: string): string {
   const action = String(row.action || '').trim().toUpperCase();
   const et = String(row.entityType || '').trim();
   const idS = idPart(row.entityId);
   const L = entityLabelsViEn(et);
 
   if (action === 'INSERT' && et === 'Customer') {
-    return bilingualDot(`Thêm ${L.vi}${idS}`, `Insert ${L.en}${idS}`);
+    return localeText(locale, `Thêm ${L.vi}${idS}`, `Insert ${L.en}${idS}`);
   }
   if (action === 'UPDATE' && et === 'Customer') {
-    return bilingualDot(`Cập nhật ${L.vi}${idS}`, `Update ${L.en}${idS}`);
+    return localeText(locale, `Cập nhật ${L.vi}${idS}`, `Update ${L.en}${idS}`);
   }
   if (action === 'DELETE' && et === 'Customer') {
-    return bilingualDot(`Xóa ${L.vi}${idS}`, `Delete ${L.en}${idS}`);
+    return localeText(locale, `Xóa ${L.vi}${idS}`, `Delete ${L.en}${idS}`);
   }
   if (action === 'APPROVE_CUSTOMER') {
-    return bilingualDot(`Duyệt hồ sơ ${L.vi}${idS}`, `Approve ${L.en} dossier${idS}`);
+    return localeText(locale, `Duyệt hồ sơ ${L.vi}${idS}`, `Approve ${L.en} dossier${idS}`);
   }
   if (action === 'REJECT_CUSTOMER') {
-    return bilingualDot(`Từ chối hồ sơ ${L.vi}${idS}`, `Reject ${L.en} dossier${idS}`);
+    return localeText(locale, `Từ chối hồ sơ ${L.vi}${idS}`, `Reject ${L.en} dossier${idS}`);
   }
   if (action === 'RESOLVE_ALERT') {
-    return bilingualDot(`Xử lý ${L.vi}${idS}`, `Resolve ${L.en}${idS}`);
+    return localeText(locale, `Xử lý ${L.vi}${idS}`, `Resolve ${L.en}${idS}`);
   }
   if (action === 'CREATE_USER') {
-    return bilingualDot(`Tạo ${L.vi}${idS}`, `Create ${L.en}${idS}`);
+    return localeText(locale, `Tạo ${L.vi}${idS}`, `Create ${L.en}${idS}`);
   }
   if (action === 'DELETE_USER') {
-    return bilingualDot(`Xóa ${L.vi}${idS}`, `Delete ${L.en}${idS}`);
+    return localeText(locale, `Xóa ${L.vi}${idS}`, `Delete ${L.en}${idS}`);
   }
   if (action === 'UPDATE_USER_STATUS') {
-    return bilingualDot(`Cập nhật trạng thái ${L.vi}${idS}`, `Update ${L.en} status${idS}`);
+    return localeText(locale, `Cập nhật trạng thái ${L.vi}${idS}`, `Update ${L.en} status${idS}`);
   }
   if (action === 'UPDATE_USER_ROLE') {
-    return bilingualDot(`Cập nhật vai trò ${L.vi}${idS}`, `Update ${L.en} role${idS}`);
+    return localeText(locale, `Cập nhật vai trò ${L.vi}${idS}`, `Update ${L.en} role${idS}`);
   }
   if (action === 'SET_PIN') {
-    return bilingualDot('Thiết lập mã PIN', 'Set security PIN');
+    return localeText(locale, 'Thiết lập mã PIN', 'Set security PIN');
   }
   if (action === 'CHANGE_PIN') {
-    return bilingualDot('Đổi mã PIN', 'Change PIN');
+    return localeText(locale, 'Đổi mã PIN', 'Change PIN');
   }
   if (action === 'ADMIN_SET_USER_PIN') {
-    return bilingualDot(`Admin đặt PIN cho ${L.vi}${idS}`, `Admin set PIN for ${L.en}${idS}`);
+    return localeText(locale, `Admin đặt PIN cho ${L.vi}${idS}`, `Admin set PIN for ${L.en}${idS}`);
   }
   if (action === 'RESET_PASSWORD_WITH_PIN') {
-    return bilingualDot('Đặt lại mật khẩu bằng PIN', 'Reset password with PIN');
+    return localeText(locale, 'Đặt lại mật khẩu bằng PIN', 'Reset password with PIN');
   }
   if (action === 'CHANGE_EMAIL_WITH_PIN') {
-    return bilingualDot('Đổi email (xác nhận PIN)', 'Change email (PIN verified)');
+    return localeText(locale, 'Đổi email (xác nhận PIN)', 'Change email (PIN verified)');
   }
   if (action === 'UPDATE_PROFILE') {
-    return bilingualDot('Cập nhật hồ sơ (tên/SĐT)', 'Update profile (name/phone)');
+    return localeText(locale, 'Cập nhật hồ sơ (tên/SĐT)', 'Update profile (name/phone)');
   }
   if (action === 'UPDATE_AVATAR') {
-    return bilingualDot('Cập nhật ảnh đại diện', 'Update avatar');
+    return localeText(locale, 'Cập nhật ảnh đại diện', 'Update avatar');
   }
   if (action === 'IMPORT_CUSTOMERS') {
-    return bilingualDot('Nhập danh sách khách hàng', 'Import customers');
+    return localeText(locale, 'Nhập danh sách khách hàng', 'Import customers');
   }
   if (action === 'IMPORT_CUSTOMERS_FAILED' || action === 'UPLOAD_FAILED') {
-    return bilingualDot('Nhập / tải tệp thất bại', 'Import or upload failed');
+    return localeText(locale, 'Nhập / tải tệp thất bại', 'Import or upload failed');
   }
   if (action === 'APPROVE_REGISTRATION') {
-    return bilingualDot('Duyệt đăng ký người dùng', 'Approve user registration');
+    return localeText(locale, 'Duyệt đăng ký người dùng', 'Approve user registration');
   }
   if (action === 'REJECT_REGISTRATION') {
-    return bilingualDot('Từ chối đăng ký người dùng', 'Reject user registration');
+    return localeText(locale, 'Từ chối đăng ký người dùng', 'Reject user registration');
   }
 
   const raw = String(row.action || '').trim();
   const normalized = raw.toLowerCase().replace(/_/g, ' ');
-  if (normalized.includes('approve customer')) return bilingualDot('Duyệt hồ sơ khách hàng', 'Approve customer dossier');
-  if (normalized.includes('reject customer')) return bilingualDot('Từ chối hồ sơ khách hàng', 'Reject customer dossier');
+  if (normalized.includes('approve customer')) return localeText(locale, 'Duyệt hồ sơ khách hàng', 'Approve customer dossier');
+  if (normalized.includes('reject customer')) return localeText(locale, 'Từ chối hồ sơ khách hàng', 'Reject customer dossier');
   if (normalized.includes('approve registration') || normalized.includes('approve user')) {
-    return bilingualDot('Duyệt người dùng', 'Approve user');
+    return localeText(locale, 'Duyệt người dùng', 'Approve user');
   }
   if (normalized.includes('reject registration') || normalized.includes('reject user')) {
-    return bilingualDot('Từ chối người dùng', 'Reject user');
+    return localeText(locale, 'Từ chối người dùng', 'Reject user');
   }
   if (normalized.includes('request password reset')) {
-    return bilingualDot('Yêu cầu đặt lại mật khẩu', 'Request password reset');
+    return localeText(locale, 'Yêu cầu đặt lại mật khẩu', 'Request password reset');
   }
   if (normalized.includes('request email change')) {
-    return bilingualDot('Yêu cầu đổi email', 'Request email change');
+    return localeText(locale, 'Yêu cầu đổi email', 'Request email change');
   }
   if (normalized.includes('reset password')) {
-    return bilingualDot('Đặt lại mật khẩu', 'Reset password');
+    return localeText(locale, 'Đặt lại mật khẩu', 'Reset password');
   }
   if (normalized.includes('change email')) {
-    return bilingualDot('Đổi email', 'Change email');
+    return localeText(locale, 'Đổi email', 'Change email');
   }
   if (normalized.includes('verify email')) {
-    return bilingualDot('Xác nhận liên kết đăng ký', 'Confirm registration link');
+    return localeText(locale, 'Xác nhận liên kết đăng ký', 'Confirm registration link');
   }
   if (normalized.includes('resend verification email')) {
-    return bilingualDot('Gửi lại email xác nhận', 'Resend confirmation email');
+    return localeText(locale, 'Gửi lại email xác nhận', 'Resend confirmation email');
   }
   if (normalized.includes('register user')) {
-    return bilingualDot('Đăng ký người dùng', 'Register user');
+    return localeText(locale, 'Đăng ký người dùng', 'Register user');
   }
   if (normalized.includes('import customers')) {
-    return bilingualDot('Nhập danh sách khách hàng', 'Import customers');
+    return localeText(locale, 'Nhập danh sách khách hàng', 'Import customers');
   }
   if (normalized.includes('import customers failed') || normalized.includes('upload failed')) {
-    return bilingualDot('Nhập dữ liệu thất bại', 'Import failed');
+    return localeText(locale, 'Nhập dữ liệu thất bại', 'Import failed');
   }
-  if (normalized.includes('resolve alert')) return bilingualDot('Xử lý cảnh báo', 'Resolve alert');
-  if (normalized.includes('update avatar')) return bilingualDot('Cập nhật ảnh đại diện', 'Update avatar');
-  if (normalized.includes('update profile')) return bilingualDot('Cập nhật hồ sơ người dùng', 'Update user profile');
-  if (normalized.includes('change password')) return bilingualDot('Đổi mật khẩu', 'Change password');
+  if (normalized.includes('resolve alert')) return localeText(locale, 'Xử lý cảnh báo', 'Resolve alert');
+  if (normalized.includes('update avatar')) return localeText(locale, 'Cập nhật ảnh đại diện', 'Update avatar');
+  if (normalized.includes('update profile')) return localeText(locale, 'Cập nhật hồ sơ người dùng', 'Update user profile');
+  if (normalized.includes('change password')) return localeText(locale, 'Đổi mật khẩu', 'Change password');
   if (normalized.includes('admin') && normalized.includes('status')) {
-    return bilingualDot('Cập nhật trạng thái người dùng', 'Update user status');
+    return localeText(locale, 'Cập nhật trạng thái người dùng', 'Update user status');
   }
   if (normalized.includes('update user') || normalized.includes('user status')) {
-    return bilingualDot('Cập nhật trạng thái người dùng', 'Update user status');
+    return localeText(locale, 'Cập nhật trạng thái người dùng', 'Update user status');
   }
   if (normalized.includes('delete')) {
-    return bilingualDot(`Xóa ${L.vi}${idS}`, `Delete ${L.en}${idS}`);
+    return localeText(locale, `Xóa ${L.vi}${idS}`, `Delete ${L.en}${idS}`);
   }
   if (normalized.includes('update')) {
-    return bilingualDot(`Cập nhật ${L.vi}${idS}`, `Update ${L.en}${idS}`);
+    return localeText(locale, `Cập nhật ${L.vi}${idS}`, `Update ${L.en}${idS}`);
   }
   if (normalized.includes('create')) {
-    return bilingualDot(`Tạo ${L.vi}${idS}`, `Create ${L.en}${idS}`);
+    return localeText(locale, `Tạo ${L.vi}${idS}`, `Create ${L.en}${idS}`);
   }
   if (normalized.includes('insert')) {
-    return bilingualDot(`Thêm ${L.vi}${idS}`, `Insert ${L.en}${idS}`);
+    return localeText(locale, `Thêm ${L.vi}${idS}`, `Insert ${L.en}${idS}`);
   }
-  return bilingualDot(raw.replace(/_/g, ' '), raw.replace(/_/g, ' '));
+  return raw.replace(/_/g, ' ');
 }
 
-function getActionShortDescription(row: AuditLogRow, _locale: string): string {
+function getActionShortDescription(row: AuditLogRow, locale: string): string {
   const action = String(row.action || '').trim().toUpperCase();
   const et = String(row.entityType || '').trim();
   const idS = idPart(row.entityId);
   const L = entityLabelsViEn(et);
 
   if (action === 'INSERT' && et === 'Customer') {
-    return bilingualDot(`Đã thêm mới ${L.vi}${idS} vào hệ thống.`, `Created new ${L.en} record${idS}.`);
+    return localeText(locale, `Đã thêm mới ${L.vi}${idS} vào hệ thống.`, `Created new ${L.en} record${idS}.`);
   }
   if (action === 'UPDATE' && et === 'Customer') {
-    return bilingualDot(`Đã cập nhật dữ liệu ${L.vi}${idS}.`, `Updated ${L.en} data${idS}.`);
+    return localeText(locale, `Đã cập nhật dữ liệu ${L.vi}${idS}.`, `Updated ${L.en} data${idS}.`);
   }
   if (action === 'DELETE' && et === 'Customer') {
-    return bilingualDot(`Đã xóa hồ sơ ${L.vi}${idS}.`, `Deleted ${L.en} record${idS}.`);
+    return localeText(locale, `Đã xóa hồ sơ ${L.vi}${idS}.`, `Deleted ${L.en} record${idS}.`);
   }
   if (action === 'APPROVE_CUSTOMER') {
-    return bilingualDot(`Phê duyệt hồ sơ ${L.vi}${idS}.`, `Approved ${L.en} dossier${idS}.`);
+    return localeText(locale, `Phê duyệt hồ sơ ${L.vi}${idS}.`, `Approved ${L.en} dossier${idS}.`);
   }
   if (action === 'REJECT_CUSTOMER') {
-    return bilingualDot(`Từ chối hồ sơ ${L.vi}${idS}.`, `Rejected ${L.en} dossier${idS}.`);
+    return localeText(locale, `Từ chối hồ sơ ${L.vi}${idS}.`, `Rejected ${L.en} dossier${idS}.`);
   }
   if (action === 'RESOLVE_ALERT') {
-    return bilingualDot(`Đánh dấu đã xử lý ${L.vi}${idS}.`, `Marked ${L.en} as resolved${idS}.`);
+    return localeText(locale, `Đánh dấu đã xử lý ${L.vi}${idS}.`, `Marked ${L.en} as resolved${idS}.`);
   }
   if (action === 'CREATE_USER') {
-    return bilingualDot(`Tạo tài khoản ${L.vi}${idS}.`, `Created ${L.en} account${idS}.`);
+    return localeText(locale, `Tạo tài khoản ${L.vi}${idS}.`, `Created ${L.en} account${idS}.`);
   }
   if (action === 'DELETE_USER') {
-    return bilingualDot(`Xóa tài khoản ${L.vi}${idS}.`, `Deleted ${L.en} account${idS}.`);
+    return localeText(locale, `Xóa tài khoản ${L.vi}${idS}.`, `Deleted ${L.en} account${idS}.`);
   }
   if (action === 'UPDATE_USER_STATUS') {
-    return bilingualDot(`Đổi trạng thái kích hoạt ${L.vi}${idS}.`, `Changed activation status for ${L.en}${idS}.`);
+    return localeText(locale, `Đổi trạng thái kích hoạt ${L.vi}${idS}.`, `Changed activation status for ${L.en}${idS}.`);
   }
   if (action === 'UPDATE_USER_ROLE') {
-    return bilingualDot(`Đổi vai trò ${L.vi}${idS}.`, `Changed role for ${L.en}${idS}.`);
+    return localeText(locale, `Đổi vai trò ${L.vi}${idS}.`, `Changed role for ${L.en}${idS}.`);
   }
   if (action === 'SET_PIN') {
-    return bilingualDot('Người dùng thiết lập mã PIN bảo mật.', 'User set a security PIN.');
+    return localeText(locale, 'Người dùng thiết lập mã PIN bảo mật.', 'User set a security PIN.');
   }
   if (action === 'CHANGE_PIN') {
-    return bilingualDot('Người dùng đổi mã PIN bảo mật.', 'User changed security PIN.');
+    return localeText(locale, 'Người dùng đổi mã PIN bảo mật.', 'User changed security PIN.');
   }
   if (action === 'ADMIN_SET_USER_PIN') {
-    return bilingualDot(`Quản trị viên đặt lại PIN cho ${L.vi}${idS}.`, `Administrator set PIN for ${L.en}${idS}.`);
+    return localeText(locale, `Quản trị viên đặt lại PIN cho ${L.vi}${idS}.`, `Administrator set PIN for ${L.en}${idS}.`);
   }
   if (action === 'RESET_PASSWORD_WITH_PIN') {
-    return bilingualDot('Đặt lại mật khẩu sau khi xác minh PIN.', 'Password reset after PIN verification.');
+    return localeText(locale, 'Đặt lại mật khẩu sau khi xác minh PIN.', 'Password reset after PIN verification.');
   }
   if (action === 'CHANGE_EMAIL_WITH_PIN') {
-    return bilingualDot('Đổi email sau khi xác minh PIN.', 'Email changed after PIN verification.');
+    return localeText(locale, 'Đổi email sau khi xác minh PIN.', 'Email changed after PIN verification.');
   }
   if (action === 'UPDATE_PROFILE') {
-    return bilingualDot('Cập nhật họ tên hoặc số điện thoại trên hồ sơ.', 'Updated name or phone on the profile.');
+    return localeText(locale, 'Cập nhật họ tên hoặc số điện thoại trên hồ sơ.', 'Updated name or phone on the profile.');
   }
   if (action === 'UPDATE_AVATAR') {
-    return bilingualDot('Cập nhật ảnh đại diện tài khoản.', 'Updated account avatar.');
+    return localeText(locale, 'Cập nhật ảnh đại diện tài khoản.', 'Updated account avatar.');
   }
   if (action === 'IMPORT_CUSTOMERS') {
-    return bilingualDot('Nhập khách hàng từ tệp (theo lô).', 'Imported customers from a file (batch).');
+    return localeText(locale, 'Nhập khách hàng từ tệp (theo lô).', 'Imported customers from a file (batch).');
   }
   if (action === 'IMPORT_CUSTOMERS_FAILED' || action === 'UPLOAD_FAILED') {
-    return bilingualDot('Nhập hoặc tải tệp thất bại.', 'Import or file upload failed.');
+    return localeText(locale, 'Nhập hoặc tải tệp thất bại.', 'Import or file upload failed.');
   }
   if (action === 'APPROVE_REGISTRATION') {
-    return bilingualDot('Phê duyệt yêu cầu đăng ký người dùng.', 'Approved user registration request.');
+    return localeText(locale, 'Phê duyệt yêu cầu đăng ký người dùng.', 'Approved user registration request.');
   }
   if (action === 'REJECT_REGISTRATION') {
-    return bilingualDot('Từ chối yêu cầu đăng ký người dùng.', 'Rejected user registration request.');
+    return localeText(locale, 'Từ chối yêu cầu đăng ký người dùng.', 'Rejected user registration request.');
   }
 
   const normalized = String(row.action || '').toLowerCase().replace(/_/g, ' ');
-  if (normalized.includes('approve customer')) return bilingualDot('Duyệt hồ sơ khách hàng.', 'Approved customer dossier.');
-  if (normalized.includes('reject customer')) return bilingualDot('Từ chối hồ sơ khách hàng.', 'Rejected customer dossier.');
+  if (normalized.includes('approve customer')) return localeText(locale, 'Duyệt hồ sơ khách hàng.', 'Approved customer dossier.');
+  if (normalized.includes('reject customer')) return localeText(locale, 'Từ chối hồ sơ khách hàng.', 'Rejected customer dossier.');
   if (normalized.includes('approve registration') || normalized.includes('approve user')) {
-    return bilingualDot('Phê duyệt đăng ký người dùng.', 'Approved user registration.');
+    return localeText(locale, 'Phê duyệt đăng ký người dùng.', 'Approved user registration.');
   }
   if (normalized.includes('reject registration') || normalized.includes('reject user')) {
-    return bilingualDot('Từ chối đăng ký người dùng.', 'Rejected user registration.');
+    return localeText(locale, 'Từ chối đăng ký người dùng.', 'Rejected user registration.');
   }
-  if (normalized.includes('request password reset')) return bilingualDot('Người dùng yêu cầu đặt lại mật khẩu.', 'User requested password reset.');
-  if (normalized.includes('reset password')) return bilingualDot('Mật khẩu đã được đặt lại.', 'Password has been reset.');
-  if (normalized.includes('request email change')) return bilingualDot('Người dùng yêu cầu thay đổi email.', 'User requested email change.');
-  if (normalized.includes('change email')) return bilingualDot('Email tài khoản đã được cập nhật.', 'Account email has been updated.');
-  if (normalized.includes('update avatar')) return bilingualDot('Cập nhật ảnh đại diện tài khoản.', 'Updated account avatar.');
-  if (normalized.includes('update profile')) return bilingualDot('Cập nhật thông tin hồ sơ người dùng.', 'Updated user profile information.');
-  if (normalized.includes('change password')) return bilingualDot('Đổi mật khẩu tài khoản.', 'Changed account password.');
+  if (normalized.includes('request password reset')) return localeText(locale, 'Người dùng yêu cầu đặt lại mật khẩu.', 'User requested password reset.');
+  if (normalized.includes('reset password')) return localeText(locale, 'Mật khẩu đã được đặt lại.', 'Password has been reset.');
+  if (normalized.includes('request email change')) return localeText(locale, 'Người dùng yêu cầu thay đổi email.', 'User requested email change.');
+  if (normalized.includes('change email')) return localeText(locale, 'Email tài khoản đã được cập nhật.', 'Account email has been updated.');
+  if (normalized.includes('update avatar')) return localeText(locale, 'Cập nhật ảnh đại diện tài khoản.', 'Updated account avatar.');
+  if (normalized.includes('update profile')) return localeText(locale, 'Cập nhật thông tin hồ sơ người dùng.', 'Updated user profile information.');
+  if (normalized.includes('change password')) return localeText(locale, 'Đổi mật khẩu tài khoản.', 'Changed account password.');
   if (normalized.includes('update user') || normalized.includes('user status')) {
-    return bilingualDot('Cập nhật trạng thái kích hoạt người dùng.', 'Updated user activation status.');
+    return localeText(locale, 'Cập nhật trạng thái kích hoạt người dùng.', 'Updated user activation status.');
   }
   if (normalized.includes('verify email')) {
-    return bilingualDot('Liên kết xác nhận trong email đăng ký đã được sử dụng.', 'The registration confirmation link was used.');
+    return localeText(locale, 'Liên kết xác nhận trong email đăng ký đã được sử dụng.', 'The registration confirmation link was used.');
   }
   if (normalized.includes('resend verification email')) {
-    return bilingualDot('Đã gửi lại email chứa liên kết xác nhận.', 'Confirmation email was resent.');
+    return localeText(locale, 'Đã gửi lại email chứa liên kết xác nhận.', 'Confirmation email was resent.');
   }
-  if (normalized.includes('register user')) return bilingualDot('Tạo mới yêu cầu đăng ký người dùng.', 'Created a new user registration request.');
-  if (normalized.includes('import customers')) return bilingualDot('Nhập dữ liệu khách hàng từ tệp.', 'Imported customers from file.');
-  if (normalized.includes('resolve alert')) return bilingualDot('Cảnh báo đã được xử lý.', 'Alert has been resolved.');
+  if (normalized.includes('register user')) return localeText(locale, 'Tạo mới yêu cầu đăng ký người dùng.', 'Created a new user registration request.');
+  if (normalized.includes('import customers')) return localeText(locale, 'Nhập dữ liệu khách hàng từ tệp.', 'Imported customers from file.');
+  if (normalized.includes('resolve alert')) return localeText(locale, 'Cảnh báo đã được xử lý.', 'Alert has been resolved.');
   if (normalized.includes('update')) {
     return idS
-      ? bilingualDot(`Đã cập nhật ${L.vi}${idS}.`, `Updated ${L.en}${idS}.`)
-      : bilingualDot(`Cập nhật ${L.vi || 'dữ liệu hệ thống'}.`, `Updated ${L.en || 'system data'}.`);
+      ? localeText(locale, `Đã cập nhật ${L.vi}${idS}.`, `Updated ${L.en}${idS}.`)
+      : localeText(locale, `Cập nhật ${L.vi || 'dữ liệu hệ thống'}.`, `Updated ${L.en || 'system data'}.`);
   }
   if (normalized.includes('delete')) {
     return idS
-      ? bilingualDot(`Đã xóa ${L.vi}${idS}.`, `Deleted ${L.en}${idS}.`)
-      : bilingualDot(`Xóa ${L.vi || 'dữ liệu'}.`, `Deleted ${L.en || 'data'}.`);
+      ? localeText(locale, `Đã xóa ${L.vi}${idS}.`, `Deleted ${L.en}${idS}.`)
+      : localeText(locale, `Xóa ${L.vi || 'dữ liệu'}.`, `Deleted ${L.en || 'data'}.`);
   }
   if (normalized.includes('create') || normalized.includes('insert')) {
     return idS
-      ? bilingualDot(`Đã thêm ${L.vi}${idS}.`, `Inserted ${L.en}${idS}.`)
-      : bilingualDot(`Thêm ${L.vi || 'bản ghi mới'}.`, `Inserted ${L.en || 'new record'}.`);
+      ? localeText(locale, `Đã thêm ${L.vi}${idS}.`, `Inserted ${L.en}${idS}.`)
+      : localeText(locale, `Thêm ${L.vi || 'bản ghi mới'}.`, `Inserted ${L.en || 'new record'}.`);
   }
-  return bilingualDot('Thao tác hệ thống hoặc không phân loại.', 'System or unclassified action.');
+  return localeText(locale, 'Thao tác hệ thống hoặc không phân loại.', 'System or unclassified action.');
 }
 
 function getActionBadgeClass(row: AuditLogRow): string {

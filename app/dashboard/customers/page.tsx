@@ -336,17 +336,22 @@ export default function CustomersPage() {
         <CardHeader>
           <CardTitle>{t('customers.list_title')}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <ScrollableTableRegion>
-            <Table className="w-max max-w-full text-sm">
+        <CardContent className="pb-5">
+          <ScrollableTableRegion className="max-h-[min(48vh,32rem,calc(100dvh-17rem))] shadow-sm">
+            <Table className="w-full table-fixed text-sm">
+              <colgroup>
+                {Array.from({ length: 6 }, (_, i) => (
+                  <col key={i} style={{ width: `${100 / 6}%` }} />
+                ))}
+              </colgroup>
               <TableHeader>
                 <TableRow className={scrollableTableHeaderRowClass}>
-                  <TableHead className="py-1.5 min-w-[11rem] pr-4">{t('customers.col_name_mail')}</TableHead>
-                  <TableHead className="py-1.5 whitespace-nowrap pr-3">{t('customers.col_app_count')}</TableHead>
-                  <TableHead className="py-1.5 whitespace-nowrap pr-3">{t('customers.col_total_loan')}</TableHead>
-                  <TableHead className="py-1.5 whitespace-nowrap pr-3">{t('customers.risk_level')}</TableHead>
-                  <TableHead className="py-1.5 max-w-sm pr-3">{t('customers.col_status_portfolio')}</TableHead>
-                  <TableHead className="py-1.5 w-24 whitespace-nowrap text-center pl-2">{t('customers.col_actions')}</TableHead>
+                  <TableHead className="py-1.5 pr-2">{t('customers.col_name_mail')}</TableHead>
+                  <TableHead className="py-1.5 whitespace-nowrap px-2">{t('customers.col_app_count')}</TableHead>
+                  <TableHead className="py-1.5 whitespace-nowrap px-2">{t('customers.col_total_loan')}</TableHead>
+                  <TableHead className="py-1.5 whitespace-nowrap px-2">{t('customers.risk_level')}</TableHead>
+                  <TableHead className="py-1.5 px-2">{t('customers.col_status_portfolio')}</TableHead>
+                  <TableHead className="py-1.5 whitespace-nowrap pl-2 text-left">{t('customers.col_actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -362,22 +367,22 @@ export default function CustomersPage() {
                       void router.push(`/dashboard/customers/${customer.id}`);
                     })}
                   >
-                    <TableCell className="py-1.5 font-medium">
+                    <TableCell className="py-1.5 pr-2 font-medium whitespace-normal">
                       <div className="leading-tight">
                         <p>{customer.name}</p>
                         <p className="text-xs text-muted-foreground">{customer.email}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="py-1.5 text-[13px] tabular-nums">
+                    <TableCell className="py-1.5 px-2 text-[13px] tabular-nums">
                       {customer.portfolioSummary?.application_count ?? 0}
                     </TableCell>
-                    <TableCell className="py-1.5 text-[13px] tabular-nums">
+                    <TableCell className="py-1.5 px-2 text-[13px] tabular-nums">
                       {formatVnd(
                         customer.portfolioSummary?.total_loan_amount ?? 0,
                         locale === 'vi' ? 'vi' : 'en',
                       )}
                     </TableCell>
-                    <TableCell className="py-1.5">
+                    <TableCell className="py-1.5 px-2">
                       <Badge
                         variant="outline"
                         className={getRiskBadgeClass(customer.listEffectiveRiskLevel)}
@@ -391,17 +396,27 @@ export default function CustomersPage() {
                         {riskLabel(customer.listEffectiveRiskLevel)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="py-1.5 text-[13px] text-muted-foreground max-w-sm break-words pr-3 align-middle">
+                    <TableCell className="py-1.5 px-2 text-[13px] text-muted-foreground break-words align-middle whitespace-normal">
                       {formatPortfolioSummary(t, customer.portfolioSummary, locale)}
                     </TableCell>
-                    <TableCell className="py-1.5 w-24 text-center align-middle pl-2">
-                      <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" asChild>
+                    <TableCell className="py-1.5 pl-2 align-middle whitespace-normal">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 px-2.5 font-normal"
+                        asChild
+                      >
                         <Link
                           href={`/dashboard/customers/${customer.id}`}
                           aria-label={t('customers.action_view_details')}
                           title={t('customers.action_view_details')}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4 shrink-0" />
+                          <span className="max-w-[9rem] truncate sm:max-w-none sm:whitespace-nowrap">
+                            {t('customers.action_view_details')}
+                          </span>
                         </Link>
                       </Button>
                     </TableCell>
@@ -410,7 +425,12 @@ export default function CustomersPage() {
               </TableBody>
             </Table>
           </ScrollableTableRegion>
-          <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          <ListPagination
+            className="mt-4 flex items-center justify-end gap-1"
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
     </div>

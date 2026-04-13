@@ -616,9 +616,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "loans.workbench.installment_state.overdue": "Quá hạn",
     "loans.workbench.installment_state.partial": "Thanh toán một phần",
     "loans.workbench.installment_state.paid": "Đã thanh toán",
-    "loans.workbench.col.amount": "Số tiền cần thanh toán",
+    "loans.workbench.col.amount": "Tổng số tiền cần thanh toán",
     "loans.workbench.col.amount_hint":
-      "Số còn phải trả cho kỳ hiện tại (giảm khi ghi thanh toán; hết kỳ thì chuyển sang kỳ tiếp theo).",
+      "Tổng số còn phải trả cho kỳ hiện tại (giảm khi ghi thanh toán; hết kỳ thì chuyển sang kỳ tiếp theo).",
     "loans.workbench.col.period_payment": "Số tiền thanh toán kì này",
     "loans.workbench.col.installment_progress": "Kỳ tới (đã trả / phải trả)",
     "loans.workbench.open_customer": "Mở KH",
@@ -1099,7 +1099,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "ai_chat.delete_session_title": "Xóa phiên chat này?",
     "ai_chat.delete_session_desc":
       "Toàn bộ tin nhắn trong phiên sẽ bị xóa vĩnh viễn và không thể khôi phục. Bạn có chắc chắn muốn tiếp tục?",
-    "ai_chat.delete_session_confirm": "Xóa phiên",
+    "ai_chat.delete_session_confirm": "Xóa",
     "ai_chat.no_sessions": "Chưa có session nào.",
     "ai_chat.session_closed": "Session đã đóng.",
     "ai_chat.empty_pick_session": "Chọn một session bên trái hoặc tạo session mới để bắt đầu.",
@@ -1844,9 +1844,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "loans.workbench.installment_state.overdue": "Overdue",
     "loans.workbench.installment_state.partial": "Partially paid",
     "loans.workbench.installment_state.paid": "Paid",
-    "loans.workbench.col.amount": "Amount due (this period)",
+    "loans.workbench.col.amount": "Total amount due (this period)",
     "loans.workbench.col.amount_hint":
-      "Remaining to pay for the current installment (decreases as you record payments; advances after the period is fully paid).",
+      "Total remaining to pay for the current installment (decreases as you record payments; advances after the period is fully paid).",
     "loans.workbench.col.period_payment": "This period payment (due)",
     "loans.workbench.col.installment_progress": "Next installment (paid / due)",
     "loans.workbench.open_customer": "Open customer",
@@ -2327,7 +2327,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "ai_chat.delete_session_title": "Delete this chat session?",
     "ai_chat.delete_session_desc":
       "All messages in this session will be permanently removed and cannot be recovered. Are you sure you want to continue?",
-    "ai_chat.delete_session_confirm": "Delete session",
+    "ai_chat.delete_session_confirm": "Delete",
     "ai_chat.no_sessions": "No sessions yet.",
     "ai_chat.session_closed": "Session closed.",
     "ai_chat.empty_pick_session": "Pick a session on the left or create a new one to get started.",
