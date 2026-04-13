@@ -11,6 +11,7 @@ import { notifyError } from '@/lib/notify';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatCompactVnd } from '@/lib/money';
 import { RECHART_MARGIN, RECHART_Y_WIDTH } from '@/lib/recharts-layout';
+import { ScrollableListRegion } from '@/components/scrollable-table-region';
 
 type DistResp = { chart_data: Array<{ bucket: string; count?: number }> };
 type ConcResp = { items: Array<{ name: string; exposure: number }> };
@@ -367,13 +368,17 @@ export default function RiskAnalyzePage() {
             <CardHeader>
               <CardTitle>{t('risk.analyze.insights')}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {dynamicInsights.map((insight, idx) => (
-                <div key={idx} className="flex gap-3">
-                  <div className="h-2 w-2 rounded-full bg-accent mt-2 flex-shrink-0" />
-                  <p className="text-sm text-muted-foreground">{insight}</p>
+            <CardContent className="min-h-0">
+              <ScrollableListRegion className="max-h-[min(48vh,20rem)] border-border/70 bg-muted/15 p-3 shadow-none">
+                <div className="space-y-3">
+                  {dynamicInsights.map((insight, idx) => (
+                    <div key={idx} className="flex gap-3">
+                      <div className="h-2 w-2 rounded-full bg-accent mt-2 flex-shrink-0" />
+                      <p className="text-sm text-muted-foreground">{insight}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </ScrollableListRegion>
             </CardContent>
           </Card>
         </TabsContent>
@@ -498,13 +503,15 @@ export default function RiskAnalyzePage() {
               <p className="text-sm text-muted-foreground">
                 {dynamicCorrelationSummary}
               </p>
-              <div className="bg-secondary p-4 rounded-lg space-y-2">
+              <div className="rounded-lg border border-border/60 bg-secondary p-3">
                 <p className="text-sm font-medium">{t('risk.analyze.strong_indicators')}</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  {dynamicIndicators.map((item, idx) => (
-                    <li key={idx}>• {item}</li>
-                  ))}
-                </ul>
+                <ScrollableListRegion className="mt-2 max-h-[min(40vh,16rem)] border-0 bg-transparent p-0 shadow-none">
+                  <ul className="space-y-1 pr-1 text-sm text-muted-foreground">
+                    {dynamicIndicators.map((item, idx) => (
+                      <li key={idx}>• {item}</li>
+                    ))}
+                  </ul>
+                </ScrollableListRegion>
               </div>
             </CardContent>
           </Card>

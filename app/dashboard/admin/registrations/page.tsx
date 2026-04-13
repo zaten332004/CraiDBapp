@@ -18,6 +18,8 @@ import { ListPagination } from '@/components/list-pagination';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { badgeTone } from '@/lib/dashboard-badge-tones';
+import { rowNavigationPointerHandlers } from '@/lib/ui/row-navigation-click';
+import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 
 type RegistrationType = 'manager' | 'analyst';
 
@@ -437,10 +439,10 @@ export default function AdminRegistrationsPage() {
               <p className="text-muted-foreground mt-1">{t('admin.reg.none_desc')}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <ScrollableTableRegion>
               <Table className="min-w-[760px] w-full">
                 <TableHeader>
-                  <TableRow className="bg-muted/35 hover:bg-muted/35">
+                  <TableRow className={scrollableTableHeaderRowClass}>
                     <TableHead className="py-1.5">{t('common.name')}</TableHead>
                     <TableHead className="py-1.5">{t('common.email')}</TableHead>
                     <TableHead className="py-1.5">{t('admin.reg.type')}</TableHead>
@@ -453,7 +455,9 @@ export default function AdminRegistrationsPage() {
                     <TableRow
                       key={reg.id}
                       className="cursor-pointer border-b border-border/70 hover:bg-muted/35"
-                      onClick={() => void openRegistrationDetails(reg.id)}
+                      {...rowNavigationPointerHandlers(() => {
+                        void openRegistrationDetails(reg.id);
+                      })}
                     >
                       <TableCell className="py-1.5 text-[12px] font-medium">{reg.name}</TableCell>
                       <TableCell className="py-1.5 text-[12px]">{reg.email}</TableCell>
@@ -526,7 +530,7 @@ export default function AdminRegistrationsPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
+            </ScrollableTableRegion>
           )}
           {filtered.length > 0 && (
             <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
@@ -557,10 +561,10 @@ export default function AdminRegistrationsPage() {
               {locale === 'vi' ? 'Không có yêu cầu quên PIN đang chờ.' : 'No pending forgot-PIN requests.'}
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <ScrollableTableRegion>
               <Table className="min-w-[760px] w-full">
                 <TableHeader>
-                  <TableRow className="bg-muted/35 hover:bg-muted/35">
+                  <TableRow className={scrollableTableHeaderRowClass}>
                     <TableHead className="py-1.5">{locale === 'vi' ? 'Người dùng' : 'User'}</TableHead>
                     <TableHead className="py-1.5">{t('common.email')}</TableHead>
                     <TableHead className="py-1.5">{locale === 'vi' ? 'Thời gian yêu cầu' : 'Requested at'}</TableHead>
@@ -601,7 +605,7 @@ export default function AdminRegistrationsPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
+            </ScrollableTableRegion>
           )}
         </CardContent>
       </Card>

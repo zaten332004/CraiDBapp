@@ -16,6 +16,7 @@ import { ListPagination } from '@/components/list-pagination';
 import { downloadCsvFile } from '@/lib/export/csv';
 import { formatDateTimeVietnam, formatDateVietnam } from '@/lib/datetime';
 import { badgeTone } from '@/lib/dashboard-badge-tones';
+import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 
 type AuditLogRow = {
   id: string;
@@ -688,7 +689,7 @@ export default function AdminAuditLogsPage() {
           </div>
         </CardHeader>
         <CardContent className="pt-0 pb-3">
-          <div className="min-h-[620px] overflow-x-auto rounded-xl border border-border bg-card">
+          <ScrollableTableRegion className="min-h-[200px]">
             <Table className="w-full min-w-[1280px] table-fixed">
               <colgroup>
                 <col className="w-[11%]" />
@@ -699,7 +700,7 @@ export default function AdminAuditLogsPage() {
                 <col className="w-[10%]" />
               </colgroup>
               <TableHeader>
-                <TableRow className="bg-muted/35 hover:bg-muted/35">
+                <TableRow className={scrollableTableHeaderRowClass}>
                   <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('common.date')}</TableHead>
                   <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{locale === 'vi' ? 'Giờ' : 'Time'}</TableHead>
                   <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('admin.audit.actor')}</TableHead>
@@ -740,7 +741,7 @@ export default function AdminAuditLogsPage() {
                 )}
               </TableBody>
             </Table>
-          </div>
+          </ScrollableTableRegion>
           {filtered.length > 0 && (
             <div className="mt-3">
             <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />

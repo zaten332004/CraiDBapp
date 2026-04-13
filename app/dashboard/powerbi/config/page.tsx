@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 import { ExternalLink, Loader2, ListChecks, RefreshCw, Trash2, Unplug, PlugZap } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { useI18n } from '@/components/i18n-provider';
@@ -20,6 +21,7 @@ import {
   loadPowerBiTableSuggestions,
   savePowerBiTableSuggestions,
 } from '@/lib/powerbi/table-suggestions-storage';
+import { isPowerBiTableNotInDatasetError } from '@/lib/powerbi/schema-table-error';
 
 type PowerBIWorkspace = { id: string; name: string; raw: unknown };
 type PowerBIDataset = { id: string; name: string; raw: unknown };
@@ -616,8 +618,12 @@ export default function PowerBIConfigPage() {
                       {samples.toLocaleString()}
                     </p>
                     {err ? (
-                      <p className="mt-1 break-words text-xs text-destructive">
-                        {t('powerbi.table_data_error_prefix')}: {err}
+                      <p className="mt-1 text-xs text-destructive">
+                        {isPowerBiTableNotInDatasetError(err)
+                          ? t('powerbi.table_data_table_not_in_dataset').replace(/\{name\}/g, sch.name)
+                          : `${t('powerbi.table_data_error_prefix')}: ${
+                              err.length > 240 ? `${err.slice(0, 240)}…` : err
+                            }`}
                       </p>
                     ) : null}
                   </div>
@@ -850,16 +856,16 @@ export default function PowerBIConfigPage() {
                     </Button>
                   </div>
                   {workspaces.length > 0 ? (
-                    <div className="max-h-40 overflow-x-auto overflow-y-auto rounded-md border bg-background/60">
+                    <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm">
                       <Table>
                         <TableHeader>
-                          <TableRow>
+                          <TableRow className={scrollableTableHeaderRowClass}>
                             <TableHead>ID</TableHead>
                             <TableHead>{t('common.name')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {workspaces.slice(0, 10).map((w) => (
+                          {workspaces.map((w) => (
                             <TableRow
                               key={w.id}
                               className={w.id === selectedWorkspaceId ? 'bg-secondary/60' : undefined}
@@ -870,7 +876,7 @@ export default function PowerBIConfigPage() {
                           ))}
                         </TableBody>
                       </Table>
-                    </div>
+                    </ScrollableTableRegion>
                   ) : null}
                 </div>
 
@@ -921,16 +927,16 @@ export default function PowerBIConfigPage() {
                     </Button>
                   </div>
                   {datasets.length > 0 ? (
-                    <div className="max-h-40 overflow-x-auto overflow-y-auto rounded-md border bg-background/60">
+                    <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm">
                       <Table>
                         <TableHeader>
-                          <TableRow>
+                          <TableRow className={scrollableTableHeaderRowClass}>
                             <TableHead>ID</TableHead>
                             <TableHead>{t('common.name')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {datasets.slice(0, 10).map((d) => (
+                          {datasets.map((d) => (
                             <TableRow
                               key={d.id}
                               className={d.id === selectedDatasetId ? 'bg-secondary/60' : undefined}
@@ -941,7 +947,7 @@ export default function PowerBIConfigPage() {
                           ))}
                         </TableBody>
                       </Table>
-                    </div>
+                    </ScrollableTableRegion>
                   ) : null}
                 </div>
 
@@ -1146,19 +1152,20 @@ export default function PowerBIConfigPage() {
               <p className="text-sm font-medium text-foreground">{t('powerbi.rules_ref_extended')}</p>
               <p className="text-xs text-muted-foreground">{t('powerbi.table_suggestions_extended_hint')}</p>
               <div className="flex flex-wrap gap-2">
-                {POWER_BI_REFERENCE_EXTENDED_TABLES.map((name) => (
-                  <Button
-                    key={name}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="font-mono text-xs"
-                    onClick={() => handleAppendExtendedSuggestion(name)}
-                    disabled={tableSuggestions.includes(name)}
-                  >
-                    + {name}
-                  </Button>
-                ))}
+                {POWER_BI_REFERENCE_EXTENDED_TABLES.filter((name) => !tableSuggestions.includes(name)).map(
+                  (name) => (
+                    <Button
+                      key={name}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="font-mono text-xs"
+                      onClick={() => handleAppendExtendedSuggestion(name)}
+                    >
+                      + {name}
+                    </Button>
+                  ),
+                )}
               </div>
             </div>
 

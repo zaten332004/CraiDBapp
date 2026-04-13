@@ -7,9 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Upload, CheckCircle, AlertCircle, File, Loader2 } from 'lucide-react';
-import { authHeaders } from '@/lib/auth/token';
-import { getUserRole } from '@/lib/auth/token';
+import { ArrowLeft, Upload, CheckCircle, AlertCircle, File, Loader2, Trash2 } from 'lucide-react';
+import { authHeaders, getAccessToken, getUserRole } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { ApiError } from '@/lib/api/shared';
@@ -17,6 +16,7 @@ import { formatUserFacingApiError, formatUserFacingFetchError, type UserFacingLo
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { CRAIDB_UPLOAD_COMPLETED_EVENT } from '@/lib/profile-sync-event';
 import { formatDateTimeVietnam } from '@/lib/datetime';
+import { rowNavigationPointerHandlers } from '@/lib/ui/row-navigation-click';
 import {
   Table,
   TableBody,
@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ScrollableListRegion, ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 
 function normalizeJobErrorRow(item: any) {
   let msg = item?.message ?? item?.error_message ?? item?.reason ?? item?.error;
@@ -72,6 +73,7 @@ export default function UploadPage() {
   } | null>(null);
   const [isLoadingFileDetail, setIsLoadingFileDetail] = useState(false);
   const [isFileDetailOpen, setIsFileDetailOpen] = useState(false);
+  const [deletingAuditId, setDeletingAuditId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const getJsonWithAuthFallback = async <T,>(path: string): Promise<T> => {
@@ -93,6 +95,28 @@ export default function UploadPage() {
       }
       return (await response.json()) as T;
     }
+  };
+
+  const deleteUploadHistoryWithAuthFallback = async (auditId: number): Promise<void> => {
+    const url = `/api/v1/upload/history/${auditId}`;
+    const fail = async (response: Response): Promise<never> => {
+      const bodyText = await response.text();
+      throw new Error(formatUserFacingFetchError(response.status, bodyText, msgLocale));
+    };
+    const token = getAccessToken();
+    let response = await fetch(url, {
+      method: 'DELETE',
+      headers: { ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      credentials: 'include',
+    });
+    if (response.status === 401 && token) {
+      response = await fetch(url, {
+        method: 'DELETE',
+        headers: authHeaders(),
+        credentials: 'include',
+      });
+    }
+    if (!response.ok) await fail(response);
   };
 
   const derivedJobId = String(uploadResult?.job_id ?? uploadResult?.jobId ?? '').trim();
@@ -253,6 +277,25 @@ export default function UploadPage() {
       cancelled = true;
     };
   }, [uploadResult]);
+
+  const handleDeleteUploadHistory = async (item: (typeof uploadHistory)[number]) => {
+    if (isViewer) return;
+    setDeletingAuditId(item.audit_id);
+    try {
+      await deleteUploadHistoryWithAuthFallback(item.audit_id);
+      setUploadHistory((prev) => prev.filter((x) => x.audit_id !== item.audit_id));
+      if (selectedHistoryAuditId === item.audit_id) {
+        setSelectedHistoryAuditId(null);
+        setIsFileDetailOpen(false);
+        setHistoryFileDetail(null);
+      }
+      notifySuccess(t('upload.history_deleted'));
+    } catch (err) {
+      notifyError(t('upload.history_delete_failed'), { description: apiErr(err) });
+    } finally {
+      setDeletingAuditId(null);
+    }
+  };
 
   const getCountsByDuplicateType = () => {
     const counts = { duplicateId: 0, duplicateEmail: 0, duplicateName: 0 };
@@ -496,10 +539,10 @@ export default function UploadPage() {
               {importErrors.length > 0 ? (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">{t('upload.row_errors_title')}</p>
-                  <div className="max-h-[320px] overflow-auto rounded-md border">
+                  <ScrollableTableRegion className="max-h-[min(52vh,22rem)] rounded-md">
                     <Table>
                       <TableHeader>
-                        <TableRow>
+                        <TableRow className={scrollableTableHeaderRowClass}>
                           <TableHead className="w-16">{t('upload.col_row')}</TableHead>
                           <TableHead>{t('upload.col_name_email')}</TableHead>
                           <TableHead>{t('upload.col_reason')}</TableHead>
@@ -522,7 +565,7 @@ export default function UploadPage() {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
+                  </ScrollableTableRegion>
                 </div>
               ) : null}
             </CardContent>
@@ -535,44 +578,71 @@ export default function UploadPage() {
             <CardTitle>{t('upload.history_title')}</CardTitle>
             <CardDescription>{t('upload.history_recent_count')}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {uploadHistory.map((item) => (
-              <div
-                key={item.audit_id}
-                className={`border border-border rounded-lg p-3 space-y-2 cursor-pointer transition-colors hover:bg-muted/30 ${
-                  selectedHistoryAuditId === item.audit_id ? 'bg-muted/30 border-accent/40' : ''
-                }`}
-                onClick={() => {
-                  setSelectedHistoryAuditId(item.audit_id);
-                  if (item.job_id) {
-                    setIsFileDetailOpen(true);
-                    void loadFileDetailByJobId(String(item.job_id), item.file_name || null);
-                  }
-                }}
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-medium text-sm truncate">{item.file_name || '-'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.status === 'completed' ? t('upload.import_status_ok') : t('upload.import_status_fail')}
-                    </p>
-                  </div>
-                  <Badge variant="secondary" className="shrink-0">
-                    {item.status === 'completed' ? <CheckCircle className="h-3 w-3 mr-1" /> : <AlertCircle className="h-3 w-3 mr-1" />}
-                    {item.status === 'completed' ? t('common.done') : (t('common.error') || 'Lỗi')}
-                  </Badge>
-                </div>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>
-                    {Number(item.success_count || 0)} / {Number(item.processed_count || 0)} {t('common.records')}
-                  </p>
-                  <p>{formatDateTimeVietnam(item.created_at, locale)}</p>
-                </div>
-              </div>
-            ))}
+          <CardContent className="flex min-h-0 flex-col space-y-3">
             {uploadHistory.length === 0 ? (
               <p className="text-xs text-muted-foreground">{t('upload.no_history')}</p>
-            ) : null}
+            ) : (
+              <ScrollableListRegion className="max-h-[min(72vh,30rem)] border-border/80 bg-muted/20 p-2 shadow-none">
+                <div className="space-y-3 pr-1">
+                  {uploadHistory.map((item) => (
+                    <div
+                      key={item.audit_id}
+                      className={`border border-border rounded-lg bg-card p-3 space-y-2 cursor-pointer transition-colors hover:bg-muted/30 ${
+                        selectedHistoryAuditId === item.audit_id ? 'bg-muted/30 border-accent/40' : ''
+                      }`}
+                      {...rowNavigationPointerHandlers(() => {
+                        setSelectedHistoryAuditId(item.audit_id);
+                        if (item.job_id) {
+                          setIsFileDetailOpen(true);
+                          void loadFileDetailByJobId(String(item.job_id), item.file_name || null);
+                        }
+                      })}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{item.file_name || '-'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.status === 'completed' ? t('upload.import_status_ok') : t('upload.import_status_fail')}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {!isViewer ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              disabled={deletingAuditId === item.audit_id}
+                              aria-label={t('upload.history_delete_aria')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDeleteUploadHistory(item);
+                              }}
+                            >
+                              {deletingAuditId === item.audit_id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                              )}
+                            </Button>
+                          ) : null}
+                          <Badge variant="secondary" className="shrink-0">
+                            {item.status === 'completed' ? <CheckCircle className="h-3 w-3 mr-1" /> : <AlertCircle className="h-3 w-3 mr-1" />}
+                            {item.status === 'completed' ? t('common.done') : (t('common.error') || 'Lỗi')}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <p>
+                          {Number(item.success_count || 0)} / {Number(item.processed_count || 0)} {t('common.records')}
+                        </p>
+                        <p>{formatDateTimeVietnam(item.created_at, locale)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollableListRegion>
+            )}
           </CardContent>
         </Card>
       </div>

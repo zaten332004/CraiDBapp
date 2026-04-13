@@ -24,26 +24,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Edit, PlusCircle, Trash2 } from 'lucide-react';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
-import { notifyError, notifySuccess } from '@/lib/notify';
+import { notifyApiError, notifyError, notifySuccess } from '@/lib/notify';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatDateTimeVietnam } from '@/lib/datetime';
-import { formatVnd } from '@/lib/money';
+import { formatVnd, parseVndDigitsToNumber, vndDigitsFromUnknown } from '@/lib/money';
+import { VndAmountInput } from '@/components/vnd-amount-input';
 import { getUserRole } from '@/lib/auth/token';
 import { badgeTone } from '@/lib/dashboard-badge-tones';
-
-function sanitizeDashboardReturnTo(raw: string | null): string | null {
-  if (!raw) return null;
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(raw);
-  } catch {
-    return null;
-  }
-  if (decoded.length > 256) return null;
-  if (!decoded.startsWith('/dashboard')) return null;
-  if (decoded.includes('//') || decoded.includes('\\')) return null;
-  return decoded;
-}
+import { sanitizeDashboardReturnTo } from '@/lib/dashboard-return-to';
 
 export default function CustomerDetailPage() {
   const { locale, t } = useI18n();
@@ -60,6 +48,25 @@ export default function CustomerDetailPage() {
   const backHref = useMemo(() => {
     return sanitizeDashboardReturnTo(returnToParam) ?? '/dashboard/customers';
   }, [returnToParam]);
+
+  const buildCustomerUrl = useMemo(() => {
+    return (applicationId: string | number) => {
+      const p = new URLSearchParams();
+      p.set('application_id', String(applicationId));
+      const safeReturn = sanitizeDashboardReturnTo(returnToParam);
+      if (safeReturn) p.set('returnTo', safeReturn);
+      return `/dashboard/customers/${customerId}?${p.toString()}`;
+    };
+  }, [customerId, returnToParam]);
+
+  const newLoanHref = useMemo(() => {
+    const p = new URLSearchParams();
+    if (applicationIdQuery != null) p.set('application_id', String(applicationIdQuery));
+    const safeReturn = sanitizeDashboardReturnTo(returnToParam);
+    if (safeReturn) p.set('returnTo', safeReturn);
+    const q = p.toString();
+    return q ? `/dashboard/customers/${customerId}/new-loan?${q}` : `/dashboard/customers/${customerId}/new-loan`;
+  }, [customerId, applicationIdQuery, returnToParam]);
   const role = getUserRole();
   const canManageProfile = role !== 'viewer';
   /** Duyệt / từ chối hồ sơ: manager & admin; analyst chỉ sửa & xóa. */
@@ -131,16 +138,18 @@ export default function CustomerDetailPage() {
           email: String(customerData.email ?? ''),
           occupation: String(customerData.occupation ?? ''),
           employment_status: String(customerData.employment_status ?? '').trim(),
-          monthly_income: customerData.monthly_income != null ? String(customerData.monthly_income) : '',
+          monthly_income: vndDigitsFromUnknown(customerData.monthly_income),
           permanent_address: String(customerData.permanent_address ?? ''),
           current_address: String(customerData.current_address ?? ''),
           loan_type: normalizeLoanType(customerData.loan_type ?? customerData.product_type),
           loan_purpose: String(customerData.loan_purpose ?? ''),
-          requested_loan_amount: customerData.requested_loan_amount != null ? String(customerData.requested_loan_amount) : customerData.loan_amount != null ? String(customerData.loan_amount) : '',
+          requested_loan_amount: vndDigitsFromUnknown(
+            customerData.requested_loan_amount ?? customerData.loan_amount,
+          ),
           requested_term_months: customerData.requested_term_months != null ? String(customerData.requested_term_months) : customerData.loan_term_months != null ? String(customerData.loan_term_months) : '',
           annual_interest_rate: customerData.annual_interest_rate != null ? String(customerData.annual_interest_rate) : customerData.interest_rate != null ? String(customerData.interest_rate) : '',
           collateral_id: String(customerData.collateral_id ?? ''),
-          collateral_value: customerData.collateral_value != null ? String(customerData.collateral_value) : customerData.collateral_amount != null ? String(customerData.collateral_amount) : '',
+          collateral_value: vndDigitsFromUnknown(customerData.collateral_value ?? customerData.collateral_amount),
         });
       } catch (err) {
         if (!cancelled) {
@@ -274,21 +283,21 @@ export default function CustomerDetailPage() {
         email: editForm.email || null,
         occupation: editForm.occupation || null,
         employment_status: normalizeEmploymentStatus(editForm.employment_status) || null,
-        monthly_income: editForm.monthly_income ? Number(editForm.monthly_income) : null,
+        monthly_income: editForm.monthly_income ? parseVndDigitsToNumber(editForm.monthly_income) : null,
         permanent_address: editForm.permanent_address || null,
         current_address: editForm.current_address || null,
         loan_type: normalizeLoanType(editForm.loan_type) || null,
         product_type: normalizeLoanType(editForm.loan_type) || null,
         loan_purpose: editForm.loan_purpose || null,
-        requested_loan_amount: editForm.requested_loan_amount ? Number(editForm.requested_loan_amount) : null,
-        loan_amount: editForm.requested_loan_amount ? Number(editForm.requested_loan_amount) : null,
+        requested_loan_amount: editForm.requested_loan_amount ? parseVndDigitsToNumber(editForm.requested_loan_amount) : null,
+        loan_amount: editForm.requested_loan_amount ? parseVndDigitsToNumber(editForm.requested_loan_amount) : null,
         requested_term_months: editForm.requested_term_months ? Number(editForm.requested_term_months) : null,
         loan_term_months: editForm.requested_term_months ? Number(editForm.requested_term_months) : null,
         annual_interest_rate: editForm.annual_interest_rate ? Number(editForm.annual_interest_rate) : null,
         interest_rate: editForm.annual_interest_rate ? Number(editForm.annual_interest_rate) : null,
         collateral_id: editForm.collateral_id || null,
-        collateral_value: editForm.collateral_value ? Number(editForm.collateral_value) : null,
-        collateral_amount: editForm.collateral_value ? Number(editForm.collateral_value) : null,
+        collateral_value: editForm.collateral_value ? parseVndDigitsToNumber(editForm.collateral_value) : null,
+        collateral_amount: editForm.collateral_value ? parseVndDigitsToNumber(editForm.collateral_value) : null,
       };
       const updated = await browserApiFetchAuth<any>(`/customers/${customerId}`, {
         method: 'PUT',
@@ -298,7 +307,7 @@ export default function CustomerDetailPage() {
       setIsEditing(false);
       notifySuccess(t('customers.detail.toast_updated'));
     } catch (err) {
-      notifyError(t('toast.action_failed'), { description: formatUserFacingApiError(err, msgLocale) });
+      notifyApiError(err, msgLocale);
     } finally {
       setIsSaving(false);
     }
@@ -323,7 +332,7 @@ export default function CustomerDetailPage() {
         nextStatus === 'approved' ? t('customers.detail.toast_approved') : t('customers.detail.toast_rejected'),
       );
     } catch (err) {
-      notifyError(t('toast.action_failed'), { description: formatUserFacingApiError(err, msgLocale) });
+      notifyApiError(err, msgLocale);
     } finally {
       setIsSaving(false);
     }
@@ -355,7 +364,7 @@ export default function CustomerDetailPage() {
       setConfirmDeleteOpen(false);
       router.push('/dashboard/customers');
     } catch (err) {
-      notifyError(t('toast.action_failed'), { description: formatUserFacingApiError(err, msgLocale) });
+      notifyApiError(err, msgLocale);
     } finally {
       setIsDeleting(false);
     }
@@ -383,7 +392,7 @@ export default function CustomerDetailPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/dashboard/customers/${customerId}/new-loan`}>
+            <Link href={newLoanHref}>
               <PlusCircle className="mr-2 h-4 w-4" />
               {t('customers.detail.new_application')}
             </Link>
@@ -466,35 +475,40 @@ export default function CustomerDetailPage() {
                   <div key={fieldId} className="rounded-lg border p-3">
                     <p className="text-xs text-muted-foreground">{label}</p>
                     {editableRow ? (
-                      <Input
-                        className="mt-1 h-9"
-                        placeholder={fieldId === 'employment_status' ? t('customers.detail.employment_ph') : undefined}
-                        value={
-                          fieldId === 'phone'
-                            ? editForm.phone_number
-                            : fieldId === 'email'
-                              ? editForm.email
-                              : fieldId === 'occupation'
-                                ? editForm.occupation
-                                : fieldId === 'employment_status'
-                                  ? editForm.employment_status
-                                  : fieldId === 'monthly_income'
-                                    ? editForm.monthly_income
+                      fieldId === 'monthly_income' ? (
+                        <VndAmountInput
+                          className="mt-1 h-9"
+                          valueDigits={editForm.monthly_income}
+                          onDigitsChange={(digits) => setEditForm((p) => ({ ...p, monthly_income: digits }))}
+                        />
+                      ) : (
+                        <Input
+                          className="mt-1 h-9"
+                          placeholder={fieldId === 'employment_status' ? t('customers.detail.employment_ph') : undefined}
+                          value={
+                            fieldId === 'phone'
+                              ? editForm.phone_number
+                              : fieldId === 'email'
+                                ? editForm.email
+                                : fieldId === 'occupation'
+                                  ? editForm.occupation
+                                  : fieldId === 'employment_status'
+                                    ? editForm.employment_status
                                     : fieldId === 'permanent_address'
                                       ? editForm.permanent_address
                                       : editForm.current_address
-                        }
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (fieldId === 'phone') setEditForm((p) => ({ ...p, phone_number: sanitizePhoneInput(v) }));
-                          else if (fieldId === 'email') setEditForm((p) => ({ ...p, email: v }));
-                          else if (fieldId === 'occupation') setEditForm((p) => ({ ...p, occupation: v }));
-                          else if (fieldId === 'employment_status') setEditForm((p) => ({ ...p, employment_status: v }));
-                          else if (fieldId === 'monthly_income') setEditForm((p) => ({ ...p, monthly_income: v.replace(/[^\d.]/g, '') }));
-                          else if (fieldId === 'permanent_address') setEditForm((p) => ({ ...p, permanent_address: v }));
-                          else setEditForm((p) => ({ ...p, current_address: v }));
-                        }}
-                      />
+                          }
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (fieldId === 'phone') setEditForm((p) => ({ ...p, phone_number: sanitizePhoneInput(v) }));
+                            else if (fieldId === 'email') setEditForm((p) => ({ ...p, email: v }));
+                            else if (fieldId === 'occupation') setEditForm((p) => ({ ...p, occupation: v }));
+                            else if (fieldId === 'employment_status') setEditForm((p) => ({ ...p, employment_status: v }));
+                            else if (fieldId === 'permanent_address') setEditForm((p) => ({ ...p, permanent_address: v }));
+                            else setEditForm((p) => ({ ...p, current_address: v }));
+                          }}
+                        />
+                      )
                     ) : (
                       <p className="mt-1 text-sm font-medium break-words">{readDisplay}</p>
                     )}
@@ -514,7 +528,7 @@ export default function CustomerDetailPage() {
                 <Label className="text-xs text-muted-foreground">{t('customers.detail.select_application')}</Label>
                 <Select
                   value={String(customer.application_id ?? '')}
-                  onValueChange={(v) => router.replace(`/dashboard/customers/${customerId}?application_id=${v}`)}
+                  onValueChange={(v) => router.replace(buildCustomerUrl(v))}
                 >
                   <SelectTrigger className="max-w-md">
                     <SelectValue placeholder={t('customers.detail.select_application')} />
@@ -610,30 +624,36 @@ export default function CustomerDetailPage() {
                               ))}
                             </SelectContent>
                           </Select>
+                        ) : fieldId === 'loan_amount' ? (
+                          <VndAmountInput
+                            className="h-9"
+                            valueDigits={editForm.requested_loan_amount}
+                            onDigitsChange={(d) => setEditForm((p) => ({ ...p, requested_loan_amount: d }))}
+                          />
+                        ) : fieldId === 'collateral_value' ? (
+                          <VndAmountInput
+                            className="h-9"
+                            valueDigits={editForm.collateral_value}
+                            onDigitsChange={(d) => setEditForm((p) => ({ ...p, collateral_value: d }))}
+                          />
                         ) : (
                           <Input
                             className="h-9"
                             value={
                               fieldId === 'loan_purpose'
                                 ? editForm.loan_purpose
-                                : fieldId === 'loan_amount'
-                                  ? editForm.requested_loan_amount
-                                  : fieldId === 'loan_term'
-                                    ? editForm.requested_term_months
-                                    : fieldId === 'interest_rate'
-                                      ? editForm.annual_interest_rate
-                                      : fieldId === 'collateral_id'
-                                        ? editForm.collateral_id
-                                        : editForm.collateral_value
+                                : fieldId === 'loan_term'
+                                  ? editForm.requested_term_months
+                                  : fieldId === 'interest_rate'
+                                    ? editForm.annual_interest_rate
+                                    : editForm.collateral_id
                             }
                             onChange={(e) => {
                               const v = e.target.value;
                               if (fieldId === 'loan_purpose') setEditForm((p) => ({ ...p, loan_purpose: v }));
-                              else if (fieldId === 'loan_amount') setEditForm((p) => ({ ...p, requested_loan_amount: v.replace(/[^\d.]/g, '') }));
                               else if (fieldId === 'loan_term') setEditForm((p) => ({ ...p, requested_term_months: v.replace(/[^\d]/g, '') }));
                               else if (fieldId === 'interest_rate') setEditForm((p) => ({ ...p, annual_interest_rate: v.replace(/[^\d.]/g, '') }));
-                              else if (fieldId === 'collateral_id') setEditForm((p) => ({ ...p, collateral_id: v }));
-                              else setEditForm((p) => ({ ...p, collateral_value: v.replace(/[^\d.]/g, '') }));
+                              else setEditForm((p) => ({ ...p, collateral_id: v }));
                             }}
                           />
                         )

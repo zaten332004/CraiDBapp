@@ -32,8 +32,10 @@ import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/forma
 import { ListPagination } from '@/components/list-pagination';
 import { getAccessToken } from '@/lib/auth/token';
 import { formatVnd } from '@/lib/money';
+import { rowNavigationPointerHandlers } from '@/lib/ui/row-navigation-click';
 import { CRAIDB_UPLOAD_COMPLETED_EVENT } from '@/lib/profile-sync-event';
 import { badgeTone } from '@/lib/dashboard-badge-tones';
+import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 
 function getRiskBadgeClass(level: string) {
   const normalized = String(level || '').toLowerCase();
@@ -43,24 +45,43 @@ function getRiskBadgeClass(level: string) {
   return badgeTone.slate;
 }
 
-function normalizeStatusKey(status: string) {
-  const normalized = String(status || '').toLowerCase();
-  if (normalized === 'approved') return 'status.approved';
-  if (normalized === 'rejected') return 'status.rejected';
-  if (normalized === 'pending') return 'status.pending';
-  if (normalized === 'active') return 'status.active';
-  if (normalized === 'inactive') return 'status.inactive';
-  return null;
+type PortfolioSummary = {
+  application_count: number;
+  total_loan_amount: number;
+  pending_count: number;
+  approved_count: number;
+  disbursed_count: number;
+  rejected_count: number;
+  has_overdue_installment: boolean;
+};
+
+function formatPortfolioSummary(
+  t: (key: string) => string,
+  s: PortfolioSummary | null | undefined,
+  locale: string,
+): string {
+  if (!s || s.application_count <= 0) return t('customers.portfolio.none');
+  const sep = locale === 'vi' ? ' · ' : ' · ';
+  const parts: string[] = [];
+  if (s.pending_count) parts.push(`${s.pending_count} ${t('customers.portfolio.pending')}`);
+  if (s.approved_count) parts.push(`${s.approved_count} ${t('customers.portfolio.approved')}`);
+  if (s.disbursed_count) parts.push(`${s.disbursed_count} ${t('customers.portfolio.disbursed')}`);
+  if (s.rejected_count) parts.push(`${s.rejected_count} ${t('customers.portfolio.rejected')}`);
+  return parts.length ? parts.join(sep) : t('customers.portfolio.none');
 }
 
-function getStatusBadgeClass(status: string) {
-  const normalized = String(status || '').toLowerCase();
-  if (normalized === 'approved') return badgeTone.emerald;
-  if (normalized === 'rejected') return badgeTone.rose;
-  if (normalized === 'pending') return badgeTone.slate;
-  if (normalized === 'active') return badgeTone.emerald;
-  if (normalized === 'inactive') return badgeTone.slate;
-  return badgeTone.slate;
+function parsePortfolioSummary(raw: unknown): PortfolioSummary | null {
+  if (raw == null || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  return {
+    application_count: Number(o.application_count ?? 0),
+    total_loan_amount: Number(o.total_loan_amount ?? 0),
+    pending_count: Number(o.pending_count ?? 0),
+    approved_count: Number(o.approved_count ?? 0),
+    disbursed_count: Number(o.disbursed_count ?? 0),
+    rejected_count: Number(o.rejected_count ?? 0),
+    has_overdue_installment: Boolean(o.has_overdue_installment),
+  };
 }
 
 /** Backend có thể trả `items`, `customers`, `data` hoặc `results`. */
@@ -91,20 +112,20 @@ export default function CustomersPage() {
   const role = getUserRole();
   const isViewer = role === 'viewer';
   const isAdmin = role === 'admin';
-  const [customers, setCustomers] = useState<Array<{
-    id: string;
-    name: string;
-    email: string;
-    loanType: string;
-    loanAmount: number | null;
-    termMonths: number | null;
-    annualRate: number | null;
-    riskLevel: string;
-    status: string;
-  }>>([]);
+  const [customers, setCustomers] = useState<
+    Array<{
+      id: string;
+      name: string;
+      email: string;
+      riskLevel: string;
+      listEffectiveRiskLevel: string;
+      portfolioSummary: PortfolioSummary | null;
+    }>
+  >([]);
 
   const [search, setSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState<string>('all');
+  const [appStatusFilter, setAppStatusFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [page, setPage] = useState(1);
@@ -118,38 +139,28 @@ export default function CustomersPage() {
       query.set('limit', String(PAGE_SIZE));
       if (search.trim()) query.set('search_name', search.trim());
       if (riskFilter !== 'all') query.set('risk_level', riskFilter);
+      if (appStatusFilter !== 'all') query.set('application_status', appStatusFilter);
       const raw = await browserApiFetchAuth<Record<string, unknown>>(`/customers?${query.toString()}`, {
         method: 'GET',
       });
       const { items, total } = normalizeCustomerListResponse(raw);
       const mapped = items.map((item) => ({
-          id: String(item.customer_id ?? item.id ?? ''),
-          name: String(item.full_name ?? item.name ?? '-'),
-          email: String(item.email || '-'),
-          loanType: String(item.loan_type || item.product_type || '-'),
-          loanAmount: item.requested_loan_amount != null ? Number(item.requested_loan_amount) : null,
-          termMonths: item.requested_term_months != null ? Number(item.requested_term_months) : null,
-          annualRate: item.annual_interest_rate != null ? Number(item.annual_interest_rate) : null,
-          riskLevel: String(item.risk_level || 'medium').toLowerCase(),
-          status: String(item.application_status || item.status || 'active').toLowerCase(),
+        id: String(item.customer_id ?? item.id ?? ''),
+        name: String(item.full_name ?? item.name ?? '-'),
+        email: String(item.email || '-'),
+        riskLevel: String(item.risk_level || 'medium').toLowerCase(),
+        listEffectiveRiskLevel: String(item.list_effective_risk_level ?? item.risk_level ?? 'medium').toLowerCase(),
+        portfolioSummary: parsePortfolioSummary(item.portfolio_summary),
       }));
-      const normalizedSearch = search.trim().toLowerCase();
-      const filtered = !normalizedSearch
-        ? mapped
-        : mapped.filter((customer) =>
-            [customer.id, customer.name, customer.email, customer.loanType]
-              .filter(Boolean)
-              .some((field) => String(field).toLowerCase().includes(normalizedSearch)),
-          );
 
-      setCustomers(filtered);
+      setCustomers(mapped);
       setTotalCount(total);
     } catch (err) {
       notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
       setIsLoading(false);
     }
-  }, [page, search, riskFilter, t, msgLocale]);
+  }, [page, search, riskFilter, appStatusFilter, t, msgLocale]);
 
   useEffect(() => {
     void loadCustomers();
@@ -174,15 +185,6 @@ export default function CustomersPage() {
     }
   };
 
-  const loanTypeLabel = (value: string) => {
-    const normalized = String(value || '').toLowerCase();
-    if (normalized === 'secured') return locale === 'vi' ? 'Có tài sản bảo đảm' : 'Secured';
-    if (normalized === 'unsecured') return locale === 'vi' ? 'Tín chấp' : 'Unsecured';
-    if (normalized === 'mortgage') return locale === 'vi' ? 'Thế chấp' : 'Mortgage';
-    if (normalized === 'business') return locale === 'vi' ? 'Kinh doanh' : 'Business';
-    return value || '-';
-  };
-
   const effectiveTotal = Math.max(totalCount, customers.length);
   const totalPages = Math.max(1, Math.ceil(effectiveTotal / PAGE_SIZE));
 
@@ -202,7 +204,7 @@ export default function CustomersPage() {
 
       const fileUrl = String(exportRes.file_url || exportRes.url || exportRes.download_url || '').trim();
       if (!fileUrl) {
-        throw new Error(locale === 'vi' ? 'Không nhận được đường dẫn file export.' : 'No export file URL returned.');
+        throw new Error(t('toast.export_no_url'));
       }
 
       const token = getAccessToken();
@@ -216,7 +218,7 @@ export default function CustomersPage() {
         headers: token ? { authorization: `Bearer ${token}` } : undefined,
       });
       if (!response.ok) {
-        throw new Error(locale === 'vi' ? 'Tải file export thất bại.' : 'Failed to download export file.');
+        throw new Error(t('toast.export_download_http_failed'));
       }
 
       const blob = await response.blob();
@@ -234,7 +236,7 @@ export default function CustomersPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(objectUrl);
 
-      notifySuccess(locale === 'vi' ? 'Đang tải file export.' : 'Downloading export file.');
+      notifySuccess(t('toast.export_downloading'));
     } catch (err) {
       notifyError(t('toast.export_failed'), { description: formatUserFacingApiError(err, msgLocale) });
     } finally {
@@ -278,8 +280,8 @@ export default function CustomersPage() {
       {/* Filters */}
       <Card className="border-border/80 bg-card shadow-sm">
         <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
+          <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end">
+            <div className="flex-1 min-w-[200px] relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder={t('customers.search_ph')}
@@ -291,6 +293,23 @@ export default function CustomersPage() {
                 className="pl-10"
               />
             </div>
+            <Select
+              value={appStatusFilter}
+              onValueChange={(v) => {
+                setAppStatusFilter(v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full md:w-[200px]">
+                <SelectValue placeholder={t('customers.app_status_filter_all')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('customers.app_status_filter_all')}</SelectItem>
+                <SelectItem value="pending">{t('status.pending')}</SelectItem>
+                <SelectItem value="approved">{t('status.approved')}</SelectItem>
+                <SelectItem value="rejected">{t('status.rejected')}</SelectItem>
+              </SelectContent>
+            </Select>
             <Select
               value={riskFilter}
               onValueChange={(v) => {
@@ -318,29 +337,29 @@ export default function CustomersPage() {
           <CardTitle>{t('customers.list_title')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-xl border border-border bg-card">
-            <Table className="min-w-[980px] w-full">
+          <ScrollableTableRegion>
+            <Table className="min-w-[720px] w-full">
               <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="py-1.5">{t('common.name')}</TableHead>
-                  <TableHead className="py-1.5">{t('customers.loan_type')}</TableHead>
-                  <TableHead className="py-1.5">{t('customers.loan_amount')}</TableHead>
-                  <TableHead className="py-1.5">{t('customers.loan_term')}</TableHead>
-                  <TableHead className="py-1.5">{t('customers.interest_rate')}</TableHead>
+                <TableRow className={scrollableTableHeaderRowClass}>
+                  <TableHead className="py-1.5 min-w-[200px]">{t('customers.col_name_mail')}</TableHead>
+                  <TableHead className="py-1.5 whitespace-nowrap">{t('customers.col_app_count')}</TableHead>
+                  <TableHead className="py-1.5 whitespace-nowrap">{t('customers.col_total_loan')}</TableHead>
                   <TableHead className="py-1.5">{t('customers.risk_level')}</TableHead>
-                  <TableHead className="py-1.5">{t('common.status')}</TableHead>
+                  <TableHead className="py-1.5 min-w-[220px]">{t('customers.col_status_portfolio')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell>
+                    <TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell>
                   </TableRow>
                 ) : customers.map((customer, rowIdx) => (
                   <TableRow
                     key={customer.id ? customer.id : `row-${rowIdx}`}
                     className="cursor-pointer border-b border-border/70 hover:bg-muted/35"
-                    onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                    {...rowNavigationPointerHandlers(() => {
+                      void router.push(`/dashboard/customers/${customer.id}`);
+                    })}
                   >
                     <TableCell className="py-1.5 font-medium">
                       <div className="leading-tight">
@@ -348,27 +367,37 @@ export default function CustomersPage() {
                         <p className="text-xs text-muted-foreground">{customer.email}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="py-1.5 text-[13px]">{loanTypeLabel(customer.loanType)}</TableCell>
-                    <TableCell className="py-1.5 text-[13px]">{formatVnd(customer.loanAmount, locale === 'vi' ? 'vi' : 'en')}</TableCell>
-                    <TableCell className="py-1.5 text-[13px]">
-                      {customer.termMonths != null ? `${customer.termMonths} ${locale === 'vi' ? 'tháng' : 'months'}` : '-'}
+                    <TableCell className="py-1.5 text-[13px] tabular-nums">
+                      {customer.portfolioSummary?.application_count ?? 0}
                     </TableCell>
-                    <TableCell className="py-1.5 text-[13px]">{customer.annualRate != null ? `${customer.annualRate}%` : '-'}</TableCell>
-                    <TableCell className="py-1.5">
-                      <Badge variant="outline" className={getRiskBadgeClass(customer.riskLevel)}>
-                        {riskLabel(customer.riskLevel)}
-                      </Badge>
+                    <TableCell className="py-1.5 text-[13px] tabular-nums">
+                      {formatVnd(
+                        customer.portfolioSummary?.total_loan_amount ?? 0,
+                        locale === 'vi' ? 'vi' : 'en',
+                      )}
                     </TableCell>
                     <TableCell className="py-1.5">
-                      <Badge variant="outline" className={getStatusBadgeClass(customer.status)}>
-                        {normalizeStatusKey(customer.status) ? t(normalizeStatusKey(customer.status) as string) : customer.status}
+                      <Badge
+                        variant="outline"
+                        className={getRiskBadgeClass(customer.listEffectiveRiskLevel)}
+                        title={
+                          customer.portfolioSummary?.has_overdue_installment &&
+                          customer.listEffectiveRiskLevel !== customer.riskLevel
+                            ? t('customers.risk_elevated_overdue_hint')
+                            : undefined
+                        }
+                      >
+                        {riskLabel(customer.listEffectiveRiskLevel)}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="py-1.5 text-[13px] text-muted-foreground max-w-[320px]">
+                      {formatPortfolioSummary(t, customer.portfolioSummary, locale)}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </ScrollableTableRegion>
           <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
         </CardContent>
       </Card>

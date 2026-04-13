@@ -20,6 +20,8 @@ import {
   isValidVietnamNationalId,
   sanitizeVietnamNationalId,
 } from '@/lib/validation/account';
+import { parseVndDigitsToNumber } from '@/lib/money';
+import { VndAmountInput } from '@/components/vnd-amount-input';
 
 function getAgeFromDateOfBirth(dateOfBirth: string): number | null {
   const normalized = String(dateOfBirth || '').trim();
@@ -102,13 +104,7 @@ export default function NewCustomerPage() {
       setFormData((prev) => ({ ...prev, [name]: value.replace(/[^\d+]/g, '').slice(0, 15) }));
       return;
     }
-    if (
-      name === 'monthly_income' ||
-      name === 'requested_loan_amount' ||
-      name === 'requested_term_months' ||
-      name === 'annual_interest_rate' ||
-      name === 'collateral_value'
-    ) {
+    if (name === 'requested_term_months' || name === 'annual_interest_rate') {
       setFormData((prev) => ({ ...prev, [name]: value.replace(/[^\d.]/g, '') }));
       return;
     }
@@ -156,8 +152,8 @@ export default function NewCustomerPage() {
       const normalizedLoanType = normalizeLoanType(formData.loan_type);
       const trimmedLoanPurpose = formData.loan_purpose.trim();
       const normalizedNationalId = sanitizeVietnamNationalId(formData.national_id);
-      const monthlyIncome = Number(formData.monthly_income);
-      const requestedLoanAmount = Number(formData.requested_loan_amount);
+      const monthlyIncome = parseVndDigitsToNumber(formData.monthly_income);
+      const requestedLoanAmount = parseVndDigitsToNumber(formData.requested_loan_amount);
       const requestedTermMonths = Number(formData.requested_term_months);
       const age = getAgeFromDateOfBirth(formData.date_of_birth);
 
@@ -232,7 +228,7 @@ export default function NewCustomerPage() {
           interest_rate: formData.annual_interest_rate ? parseFloat(formData.annual_interest_rate) : undefined,
           application_status: 'pending',
           collateral_id: formData.collateral_id.trim() || undefined,
-          collateral_value: formData.collateral_value ? parseFloat(formData.collateral_value) : undefined,
+          collateral_value: formData.collateral_value ? parseVndDigitsToNumber(formData.collateral_value) : undefined,
           notes: formData.notes.trim() || undefined,
         }),
       });
@@ -488,7 +484,16 @@ export default function NewCustomerPage() {
                   <Label htmlFor="monthly_income" required>
                     {t('customers.new.income')}
                   </Label>
-                  <Input id="monthly_income" name="monthly_income" inputMode="decimal" placeholder={t('customers.new.income_ph')} value={formData.monthly_income} onChange={handleChange} disabled={isLoading} required />
+                  <VndAmountInput
+                    id="monthly_income"
+                    name="monthly_income"
+                    form="new-customer-form"
+                    valueDigits={formData.monthly_income}
+                    onDigitsChange={(digits) => setFormData((prev) => ({ ...prev, monthly_income: digits }))}
+                    placeholderDigits="20000000"
+                    disabled={isLoading}
+                    required
+                  />
                 </div>
               </div>
 
@@ -575,14 +580,13 @@ export default function NewCustomerPage() {
                 <Label htmlFor="requested_loan_amount" required>
                   {t('customers.new.label.requested_loan_amount')}
                 </Label>
-                <Input
+                <VndAmountInput
                   id="requested_loan_amount"
                   name="requested_loan_amount"
                   form="new-customer-form"
-                  inputMode="decimal"
-                  placeholder="500000000"
-                  value={formData.requested_loan_amount}
-                  onChange={handleChange}
+                  valueDigits={formData.requested_loan_amount}
+                  onDigitsChange={(digits) => setFormData((prev) => ({ ...prev, requested_loan_amount: digits }))}
+                  placeholderDigits="500000000"
                   disabled={isLoading}
                   required
                 />
@@ -635,14 +639,13 @@ export default function NewCustomerPage() {
 
             <div className="space-y-2">
               <Label htmlFor="collateral_value">{t('customers.new.label.collateral_value')}</Label>
-              <Input
+              <VndAmountInput
                 id="collateral_value"
                 name="collateral_value"
                 form="new-customer-form"
-                inputMode="decimal"
+                valueDigits={formData.collateral_value}
+                onDigitsChange={(digits) => setFormData((prev) => ({ ...prev, collateral_value: digits }))}
                 placeholder={t('customers.new.ph.collateral_value')}
-                value={formData.collateral_value}
-                onChange={handleChange}
                 disabled={isLoading}
               />
             </div>

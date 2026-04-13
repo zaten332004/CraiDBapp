@@ -38,7 +38,8 @@ export function middleware(request: NextRequest) {
     if (role === "viewer") {
       if (
         pathname.startsWith("/dashboard/upload") ||
-        pathname.startsWith("/dashboard/customers/new")
+        pathname.startsWith("/dashboard/customers/new") ||
+        pathname.startsWith("/dashboard/loans/approved-workbench")
       ) {
         return NextResponse.redirect(new URL("/dashboard/forbidden", request.url));
       }

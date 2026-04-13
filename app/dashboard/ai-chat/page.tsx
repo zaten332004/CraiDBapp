@@ -11,7 +11,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -42,12 +42,13 @@ import { useI18n } from '@/components/i18n-provider';
 import { getAccessToken, getUserRole, type UserRole } from '@/lib/auth/token';
 import { cn } from '@/lib/utils';
 import { loadPowerBiTableSuggestions } from '@/lib/powerbi/table-suggestions-storage';
-import { notifyError, notifyInfo } from '@/lib/notify';
+import { notifyApiError, notifyError, notifyInfo } from '@/lib/notify';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { ChatMarkdown } from '@/components/ai-chat/chat-markdown';
 import {
   BarChart3,
   Bell,
+  CircleSlash,
   CircleX,
   FileText,
   Loader2,
@@ -119,7 +120,7 @@ type UploadedFileCtx = {
   [key: string]: unknown;
 };
 
-type AiDataSource = 'customer' | 'upload' | 'powerbi' | 'alerts';
+type AiDataSource = 'none' | 'customer' | 'upload' | 'powerbi' | 'alerts';
 
 function normalizeCustomerSearchResponse(data: unknown): Array<{ customer_id: number; label: string }> {
   if (data == null || typeof data !== 'object') return [];
@@ -463,7 +464,7 @@ export default function AIChatPage() {
     }
   }, [t, apiErr]);
 
-  const [aiDataSource, setAiDataSource] = useState<AiDataSource>('powerbi');
+  const [aiDataSource, setAiDataSource] = useState<AiDataSource>('none');
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [customerListLoading, setCustomerListLoading] = useState(false);
   const [customerListFull, setCustomerListFull] = useState<Array<{ customer_id: number; label: string }>>([]);
@@ -481,6 +482,15 @@ export default function AIChatPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [pendingFiles, setPendingFiles] = useState<UploadedFileCtx[]>([]);
+
+  /** Giống mục «Chỉ chat» trong menu +: tắt nguồn snapshot / danh mục. */
+  const clearComposerToChatOnly = useCallback(() => {
+    setAiDataSource('none');
+    setSelectedCustomerIds([]);
+    setPendingFiles([]);
+    if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
+  }, []);
+
   const skipPendingPersistOnceRef = useRef(true);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
@@ -505,10 +515,6 @@ export default function AIChatPage() {
   const lastSessionIdModelPrefsAppliedRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
-  /** Incremented when sending the first message from the hero layout (triggers bottom snap animation). */
-  const [composerSnapGeneration, setComposerSnapGeneration] = useState(0);
-  const [composerSnapPlaying, setComposerSnapPlaying] = useState(false);
-  const [firstSessionMessagesAnim, setFirstSessionMessagesAnim] = useState(false);
   const [dropChatHighlight, setDropChatHighlight] = useState(false);
   const dragChatDepthRef = useRef(0);
 
@@ -559,45 +565,6 @@ export default function AIChatPage() {
     syncChatInputHeight();
   }, [input, syncChatInputHeight, hasConversation, pendingFiles.length]);
 
-  useLayoutEffect(() => {
-    if (!hasConversation) {
-      setComposerSnapPlaying(false);
-      setFirstSessionMessagesAnim(false);
-      return;
-    }
-    if (composerSnapGeneration === 0) return;
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      return;
-    }
-    let cancelled = false;
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!cancelled) {
-          setFirstSessionMessagesAnim(true);
-          setComposerSnapPlaying(true);
-        }
-      });
-    });
-    const tid = window.setTimeout(() => {
-      if (!cancelled) {
-        setComposerSnapPlaying(false);
-        setFirstSessionMessagesAnim(false);
-      }
-    }, 1000);
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(id);
-      window.clearTimeout(tid);
-    };
-  }, [hasConversation, composerSnapGeneration]);
-
-  useEffect(() => {
-    if (!composerSnapPlaying || typeof window === 'undefined') return;
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    setComposerSnapPlaying(false);
-    setFirstSessionMessagesAnim(false);
-  }, [composerSnapPlaying]);
-
   useEffect(() => {
     if (!selectedModel || modelOptions.length === 0) return;
     const opt = modelOptions.find((o) => o.model === selectedModel);
@@ -610,7 +577,7 @@ export default function AIChatPage() {
   useEffect(() => {
     if (aiDataSource !== 'alerts') return;
     if (!canUseAlertsAiDataSource(userRole)) {
-      setAiDataSource('powerbi');
+      setAiDataSource('none');
     }
   }, [userRole, aiDataSource]);
 
@@ -884,15 +851,12 @@ export default function AIChatPage() {
     setMessages([]);
     setInput('');
     setPendingFiles([]);
-    setAiDataSource('powerbi');
+    setAiDataSource('none');
     setSelectedCustomerIds([]);
     setPickerDraftIds([]);
     setCustomerPickerOpen(false);
     setCustomerListFull([]);
     setCustomerListFilter('');
-    setComposerSnapGeneration(0);
-    setComposerSnapPlaying(false);
-    setFirstSessionMessagesAnim(false);
     dragChatDepthRef.current = 0;
     setDropChatHighlight(false);
     if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
@@ -951,7 +915,7 @@ export default function AIChatPage() {
       }
       await loadSessions();
     } catch (err) {
-      notifyError(t('toast.action_failed'), { description: apiErr(err) });
+      notifyApiError(err, msgLocale);
     } finally {
       setIsLoading(false);
     }
@@ -966,7 +930,7 @@ export default function AIChatPage() {
       await browserApiFetchAuth<any>(endpoint, { method: 'POST' });
       await loadSessions();
     } catch (err) {
-      notifyError(t('toast.action_failed'), { description: apiErr(err) });
+      notifyApiError(err, msgLocale);
     } finally {
       setIsLoading(false);
     }
@@ -993,7 +957,7 @@ export default function AIChatPage() {
       }
       await loadSessions();
     } catch (err) {
-      notifyError(t('toast.action_failed'), { description: apiErr(err) });
+      notifyApiError(err, msgLocale);
     } finally {
       setIsLoading(false);
     }
@@ -1021,10 +985,6 @@ export default function AIChatPage() {
       Boolean(selectedModel) &&
       modelOptions.some((o) => o.model === selectedModel && isModelAllowed(o));
     const resolvedModel = hadValidModelSelection ? selectedModel : pickLowestAllowedModel();
-
-    if (!hasConversation) {
-      setComposerSnapGeneration((g) => g + 1);
-    }
 
     const text = input.trim();
     const attachForMsg = pendingFiles.length ? uploadedCtxToMessageAttachments(pendingFiles) : undefined;
@@ -1093,7 +1053,6 @@ export default function AIChatPage() {
             },
           ]);
         }
-        setSessionsOpen(true);
         void loadSessions();
       } else {
         const reply = String(data?.response ?? data?.reply ?? data?.message ?? '').trim() || t('ai_chat.default_reply');
@@ -1222,6 +1181,15 @@ export default function AIChatPage() {
     return `${s.pinned ? '📌 ' : ''}${t('ai_chat.session')}`;
   };
 
+  const activeSessionBarTitle = useMemo(() => {
+    if (!sessionId?.trim()) return t('ai_chat.session_bar_draft');
+    const s = sessions.find((x) => x.id === sessionId);
+    if (!s) return t('ai_chat.session');
+    const base = (s.title || '').trim();
+    if (base) return `${s.pinned ? '📌 ' : ''}${base}`;
+    return `${s.pinned ? '📌 ' : ''}${t('ai_chat.session')}`;
+  }, [sessionId, sessions, t]);
+
   const renderModelSelect = (roundedFull?: boolean) => (
     <Select
       value={selectedModel}
@@ -1281,6 +1249,10 @@ export default function AIChatPage() {
         sideOffset={6}
         className="w-[min(calc(100vw-2rem),17rem)]"
       >
+        <DropdownMenuItem onClick={() => clearComposerToChatOnly()}>
+          <CircleSlash className="mr-2 h-4 w-4 shrink-0 opacity-80" />
+          {t('ai_chat.data_source_none')}
+        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
             setAiDataSource('customer');
@@ -1330,46 +1302,49 @@ export default function AIChatPage() {
     </DropdownMenu>
   );
 
-  const renderComposerSourceHint = () => (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
-      {aiDataSource === 'customer' && selectedCustomerIds.length > 0 ? (
-        <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">
-          {t('ai_chat.source_customer_list_note')}
-        </span>
-      ) : (
-        <>
-          <span className="shrink-0">{t('ai_chat.data_source_active')}:</span>
-          <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">
-            {aiDataSource === 'customer'
-              ? t('ai_chat.data_source_customer')
-              : aiDataSource === 'upload'
-                ? t('ai_chat.data_source_upload')
-                : aiDataSource === 'alerts'
-                  ? t('ai_chat.data_source_alerts')
-                  : t('ai_chat.data_source_powerbi')}
-          </span>
-        </>
-      )}
-      {aiDataSource === 'customer' && selectedCustomerIds.length > 0 ? (
-        <span className="text-[11px] text-muted-foreground shrink-0">
-          {t('ai_chat.source_customer_list_count').replace('{n}', String(selectedCustomerIds.length))}
-        </span>
-      ) : null}
-      {aiDataSource === 'customer' && selectedCustomerIds.length > 0 ? (
+  const renderComposerSourceHint = () => {
+    if (aiDataSource === 'none') return null;
+    return (
+      <div className="flex items-start gap-0.5 px-1 text-xs text-muted-foreground">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          {aiDataSource === 'customer' && selectedCustomerIds.length > 0 ? (
+            <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">
+              {t('ai_chat.source_customer_list_note')}
+            </span>
+          ) : (
+            <>
+              <span className="shrink-0">{t('ai_chat.data_source_active')}:</span>
+              <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">
+                {aiDataSource === 'customer'
+                  ? t('ai_chat.data_source_customer')
+                  : aiDataSource === 'upload'
+                    ? t('ai_chat.data_source_upload')
+                    : aiDataSource === 'alerts'
+                      ? t('ai_chat.data_source_alerts')
+                      : t('ai_chat.data_source_powerbi')}
+              </span>
+            </>
+          )}
+          {aiDataSource === 'customer' && selectedCustomerIds.length > 0 ? (
+            <span className="text-[11px] text-muted-foreground shrink-0">
+              {t('ai_chat.source_customer_list_count').replace('{n}', String(selectedCustomerIds.length))}
+            </span>
+          ) : null}
+        </div>
         <Button
           type="button"
           variant="ghost"
-          size="sm"
-          className="h-7 px-2 text-xs shrink-0"
-          onClick={() => setSelectedCustomerIds([])}
-          disabled={isSending}
+          size="icon"
+          className="h-6 w-6 shrink-0 rounded-md text-muted-foreground hover:text-foreground -mt-0.5"
+          disabled={isSending || isUploadingFile}
+          aria-label={t('ai_chat.clear_data_source')}
+          onClick={() => clearComposerToChatOnly()}
         >
-          <X className="mr-1 h-3 w-3" />
-          {t('ai_chat.clear_customer')}
+          <X className="h-3.5 w-3.5" />
         </Button>
-      ) : null}
-    </div>
-  );
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-row items-stretch gap-0 md:gap-3 p-6 md:p-8 h-[calc(100vh-5rem)] min-h-0">
@@ -1406,13 +1381,13 @@ export default function AIChatPage() {
       {/* Panel Lịch sử — animation kéo ngang (đủ rộng để luôn thấy nút ⋯) */}
       <div
         className={cn(
-          'shrink-0 min-h-0 overflow-hidden transition-[width] duration-300 ease-in-out',
+          'flex h-full min-h-0 max-h-full shrink-0 flex-col overflow-hidden transition-[width] duration-300 ease-in-out',
           sessionsOpen ? 'w-[min(calc(100vw-2.5rem),22rem)] sm:w-96' : 'w-0',
         )}
       >
-        <div className="h-full w-full min-h-0 flex flex-col pr-0 sm:pr-1">
+        <div className="flex h-full min-h-0 w-full min-w-0 flex-col pr-0 sm:pr-1">
           <Card className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border shadow-sm">
-            <CardHeader className="space-y-3 pb-2 px-4">
+            <CardHeader className="shrink-0 space-y-3 pb-2 px-4">
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -1447,8 +1422,8 @@ export default function AIChatPage() {
                 {t('ai_chat.new_draft')}
               </Button>
             </CardHeader>
-            <CardContent className="flex-1 min-h-0 flex flex-col px-3 pb-4 pt-0 overflow-hidden">
-              <ScrollArea className="flex-1 min-h-0 pr-2">
+            <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-4 pt-0">
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-1 [scrollbar-gutter:stable]">
                 <div className="space-y-2 pb-2 min-w-0">
                   {sessions.length === 0 && (
                     <div className="text-sm text-muted-foreground">{t('ai_chat.no_sessions')}</div>
@@ -1525,24 +1500,36 @@ export default function AIChatPage() {
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      <Card className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden border shadow-sm">
-        <CardHeader className="space-y-1">
-          <CardTitle>{t('ai_chat.title')}</CardTitle>
-          <CardDescription>{t('ai_chat.desc')}</CardDescription>
-        </CardHeader>
-        <CardContent
+      <div className="flex flex-1 flex-col min-h-0 min-w-0 gap-4">
+        <header className="shrink-0 space-y-1 px-0.5">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">{t('ai_chat.title')}</h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">{t('ai_chat.desc')}</p>
+        </header>
+        <div
           className={cn(
-            'flex min-h-0 flex-1 flex-col',
-            !hasConversation && 'py-10',
+            'flex min-h-0 flex-1 flex-col min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card px-4 shadow-md md:px-5',
+            !hasConversation && 'py-6',
             hasConversation && 'pb-2 pt-0',
           )}
         >
+          <div
+            className="shrink-0 border-b border-border/70 bg-muted/25 py-2.5 text-center -mx-4 px-3 md:-mx-5 md:px-5"
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              className="block truncate text-sm font-semibold tracking-tight text-foreground max-w-[min(100%,36rem)] mx-auto"
+              title={activeSessionBarTitle}
+            >
+              {activeSessionBarTitle}
+            </span>
+          </div>
           {!hasConversation ? (
             <div
               className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-6 px-1"
@@ -1556,11 +1543,6 @@ export default function AIChatPage() {
                   {t('ai_chat.drop_files_hint')}
                 </div>
               ) : null}
-              <div className="w-full max-w-5xl space-y-2 px-2 text-center">
-                <h2 className="text-4xl font-semibold tracking-tight">{t('ai_chat.title')}</h2>
-                <p className="text-muted-foreground">{t('ai_chat.hero_subtitle')}</p>
-              </div>
-
               <div className="w-full max-w-5xl px-2">
                 <form
                   onSubmit={handleSendMessage}
@@ -1632,30 +1614,22 @@ export default function AIChatPage() {
                   {t('ai_chat.drop_files_hint')}
                 </div>
               ) : null}
-              <div
-                className={cn(
-                  'flex min-h-0 flex-1 flex-col pr-0',
-                  firstSessionMessagesAnim && 'ai-chat-messages-reveal',
-                )}
-                onAnimationEnd={(ev) => {
-                  if (ev.target !== ev.currentTarget) return;
-                  if (String(ev.animationName || '').includes('ai-chat-messages-reveal')) {
-                    setFirstSessionMessagesAnim(false);
-                  }
-                }}
-              >
+              <div className="flex min-h-0 flex-1 flex-col pr-0">
                 <ScrollArea className="min-h-0 flex-1 pr-4">
-                <div className="space-y-4">
+                <div className="space-y-4 pb-6">
                   {messages.map((message) => (
                     <div
                       key={message.id}
                       className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className="max-w-4xl min-w-0">
+                      <div className="max-w-4xl min-w-0 ai-chat-bubble-wrap">
                         <div
-                          className={`rounded-lg px-4 py-3 ${
-                            message.sender === 'user' ? 'bg-accent text-accent-foreground' : 'bg-secondary text-foreground'
-                          }`}
+                          className={cn(
+                            'ai-chat-bubble border px-4 py-3 bg-background text-foreground shadow-sm',
+                            message.sender === 'user'
+                              ? 'ai-chat-bubble--out border-2 border-accent'
+                              : 'ai-chat-bubble--in border-border',
+                          )}
                         >
                           {message.sender === 'user' && message.attachments && message.attachments.length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-2">
@@ -1664,7 +1638,7 @@ export default function AIChatPage() {
                                   key={a.id}
                                   type="button"
                                   onClick={() => setPreviewAttachment(a)}
-                                  className="inline-flex items-center gap-1.5 rounded-md border border-accent-foreground/25 bg-background/15 px-2 py-1 text-xs font-medium text-accent-foreground hover:bg-background/25 text-left max-w-full"
+                                  className="inline-flex items-center gap-1.5 rounded-md border border-accent/35 bg-muted/30 px-2 py-1 text-xs font-medium text-foreground hover:bg-muted/50 text-left max-w-full"
                                 >
                                   <FileText className="h-3.5 w-3.5 shrink-0 opacity-90" />
                                   <span className="truncate min-w-0">{a.name}</span>
@@ -1677,7 +1651,7 @@ export default function AIChatPage() {
                           ) : message.text ? (
                             <p className="text-sm whitespace-pre-wrap break-words">{message.text}</p>
                           ) : null}
-                          <span className="text-xs opacity-70 mt-3 block">
+                          <span className="text-xs text-muted-foreground mt-3 block">
                             {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
@@ -1697,8 +1671,10 @@ export default function AIChatPage() {
 
                   {isSending && (
                     <div className="flex justify-start">
-                      <div className="bg-secondary text-foreground rounded-lg px-4 py-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                      <div className="max-w-4xl min-w-0 ai-chat-bubble-wrap">
+                        <div className="ai-chat-bubble ai-chat-bubble--in border border-border bg-background px-4 py-2 text-foreground shadow-sm">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1707,18 +1683,7 @@ export default function AIChatPage() {
               </ScrollArea>
               </div>
 
-              <div
-                className={cn(
-                  'mt-auto w-full shrink-0 pt-3',
-                  composerSnapPlaying && 'ai-chat-composer-snap-to-bottom',
-                )}
-                onAnimationEnd={(ev) => {
-                  if (ev.target !== ev.currentTarget) return;
-                  if (String(ev.animationName || '').includes('ai-chat-composer-snap-to-bottom')) {
-                    setComposerSnapPlaying(false);
-                  }
-                }}
-              >
+              <div className="mt-auto w-full shrink-0 pt-3">
                 <form
                   onSubmit={handleSendMessage}
                   className="flex flex-col gap-2 rounded-2xl border border-border/80 bg-muted/15 p-3 shadow-sm dark:bg-muted/20"
@@ -1772,8 +1737,8 @@ export default function AIChatPage() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <Dialog
         open={customerPickerOpen}

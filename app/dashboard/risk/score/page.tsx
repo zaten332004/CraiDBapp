@@ -13,9 +13,10 @@ import { Loader2, TrendingUp } from 'lucide-react';
 import { authJsonHeaders } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
 import { formatUserFacingApiError, formatUserFacingFetchError, type UserFacingLocale } from '@/lib/api/format-api-error';
-import { notifyError } from '@/lib/notify';
+import { notifyApiError, notifyError } from '@/lib/notify';
 import { browserApiFetchAuth } from '@/lib/api/browser';
-import { formatVndDigits, sanitizeVndDigitString, parseVndDigitsToNumber } from '@/lib/money';
+import { parseVndDigitsToNumber } from '@/lib/money';
+import { VndAmountInput } from '@/components/vnd-amount-input';
 import { cn } from '@/lib/utils';
 import {
   RiskScoreExplanationPanel,
@@ -135,24 +136,17 @@ function VndDigitField(props: {
   placeholderDigits?: string;
 }) {
   const { id, label, hint, valueDigits, onDigitsChange, disabled, placeholderDigits } = props;
-  const [focused, setFocused] = useState(false);
-  const display = focused ? valueDigits : valueDigits ? formatVndDigits(Number(valueDigits)) : '';
-  const ph = placeholderDigits ? formatVndDigits(Number(placeholderDigits)) : undefined;
 
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
-      <Input
+      <VndAmountInput
         id={id}
-        inputMode="numeric"
-        autoComplete="off"
-        placeholder={ph}
-        value={display}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onChange={(e) => onDigitsChange(sanitizeVndDigitString(e.target.value))}
+        valueDigits={valueDigits}
+        onDigitsChange={onDigitsChange}
         disabled={disabled}
+        placeholderDigits={placeholderDigits}
         className={disabled ? RISK_SCORE_LOADED_FIELD_CLASS : undefined}
       />
     </div>
@@ -302,7 +296,7 @@ export default function RiskScorePage() {
           cicCreditPersistedThisLoadRef.current = true;
         }
       } catch (err) {
-        notifyError(t('toast.action_failed'), { description: apiErr(err) });
+        notifyApiError(err, msgLocale);
       } finally {
         setIsSyncingCustomer(false);
       }

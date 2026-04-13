@@ -333,13 +333,13 @@ export default function ProfilePage() {
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Cannot read image file'));
+        reader.onerror = () => reject(new Error(t('profile.err.cannot_read_file')));
         reader.readAsDataURL(file);
       });
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
         const image = new Image();
         image.onload = () => resolve(image);
-        image.onerror = () => reject(new Error('Cannot load image'));
+        image.onerror = () => reject(new Error(t('profile.err.cannot_load_image')));
         image.src = dataUrl;
       });
       return Math.abs(img.naturalWidth - img.naturalHeight) > 2;
@@ -350,7 +350,7 @@ export default function ProfilePage() {
   };
 
   const buildCroppedAvatarFile = async () => {
-    if (!cropImage) throw new Error('No image selected');
+    if (!cropImage) throw new Error(t('profile.err.no_image'));
     const sourceW = cropImage.naturalWidth;
     const sourceH = cropImage.naturalHeight;
     const side = Math.max(64, Math.round(Math.min(sourceW, sourceH) / Math.max(1, cropZoom)));
@@ -365,7 +365,7 @@ export default function ProfilePage() {
     canvas.width = 1024;
     canvas.height = 1024;
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Cannot initialize canvas');
+    if (!ctx) throw new Error(t('profile.err.canvas_init'));
     ctx.drawImage(cropImage, sx, sy, side, side, 0, 0, 1024, 1024);
 
     let quality = 0.92;
@@ -375,8 +375,8 @@ export default function ProfilePage() {
       if (blob && blob.size <= 5 * 1024 * 1024) break;
       quality -= 0.1;
     }
-    if (!blob) throw new Error(isVi ? 'Không thể tạo ảnh sau khi cắt.' : 'Could not create cropped image.');
-    if (blob.size > 5 * 1024 * 1024) throw new Error(isVi ? 'Ảnh sau khi cắt vẫn vượt quá 5MB.' : 'Cropped image is still larger than 5MB.');
+    if (!blob) throw new Error(t('profile.err.crop_blob'));
+    if (blob.size > 5 * 1024 * 1024) throw new Error(t('profile.err.crop_too_large'));
     const safeName = (cropFileName || 'avatar').replace(/\.[^.]+$/, '') + '.webp';
     return new File([blob], safeName, { type: 'image/webp' });
   };

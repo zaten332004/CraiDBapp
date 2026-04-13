@@ -31,11 +31,13 @@ import {
 import { AlertCircle, CheckCircle, Clock, MoreHorizontal, UserRound } from 'lucide-react';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
-import { notifyError, notifySuccess } from '@/lib/notify';
+import { notifyApiError, notifyError, notifySuccess } from '@/lib/notify';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
+import { rowNavigationPointerHandlers } from '@/lib/ui/row-navigation-click';
 import { ListPagination } from '@/components/list-pagination';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
+import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 import { badgeTone } from '@/lib/dashboard-badge-tones';
 
 const ALERTS_LIST_PATH = '/dashboard/alerts';
@@ -235,7 +237,7 @@ export default function AlertsPage() {
       );
       await loadAlerts();
     } catch (err) {
-      notifyError(t('toast.action_failed'), { description: formatUserFacingApiError(err, msgLocale) });
+      notifyApiError(err, msgLocale);
     }
   };
 
@@ -307,7 +309,7 @@ export default function AlertsPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto rounded-xl border border-border bg-card">
+              <ScrollableTableRegion>
                 <Table className="w-full table-fixed">
                   <colgroup>
                     <col className="w-[4%]" />
@@ -319,7 +321,7 @@ export default function AlertsPage() {
                     <col className="w-[12%]" />
                   </colgroup>
                   <TableHeader>
-                    <TableRow className="bg-muted/35 hover:bg-muted/35">
+                    <TableRow className={scrollableTableHeaderRowClass}>
                       <TableHead></TableHead>
                       <TableHead className="py-2.5 text-[13px] font-semibold">{t('alerts.type')}</TableHead>
                       <TableHead className="py-2.5 text-[13px] font-semibold">{t('alerts.customer')}</TableHead>
@@ -343,9 +345,11 @@ export default function AlertsPage() {
                           'border-b border-border/70 hover:bg-muted/35',
                           rowOpensProfile && 'cursor-pointer',
                         )}
-                        onClick={() => {
-                          if (cid != null) router.push(customerDetailHrefFromAlerts(cid));
-                        }}
+                        {...(rowOpensProfile && cid != null
+                          ? rowNavigationPointerHandlers(() => {
+                              void router.push(customerDetailHrefFromAlerts(cid));
+                            })
+                          : {})}
                       >
                         <TableCell className="py-2">{getStatusIcon(alert.status)}</TableCell>
                         <TableCell className="max-w-0 py-2">
@@ -424,7 +428,7 @@ export default function AlertsPage() {
                     })}
                   </TableBody>
                 </Table>
-              </div>
+              </ScrollableTableRegion>
               {filteredAlerts.length > PAGE_SIZE && (
                 <div className="mt-3">
                   <ListPagination page={safePage} totalPages={totalPages} onPageChange={setPage} />

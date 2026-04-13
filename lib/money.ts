@@ -12,6 +12,13 @@ export function parseVndDigitsToNumber(digits: string): number {
   return Number(d);
 }
 
+/** Chuỗi chỉ gồm chữ số → nhóm nghìn bằng dấu chấm (kiểu VN), không ép qua Number (an toàn số rất lớn). */
+export function formatVndDigitGroups(digits: string): string {
+  const d = sanitizeVndDigitString(digits, 32);
+  if (!d) return '';
+  return d.replace(THOUSANDS_RE, '.');
+}
+
 /** Nhóm nghìn bằng dấu chấm (kiểu VN): 1.000.000 */
 export function formatVndDigits(value: number): string {
   const n = Math.round(Number(value));
@@ -19,6 +26,15 @@ export function formatVndDigits(value: number): string {
   const abs = Math.abs(n);
   const body = String(abs).replace(THOUSANDS_RE, '.');
   return n < 0 ? `-${body}` : body;
+}
+
+/** Chuỗi số thuần từ giá trị API / form (số hoặc chuỗi có thể đã có dấu chấm). */
+export function vndDigitsFromUnknown(raw: unknown): string {
+  if (raw == null || raw === '') return '';
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return sanitizeVndDigitString(String(Math.round(raw)), 32);
+  }
+  return sanitizeVndDigitString(String(raw).replace(/\./g, ''), 32);
 }
 
 /** Số tiền VND đầy đủ: 1.000.000 đ | 1.000.000 VND */

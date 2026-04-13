@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ScrollableTableRegion, scrollableTableHeaderRowClass } from "@/components/scrollable-table-region";
 import {
   API_BASE_URL_DISPLAY,
   API_GROUPS,
@@ -119,10 +120,10 @@ export default async function ApiDocsPage() {
                 </p>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-lg border border-border">
+              <ScrollableTableRegion className="mt-4 rounded-lg">
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className={scrollableTableHeaderRowClass}>
                       <TableHead className="w-[110px]">{t("api_docs.method")}</TableHead>
                       <TableHead>{t("api_docs.path")}</TableHead>
                       <TableHead className="w-[110px]">{t("api_docs.auth")}</TableHead>
@@ -146,7 +147,7 @@ export default async function ApiDocsPage() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+              </ScrollableTableRegion>
             </section>
           ))}
         </div>

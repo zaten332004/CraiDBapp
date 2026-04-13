@@ -449,3 +449,53 @@
   background: color-mix(in srgb, var(--card), var(--primary) 12%) !important;
   color: var(--foreground) !important;
 }
+
+/* -------------------------------------------------------------------------- */
+/* AI Chat: speech-bubble tail (outline), direction by sender                 */
+/* -------------------------------------------------------------------------- */
+
+.ai-chat-bubble-wrap {
+  position: relative;
+  padding-bottom: 6px;
+}
+
+.ai-chat-bubble {
+  position: relative;
+  border-radius: 1rem;
+}
+
+/* Small diamond “hook” continuing the bubble border; points down-left (assistant). */
+.ai-chat-bubble--in::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  left: 1.1rem;
+  bottom: -5px;
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  background: var(--background);
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-bottom-left-radius: 2px;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+/* Mirror: tail at bottom-right (user). */
+.ai-chat-bubble--out::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  right: 1.1rem;
+  bottom: -6px;
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  background: var(--background);
+  border-right: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  border-bottom-right-radius: 2px;
+  transform: rotate(-45deg);
+  pointer-events: none;
+}

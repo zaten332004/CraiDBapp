@@ -56,6 +56,11 @@ import {
   ClipboardList,
 } from 'lucide-react';
 
+/** Approved loan workbench: analyst, manager, admin only (not viewer). */
+function canSeeApprovedLoanWorkbench(role: UserRole | null): boolean {
+  return role === "admin" || role === "manager" || role === "analyst";
+}
+
 const navigationItems = [
   {
     titleKey: 'sidebar.dashboard',
@@ -223,6 +228,9 @@ export function AppSidebar() {
   const visibleNavHrefs = React.useMemo(() => {
     const hrefs: string[] = [];
     for (const item of navigationItems) {
+      if (item.titleKey === "sidebar.loans_workbench" && !canSeeApprovedLoanWorkbench(role)) {
+        continue;
+      }
       if (isAnalyst && !ANALYST_NAV_TITLE_KEYS.has(item.titleKey)) {
         continue;
       }
@@ -253,7 +261,7 @@ export function AppSidebar() {
       hrefs.unshift('/dashboard/customers');
     }
     return hrefs;
-  }, [isAdmin, isAnalyst, isViewer]);
+  }, [isAdmin, isAnalyst, isViewer, role]);
 
   const navIndexFor = React.useCallback(
     (path: string) => {
@@ -310,6 +318,9 @@ export function AppSidebar() {
         <SidebarMenu>
           {navigationItems
             .filter((item) => {
+              if (item.titleKey === "sidebar.loans_workbench") {
+                return canSeeApprovedLoanWorkbench(role);
+              }
               if (isAnalyst) {
                 return ANALYST_NAV_TITLE_KEYS.has(item.titleKey);
               }

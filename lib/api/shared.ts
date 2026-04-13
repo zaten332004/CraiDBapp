@@ -17,6 +17,35 @@ export type ApiFetchOptions = Omit<RequestInit, "body" | "headers"> & {
   body?: unknown;
 };
 
+/**
+ * Avoid double JSON-encoding: some callers mistakenly pass `body: JSON.stringify(obj)`.
+ * FastAPI then receives a JSON string value instead of an object → Pydantic
+ * "Input should be a valid dictionary or object to extract fields from".
+ */
+function serializeJsonRequestBody(body: unknown): BodyInit {
+  if (body instanceof FormData) return body;
+  if (body instanceof URLSearchParams) return body;
+  if (typeof Blob !== "undefined" && body instanceof Blob) return body;
+  if (body instanceof ArrayBuffer) return body;
+  if (ArrayBuffer.isView(body)) return body as BodyInit;
+  if (typeof body === "string") {
+    const trimmed = body.trim();
+    if (
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"))
+    ) {
+      try {
+        JSON.parse(trimmed);
+        return trimmed;
+      } catch {
+        return JSON.stringify(body);
+      }
+    }
+    return JSON.stringify(body);
+  }
+  return JSON.stringify(body);
+}
+
 export function joinUrl(baseUrl: string, path: string) {
   const base = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
@@ -40,7 +69,7 @@ export async function fetchJson<T>(url: string, options: ApiFetchOptions = {}): 
   const response = await fetch(url, {
     ...options,
     headers,
-    body: hasBody ? JSON.stringify(options.body) : undefined,
+    body: hasBody ? serializeJsonRequestBody(options.body) : undefined,
   });
 
   if (!response.ok) {

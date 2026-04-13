@@ -18,6 +18,8 @@ import { ListPagination } from '@/components/list-pagination';
 import { downloadCsvFile } from '@/lib/export/csv';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { badgeTone } from '@/lib/dashboard-badge-tones';
+import { rowNavigationPointerHandlers } from '@/lib/ui/row-navigation-click';
+import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 
 type LocalePin = 'vi' | 'en';
 
@@ -437,10 +439,10 @@ export default function AdminUsersPage() {
         </CardHeader>
 
         <CardContent className="pt-0">
-          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+          <ScrollableTableRegion>
             <Table className="min-w-[820px] w-full">
               <TableHeader>
-                <TableRow className="bg-muted/35 hover:bg-muted/35">
+                <TableRow className={scrollableTableHeaderRowClass}>
                   <TableHead className="py-1.5">{t('common.name')}</TableHead>
                   <TableHead className="py-1.5">{t('common.email')}</TableHead>
                   <TableHead className="py-1.5">{t('common.role')}</TableHead>
@@ -453,7 +455,9 @@ export default function AdminUsersPage() {
                   <TableRow
                     key={user.id}
                     className="cursor-pointer border-b border-border/70 hover:bg-muted/35"
-                    onClick={() => setSelectedUser(user)}
+                    {...rowNavigationPointerHandlers(() => {
+                      setSelectedUser(user);
+                    })}
                   >
                     <TableCell className="py-1.5 font-medium">
                       <div className="flex flex-col">
@@ -525,7 +529,7 @@ export default function AdminUsersPage() {
                 )}
               </TableBody>
             </Table>
-          </div>
+          </ScrollableTableRegion>
           <div className="mt-1">
             <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
           </div>
