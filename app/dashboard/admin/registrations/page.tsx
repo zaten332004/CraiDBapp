@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { CheckCircle, XCircle, Loader2, RefreshCw, MoreHorizontal } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, RefreshCw, MoreHorizontal, Copy } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { useI18n } from '@/components/i18n-provider';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
@@ -187,6 +187,25 @@ export default function AdminRegistrationsPage() {
     setPinResetDialogOpen(true);
   };
 
+  const copyPinForManualShare = async () => {
+    const normalized = pinResetPin.replace(/\D/g, '').slice(0, 6);
+    if (normalized.length !== 6) {
+      notifyError(locale === 'vi' ? 'Vui lòng nhập đủ 6 chữ số PIN trước khi copy.' : 'Enter exactly 6 digits before copying.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(normalized);
+      notifySuccess(
+        locale === 'vi' ? 'Đã copy PIN mới.' : 'New PIN copied.',
+        locale === 'vi'
+          ? 'Hãy gửi PIN này thủ công cho người dùng (chat/điện thoại).'
+          : 'Send this PIN to the user manually (chat/phone).',
+      );
+    } catch {
+      notifyError(locale === 'vi' ? 'Không thể copy PIN.' : 'Could not copy PIN.');
+    }
+  };
+
   const confirmPinResetAction = async () => {
     if (!pinResetTarget || !pinResetAction) return;
     if (pinResetAction === 'approve') {
@@ -200,11 +219,24 @@ export default function AdminRegistrationsPage() {
     try {
       const userId = encodeURIComponent(pinResetTarget.userId);
       if (pinResetAction === 'approve') {
+        const issuedPin = pinResetPin.replace(/\D/g, '').slice(0, 6);
         await browserApiFetchAuth(`/admin/pin-reset-requests/${userId}/approve`, {
           method: 'POST',
-          body: { pin: pinResetPin.replace(/\D/g, '').slice(0, 6) },
+          body: { pin: issuedPin },
         });
-        notifySuccess(locale === 'vi' ? 'Đã duyệt và cấp PIN mới.' : 'Approved and issued a new PIN.');
+        notifySuccess(
+          locale === 'vi' ? 'Đã duyệt và cấp PIN mới.' : 'Approved and issued a new PIN.',
+          {
+            details: [
+              locale === 'vi'
+                ? `PIN vừa cấp: ${issuedPin}`
+                : `Issued PIN: ${issuedPin}`,
+              locale === 'vi'
+                ? 'Hãy gửi PIN này thủ công cho người dùng (chat/điện thoại).'
+                : 'Send this PIN to the user manually (chat/phone).',
+            ],
+          },
+        );
       } else {
         await browserApiFetchAuth(`/admin/pin-reset-requests/${userId}/reject`, {
           method: 'POST',
@@ -215,6 +247,8 @@ export default function AdminRegistrationsPage() {
       setPinResetDialogOpen(false);
       setPinResetTarget(null);
       setPinResetAction(null);
+      setPinResetPin('');
+      setPinResetReason('');
       await loadPinResetRequests();
     } catch (err) {
       notifyError(locale === 'vi' ? 'Không thể xử lý yêu cầu quên PIN.' : 'Could not process forgot-PIN request.', {
@@ -643,13 +677,29 @@ export default function AdminRegistrationsPage() {
           {pinResetAction === 'approve' ? (
             <div className="space-y-2">
               <p className="text-sm font-medium">{locale === 'vi' ? 'Mã PIN mới (6 số)' : 'New PIN (6 digits)'}</p>
-              <Input
-                value={pinResetPin}
-                onChange={(e) => setPinResetPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                inputMode="numeric"
-                maxLength={6}
-                placeholder={locale === 'vi' ? 'Nhập PIN mới' : 'Enter new PIN'}
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  value={pinResetPin}
+                  onChange={(e) => setPinResetPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder={locale === 'vi' ? 'Nhập PIN mới' : 'Enter new PIN'}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void copyPinForManualShare()}
+                  disabled={pinResetLoading}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  {locale === 'vi' ? 'Copy PIN' : 'Copy PIN'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {locale === 'vi'
+                  ? 'Sau khi duyệt, hãy gửi PIN này thủ công cho người dùng (chat/điện thoại).'
+                  : 'After approval, send this PIN to the user manually (chat/phone).'}
+              </p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -669,6 +719,8 @@ export default function AdminRegistrationsPage() {
                 setPinResetDialogOpen(false);
                 setPinResetTarget(null);
                 setPinResetAction(null);
+                setPinResetPin('');
+                setPinResetReason('');
               }}
               disabled={pinResetLoading}
             >

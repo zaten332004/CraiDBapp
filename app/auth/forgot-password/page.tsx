@@ -156,7 +156,7 @@ export default function ForgotPasswordPage() {
       }
       notifySuccess(
         latestPending
-          ? (isVi ? 'Yêu cầu vẫn đang chờ admin xử lý.' : 'Your request is still pending admin review.')
+          ? (isVi ? 'Yêu cầu vẫn đang chờ admin xử lý. Vui lòng liên hệ admin để nhận PIN mới khi đã cấp.' : 'Your request is still pending admin review. Please contact admin to receive the PIN once issued.')
           : (isVi ? 'Đã làm mới trạng thái mã PIN.' : 'PIN status refreshed.'),
       );
     } finally {
@@ -186,6 +186,12 @@ export default function ForgotPasswordPage() {
           (isVi
             ? 'Đã gửi yêu cầu cấp mã PIN mới tới admin. Vui lòng chờ duyệt.'
             : 'Your request for a new PIN has been sent to admin. Please wait for review.'),
+      );
+      notifySuccess(
+        isVi ? 'Vui lòng liên hệ admin để nhận PIN mới.' : 'Please contact admin to receive your new PIN.',
+        isVi
+          ? 'Hệ thống chưa gửi PIN qua email. Admin sẽ cấp PIN và gửi thủ công cho bạn.'
+          : 'This system does not send PIN by email yet. Admin will issue the PIN and send it to you manually.',
       );
     } catch (err) {
       notifyError(
@@ -327,7 +333,9 @@ export default function ForgotPasswordPage() {
                   {pendingNewPin ? (
                     <div className="space-y-1.5">
                       <p className="text-xs text-muted-foreground">
-                        {isVi ? 'Đang chờ admin cấp mã PIN mới.' : 'Waiting for admin to issue a new PIN.'}
+                        {isVi
+                          ? 'Đang chờ admin cấp mã PIN mới. Vui lòng liên hệ admin để nhận PIN khi đã được cấp.'
+                          : 'Waiting for admin to issue a new PIN. Contact admin to receive it once issued.'}
                       </p>
                     </div>
                   ) : null}
