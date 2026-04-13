@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Eye, EyeOff, KeyRound, Mail, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, Mail, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -258,19 +258,24 @@ export default function ForgotPasswordPage() {
                   />
                   <ShieldCheck className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 </div>
-                <div className="flex items-center justify-between gap-2">
-                  <button
+                <div className="space-y-2">
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-3 text-xs sm:text-sm"
                     onClick={() => void requestForgotPin()}
-                    className="text-xs font-medium text-accent hover:underline underline-offset-2"
-                    disabled={loading}
+                    disabled={loading || pendingNewPin}
                   >
-                    {isVi ? 'Quên mã PIN?' : 'Forgot PIN?'}
-                  </button>
+                    <ShieldAlert className="mr-2 h-4 w-4" />
+                    {pendingNewPin
+                      ? (isVi ? 'Đã gửi yêu cầu cấp mã PIN mới' : 'New PIN request submitted')
+                      : (isVi ? 'Quên mã PIN? Gửi yêu cầu cho admin' : 'Forgot PIN? Send request to admin')}
+                  </Button>
                   {pendingNewPin ? (
-                    <span className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {isVi ? 'Đang chờ admin cấp mã PIN mới.' : 'Waiting for admin to issue a new PIN.'}
-                    </span>
+                    </p>
                   ) : null}
                 </div>
               </div>

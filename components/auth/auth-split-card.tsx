@@ -555,7 +555,7 @@ export function AuthSplitCard() {
                     </div>
                     <div className="pt-1 text-right">
                       <Link href="/auth/forgot-password" className="text-xs font-medium text-accent hover:underline">
-                        Quên mật khẩu?
+                        Forgot password?
                       </Link>
                     </div>
                   </div>

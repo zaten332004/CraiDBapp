@@ -129,6 +129,10 @@ export default function PowerBIConfigPage() {
     setDatasets(parsed);
   };
 
+  const refreshWorkspaceAndDatasetLists = async () => {
+    await Promise.allSettled([loadWorkspaces(), loadDatasets()]);
+  };
+
   /** Đồng bộ trạng thái tài khoản + điền lại ô cấu hình từ bản lưu server (trước khi ngắt kết nối). */
   const applySavedPowerBiFromStatus = (s: PowerBiStatus) => {
     const sync = typeof s?.last_sync === 'string' ? s.last_sync.trim() : '';
@@ -291,6 +295,7 @@ export default function PowerBIConfigPage() {
         /* gợi ý bảng không bắt buộc để kết nối thành công */
       }
       await loadAccountPowerBiStatus();
+      await refreshWorkspaceAndDatasetLists();
     } catch (err) {
       setIsConnected(false);
       const detail = formatUserFacingApiError(err, msgLocale);
@@ -432,6 +437,24 @@ export default function PowerBIConfigPage() {
         body: { dataset_id: selectedDatasetId, datasetId: selectedDatasetId },
       });
       setRefreshResult(res);
+      const isSuccess = Boolean(res?.success);
+      const msg = typeof res?.message === 'string' ? res.message.trim() : '';
+      const sync = typeof res?.last_sync === 'string' ? res.last_sync.trim() : '';
+      if (isSuccess) {
+        const lines = [msg || t('powerbi.refresh_result')];
+        if (sync) {
+          lines.push(`${t('powerbi.last_synced')}: ${formatDateTimeVietnam(sync, locale)}`);
+        }
+        notifySuccess(t('powerbi.refresh_dataset'), {
+          description: lines.join('\n'),
+          duration: 5200,
+        });
+      } else {
+        notifyError(t('powerbi.refresh_dataset'), {
+          description: msg || t('powerbi.toast.test_fail_fallback'),
+          duration: 6500,
+        });
+      }
       await loadAccountPowerBiStatus();
     } catch (err) {
       notifyError(t('powerbi.refresh_dataset'), { description: formatUserFacingApiError(err, msgLocale), duration: 6500 });
@@ -449,7 +472,7 @@ export default function PowerBIConfigPage() {
       setIsLoading(true);
       try {
         // Tải danh sách trước, rồi mới hydrate từ /status — tránh setWorkspaces/setDatasets ghi đè workspace/dataset đã lưu.
-        await Promise.allSettled([loadWorkspaces(), loadDatasets()]);
+        await refreshWorkspaceAndDatasetLists();
         await loadAccountPowerBiStatus();
         await runConnectionTest();
       } finally {
@@ -591,7 +614,6 @@ export default function PowerBIConfigPage() {
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       <span className="font-medium text-foreground">{t('powerbi.table_data_sample_count')}:</span>{' '}
                       {samples.toLocaleString()}
-                      {sampleCap != null ? ` (${t('powerbi.table_data_sample_cap_suffix')}${sampleCap.toLocaleString()})` : ''}
                     </p>
                     {err ? (
                       <p className="mt-1 break-words text-xs text-destructive">
