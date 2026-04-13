@@ -150,12 +150,15 @@ function canRecordInstallmentPayment(row: WorkbenchRow): boolean {
     .toLowerCase() !== 'paid';
 }
 
-/** Số còn phải trả trong kỳ hiện tại (theo kỳ cố định − đã ghi nhận cho kỳ đó). */
+/** Số còn phải trả trong kỳ hiện tại (kỳ cố định hoặc next_total_due từ API − đã ghi nhận next_paid). */
 function currentPeriodRemainingVnd(row: WorkbenchRow): number | null {
-  const per = flatPeriodPaymentVnd(row);
-  if (per == null) return null;
   const paid = row.next_paid != null && Number.isFinite(Number(row.next_paid)) ? Math.round(Number(row.next_paid)) : 0;
-  return Math.max(0, per - Math.max(0, paid));
+  const per = flatPeriodPaymentVnd(row);
+  if (per != null) return Math.max(0, per - Math.max(0, paid));
+  if (row.next_total_due != null && Number.isFinite(Number(row.next_total_due))) {
+    return Math.max(0, Math.round(Number(row.next_total_due)) - Math.max(0, paid));
+  }
+  return null;
 }
 
 /** Lowercase + strip combining marks so "Nguyen" matches "Nguyễn". */
@@ -281,6 +284,11 @@ export default function ApprovedLoanWorkbenchPage() {
     }
     setPaySaving(true);
     try {
+      const remainingInPeriod = currentPeriodRemainingVnd(payRow);
+      /** Backend thường chỉ giữ kỳ hiện tại khi partial; 'paid' có thể đóng kỳ và nhảy hạn. */
+      const paymentStatus: 'paid' | 'partial' =
+        remainingInPeriod != null && remainingInPeriod > 0 && amt < remainingInPeriod ? 'partial' : 'paid';
+
       await browserApiFetchAuth('/loan-payments', {
         method: 'POST',
         body: {
@@ -288,7 +296,7 @@ export default function ApprovedLoanWorkbenchPage() {
           schedule_id: payScheduleId.trim() ? Number(payScheduleId) : null,
           payment_date: payDate,
           amount_paid: amt,
-          status: 'paid',
+          status: paymentStatus,
         },
       });
       notifySuccess(t('loans.workbench.toast_payment_ok'));
