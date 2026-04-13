@@ -23,6 +23,7 @@ import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/componen
 import {
   extractRegistrationList,
   normalizeRegistrationRow,
+  usernameFromEmail,
   type RegistrationRow,
   type RegistrationType,
 } from '@/lib/admin/registration-list';

@@ -21,7 +21,7 @@ export function extractRegistrationList(data: unknown): unknown[] {
   return [];
 }
 
-function usernameFromEmail(email: unknown) {
+export function usernameFromEmail(email: unknown) {
   const raw = String(email ?? '').trim();
   if (!raw) return '';
   const atIndex = raw.indexOf('@');

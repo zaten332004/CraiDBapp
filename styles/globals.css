@@ -465,22 +465,23 @@
   color: var(--foreground);
 }
 
-/* Assistant / incoming: neutral muted-lavender slate (clearly not user accent). */
+/* Assistant / incoming: nền xám–xanh nhạt (khác hẳn bong bóng user). */
 .ai-chat-bubble.ai-chat-bubble--in {
-  --ai-chat-bubble-fill: color-mix(in srgb, var(--muted) 72%, var(--primary) 10%);
-  --ai-chat-bubble-edge: color-mix(in srgb, var(--border), var(--primary) 22%);
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--card) 70%, var(--primary) 30%);
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--border), var(--primary) 38%);
   background: var(--ai-chat-bubble-fill);
   border: 1px solid var(--ai-chat-bubble-edge);
 }
 
 .dark .ai-chat-bubble.ai-chat-bubble--in {
-  --ai-chat-bubble-fill: color-mix(in srgb, var(--muted) 58%, var(--background) 28%);
-  --ai-chat-bubble-edge: color-mix(in srgb, var(--border), var(--foreground) 10%);
+  /* Khối assistant: xám slate, không dùng primary để khỏi lẫn với user (xanh). */
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--muted) 55%, var(--card) 45%);
+  --ai-chat-bubble-edge: color-mix(in srgb, var(--border), var(--muted-foreground) 22%);
 }
 
-/* User / outgoing: accent-tinted (visibly different from assistant). */
+/* User / outgoing: light = viền accent (xanh teal); dark = primary vì accent theme tối gần muted. */
 .ai-chat-bubble.ai-chat-bubble--out {
-  --ai-chat-bubble-fill: color-mix(in srgb, var(--accent) 26%, var(--background));
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--accent) 40%, var(--card));
   --ai-chat-bubble-edge: var(--accent);
   background: var(--ai-chat-bubble-fill);
   border: 2px solid var(--ai-chat-bubble-edge);
@@ -488,7 +489,8 @@
 }
 
 .dark .ai-chat-bubble.ai-chat-bubble--out {
-  --ai-chat-bubble-fill: color-mix(in srgb, var(--accent) 38%, var(--background));
+  --ai-chat-bubble-fill: color-mix(in srgb, var(--primary) 36%, var(--card));
+  --ai-chat-bubble-edge: var(--primary);
 }
 
 /* Small diamond “hook” continuing the bubble border; points down-left (assistant). */

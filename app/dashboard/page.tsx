@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp, Users, AlertCircle, PieChart } from 'lucide-react';
@@ -13,10 +12,7 @@ import { notifyError } from '@/lib/notify';
 import { formatDateTimeVietnam, formatDateVietnam } from '@/lib/datetime';
 import { formatCompactVnd } from '@/lib/money';
 import { RECHART_MARGIN, RECHART_Y_WIDTH } from '@/lib/recharts-layout';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { extractRegistrationList, normalizeRegistrationRow, type RegistrationRow } from '@/lib/admin/registration-list';
-import { cn } from '@/lib/utils';
+import { extractRegistrationList, normalizeRegistrationRow } from '@/lib/admin/registration-list';
 
 type PortfolioKPI = {
   total_exposure: number;
@@ -68,7 +64,6 @@ export default function DashboardPage() {
   const [recentAlerts, setRecentAlerts] = useState<AlertItem[]>([]);
   const [openAlertsCount, setOpenAlertsCount] = useState(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
-  const [pendingAccounts, setPendingAccounts] = useState<RegistrationRow[]>([]);
   const [activeUsersCount, setActiveUsersCount] = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
 
@@ -106,20 +101,12 @@ export default function DashboardPage() {
             browserApiFetchAuth<any[]>('/admin/users?status_filter=active', { method: 'GET' }),
           ]);
           if (!cancelled) {
-            const pendingRows = extractRegistrationList(pendingPayload)
+            const pendingCount = extractRegistrationList(pendingPayload)
               .map((x) => normalizeRegistrationRow(x))
-              .filter(Boolean) as RegistrationRow[];
-            pendingRows.sort((a, b) => {
-              const ta = Date.parse(String(a.requestedAt || ''));
-              const tb = Date.parse(String(b.requestedAt || ''));
-              return (Number.isNaN(tb) ? 0 : tb) - (Number.isNaN(ta) ? 0 : ta);
-            });
-            setPendingAccounts(pendingRows);
-            setPendingApprovalsCount(pendingRows.length);
+              .filter(Boolean).length;
+            setPendingApprovalsCount(pendingCount);
             setActiveUsersCount((activeUsers || []).length);
           }
-        } else if (!cancelled) {
-          setPendingAccounts([]);
         }
 
         const customers = await browserApiFetchAuth<{ total: number }>('/customers?page=1', { method: 'GET' });
@@ -172,64 +159,6 @@ export default function DashboardPage() {
               <KPICard key={idx} title={metric.title} value={metric.value} icon={metric.icon} />
             ))}
           </div>
-
-          {role === 'admin' ? (
-            <Card>
-              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:space-y-0">
-                <div className="space-y-1.5">
-                  <CardTitle>{t('dashboard.pending_accounts_title')}</CardTitle>
-                  <CardDescription>{t('dashboard.pending_accounts_desc')}</CardDescription>
-                </div>
-                <Button variant="outline" size="sm" className="shrink-0" asChild>
-                  <Link href="/dashboard/admin/registrations">{t('dashboard.pending_view_all')}</Link>
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {pendingAccounts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t('dashboard.pending_accounts_empty')}</p>
-                ) : (
-                  <div className="max-h-[min(24rem,55vh)] overflow-auto rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>{t('dashboard.pending_col_display')}</TableHead>
-                          <TableHead>{t('dashboard.pending_col_email')}</TableHead>
-                          <TableHead>{t('dashboard.pending_col_role')}</TableHead>
-                          <TableHead className="whitespace-nowrap">{t('dashboard.pending_col_requested')}</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {pendingAccounts.map((r) => (
-                          <TableRow key={r.id}>
-                            <TableCell>
-                              <div>
-                                {r.fullName ? <p className="font-medium text-foreground">{r.fullName}</p> : null}
-                                <p
-                                  className={cn(
-                                    'font-mono text-sm',
-                                    r.fullName ? 'text-xs text-muted-foreground' : 'font-medium text-foreground',
-                                  )}
-                                >
-                                  {r.name}
-                                </p>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm">{r.email}</TableCell>
-                            <TableCell className="text-sm">
-                              {r.type === 'manager' ? t('role.manager') : t('role.analyst')}
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap text-sm text-muted-foreground tabular-nums">
-                              {formatDateTimeVietnam(r.requestedAt ?? '', locale)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ) : null}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>

@@ -638,8 +638,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "loans.workbench.facility_id": "Facility ID",
     "loans.workbench.schedule_id": "Schedule ID (tùy chọn)",
     "loans.workbench.save_payment": "Lưu",
-    "loans.workbench.payment_target_note":
-      "Thanh toán này ghi vào khoản vay (loan facility) có mã nội bộ facility_id = {facility_id}. Hồ sơ vay liên quan có mã tham chiếu application_ref_no = {application_ref} (ví dụ APP-YYYYMMDD…-customer_id).",
     "loans.workbench.empty": "Chưa có hồ sơ đã duyệt hoặc chưa có lịch trả.",
     "loans.workbench.toast_payment_ok": "Đã ghi nhận thanh toán.",
 
@@ -1874,8 +1872,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "loans.workbench.facility_id": "Facility ID",
     "loans.workbench.schedule_id": "Schedule ID (optional)",
     "loans.workbench.save_payment": "Save",
-    "loans.workbench.payment_target_note":
-      "This payment is posted to the loan facility with internal id facility_id = {facility_id}. The linked loan application reference is application_ref_no = {application_ref} (e.g. APP-YYYYMMDD…-customer_id).",
     "loans.workbench.empty": "No approved applications or no repayment schedule yet.",
     "loans.workbench.toast_payment_ok": "Payment recorded.",
 

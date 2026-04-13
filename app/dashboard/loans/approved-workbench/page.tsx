@@ -479,11 +479,6 @@ export default function ApprovedLoanWorkbenchPage() {
             <DialogTitle>{t('loans.workbench.record_payment')}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 py-2">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {t('loans.workbench.payment_target_note')
-                .replace('{facility_id}', String(payRow?.facility_id ?? '—'))
-                .replace('{application_ref}', String(payRow?.application_ref_no ?? '—'))}
-            </p>
             <div className="space-y-2">
               <Label>{t('loans.workbench.payment_amount')}</Label>
               <VndAmountInput
