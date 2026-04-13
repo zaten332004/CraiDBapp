@@ -430,7 +430,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "customers.col_app_count": "Số hồ sơ vay",
     "customers.col_total_loan": "Tổng khoản vay (VND)",
     "customers.col_status_portfolio": "Trạng thái hồ sơ",
-    "customers.col_view_details": "Xem chi tiết",
+    "customers.col_actions": "Thao tác",
+    "customers.action_view_details": "Xem chi tiết",
     "customers.portfolio.none": "Chưa có hồ sơ",
     "customers.portfolio.pending": "đang chờ",
     "customers.portfolio.approved": "đã duyệt",
@@ -601,8 +602,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "customers.detail.new_application": "Mở thêm hồ sơ vay",
 
     "loans.workbench.title": "Hồ sơ vay đã duyệt",
-    "loans.workbench.desc":
-      "Theo dõi kỳ đến hạn và ghi nhận thanh toán thủ công. Cột «Giá trị hồ sơ» là số tiền trên đơn vay (không đổi khi trả nợ); tiến độ trả nợ xem ở cột «Kỳ tới».",
+    "loans.workbench.filter_period_state": "Lọc theo trạng thái kỳ",
+    "loans.workbench.filter_all": "Tất cả trạng thái",
     "loans.workbench.search_placeholder": "Tìm theo tên khách hàng hoặc mã hồ sơ…",
     "loans.workbench.no_match": "Không có hồ sơ khớp với từ khóa.",
     "loans.workbench.list_meta": "Hiển thị {shown} / {total} hồ sơ",
@@ -615,7 +616,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "loans.workbench.installment_state.overdue": "Quá hạn",
     "loans.workbench.installment_state.partial": "Thanh toán một phần",
     "loans.workbench.installment_state.paid": "Đã thanh toán",
-    "loans.workbench.col.amount": "Giá trị hồ sơ",
+    "loans.workbench.col.amount": "Số tiền cần thanh toán",
+    "loans.workbench.col.amount_hint":
+      "Số còn phải trả cho kỳ hiện tại (giảm khi ghi thanh toán; hết kỳ thì chuyển sang kỳ tiếp theo).",
     "loans.workbench.col.period_payment": "Số tiền thanh toán kì này",
     "loans.workbench.col.installment_progress": "Kỳ tới (đã trả / phải trả)",
     "loans.workbench.open_customer": "Mở KH",
@@ -627,6 +630,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "loans.workbench.facility_id": "Facility ID",
     "loans.workbench.schedule_id": "Schedule ID (tùy chọn)",
     "loans.workbench.save_payment": "Lưu",
+    "loans.workbench.payment_target_note":
+      "Thanh toán này ghi vào khoản vay (loan facility) có mã nội bộ facility_id = {facility_id}. Hồ sơ vay liên quan có mã tham chiếu application_ref_no = {application_ref} (ví dụ APP-YYYYMMDD…-customer_id).",
     "loans.workbench.empty": "Chưa có hồ sơ đã duyệt hoặc chưa có lịch trả.",
     "loans.workbench.toast_payment_ok": "Đã ghi nhận thanh toán.",
 
@@ -1652,7 +1657,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "customers.col_app_count": "Loan applications",
     "customers.col_total_loan": "Total principal (VND)",
     "customers.col_status_portfolio": "Application status",
-    "customers.col_view_details": "View details",
+    "customers.col_actions": "Actions",
+    "customers.action_view_details": "View details",
     "customers.portfolio.none": "No applications",
     "customers.portfolio.pending": "pending",
     "customers.portfolio.approved": "approved",
@@ -1824,8 +1830,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "customers.detail.new_application": "Add another loan application",
 
     "loans.workbench.title": "Approved loan applications",
-    "loans.workbench.desc":
-      "Track next due installments and record payments manually. “Application value” is the amount on the loan application (unchanged as you pay); installment progress is in the next column.",
+    "loans.workbench.filter_period_state": "Filter by installment state",
+    "loans.workbench.filter_all": "All states",
     "loans.workbench.search_placeholder": "Search by customer name or application ref…",
     "loans.workbench.no_match": "No records match your search.",
     "loans.workbench.list_meta": "Showing {shown} / {total} records",
@@ -1838,7 +1844,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "loans.workbench.installment_state.overdue": "Overdue",
     "loans.workbench.installment_state.partial": "Partially paid",
     "loans.workbench.installment_state.paid": "Paid",
-    "loans.workbench.col.amount": "Application value",
+    "loans.workbench.col.amount": "Amount due (this period)",
+    "loans.workbench.col.amount_hint":
+      "Remaining to pay for the current installment (decreases as you record payments; advances after the period is fully paid).",
     "loans.workbench.col.period_payment": "This period payment (due)",
     "loans.workbench.col.installment_progress": "Next installment (paid / due)",
     "loans.workbench.open_customer": "Open customer",
@@ -1850,6 +1858,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "loans.workbench.facility_id": "Facility ID",
     "loans.workbench.schedule_id": "Schedule ID (optional)",
     "loans.workbench.save_payment": "Save",
+    "loans.workbench.payment_target_note":
+      "This payment is posted to the loan facility with internal id facility_id = {facility_id}. The linked loan application reference is application_ref_no = {application_ref} (e.g. APP-YYYYMMDD…-customer_id).",
     "loans.workbench.empty": "No approved applications or no repayment schedule yet.",
     "loans.workbench.toast_payment_ok": "Payment recorded.",
 

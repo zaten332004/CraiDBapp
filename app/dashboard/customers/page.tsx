@@ -338,15 +338,15 @@ export default function CustomersPage() {
         </CardHeader>
         <CardContent>
           <ScrollableTableRegion>
-            <Table className="min-w-[800px] w-full">
+            <Table className="w-max max-w-full text-sm">
               <TableHeader>
                 <TableRow className={scrollableTableHeaderRowClass}>
-                  <TableHead className="py-1.5 min-w-[200px]">{t('customers.col_name_mail')}</TableHead>
-                  <TableHead className="py-1.5 whitespace-nowrap">{t('customers.col_app_count')}</TableHead>
-                  <TableHead className="py-1.5 whitespace-nowrap">{t('customers.col_total_loan')}</TableHead>
-                  <TableHead className="py-1.5">{t('customers.risk_level')}</TableHead>
-                  <TableHead className="py-1.5 min-w-[220px]">{t('customers.col_status_portfolio')}</TableHead>
-                  <TableHead className="py-1.5 w-[100px] text-center">{t('customers.col_view_details')}</TableHead>
+                  <TableHead className="py-1.5 min-w-[11rem] pr-4">{t('customers.col_name_mail')}</TableHead>
+                  <TableHead className="py-1.5 whitespace-nowrap pr-3">{t('customers.col_app_count')}</TableHead>
+                  <TableHead className="py-1.5 whitespace-nowrap pr-3">{t('customers.col_total_loan')}</TableHead>
+                  <TableHead className="py-1.5 whitespace-nowrap pr-3">{t('customers.risk_level')}</TableHead>
+                  <TableHead className="py-1.5 max-w-sm pr-3">{t('customers.col_status_portfolio')}</TableHead>
+                  <TableHead className="py-1.5 w-24 whitespace-nowrap text-center pl-2">{t('customers.col_actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -391,14 +391,15 @@ export default function CustomersPage() {
                         {riskLabel(customer.listEffectiveRiskLevel)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="py-1.5 text-[13px] text-muted-foreground max-w-[320px]">
+                    <TableCell className="py-1.5 text-[13px] text-muted-foreground max-w-sm break-words pr-3 align-middle">
                       {formatPortfolioSummary(t, customer.portfolioSummary, locale)}
                     </TableCell>
-                    <TableCell className="py-1.5 text-center">
+                    <TableCell className="py-1.5 w-24 text-center align-middle pl-2">
                       <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" asChild>
                         <Link
                           href={`/dashboard/customers/${customer.id}`}
-                          aria-label={t('customers.col_view_details')}
+                          aria-label={t('customers.action_view_details')}
+                          title={t('customers.action_view_details')}
                         >
                           <Eye className="h-4 w-4" />
                         </Link>

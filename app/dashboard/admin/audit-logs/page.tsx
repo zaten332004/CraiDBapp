@@ -16,6 +16,7 @@ import { ListPagination } from '@/components/list-pagination';
 import { downloadCsvFile } from '@/lib/export/csv';
 import { formatDateTimeVietnam, formatDateVietnam } from '@/lib/datetime';
 import { badgeTone } from '@/lib/dashboard-badge-tones';
+import { cn } from '@/lib/utils';
 import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 
 type AuditLogRow = {
@@ -79,18 +80,40 @@ function normalizeAuditLog(item: any, idx: number): AuditLogRow {
   };
 }
 
-function entityDisplayName(entityType: string, locale: string): string {
+/** Human-readable entity name in Vietnamese and English (for audit badges). */
+function entityLabelsViEn(entityType: string): { vi: string; en: string } {
   const t = String(entityType || '').trim();
   const map: Record<string, { vi: string; en: string }> = {
-    Customer: { vi: 'Khách hàng', en: 'Customer' },
-    User: { vi: 'Người dùng', en: 'User' },
-    UserProfile: { vi: 'Hồ sơ người dùng', en: 'User profile' },
-    Alert: { vi: 'Cảnh báo', en: 'Alert' },
-    CustomerImport: { vi: 'Nhập khách hàng', en: 'Customer import' },
+    Customer: { vi: 'khách hàng', en: 'customer' },
+    User: { vi: 'người dùng', en: 'user' },
+    UserProfile: { vi: 'hồ sơ người dùng', en: 'user profile' },
+    Alert: { vi: 'cảnh báo', en: 'alert' },
+    CustomerImport: { vi: 'lô nhập khách hàng', en: 'customer import batch' },
+    Loan_Application: { vi: 'hồ sơ vay', en: 'loan application' },
+    Loan_Payment: { vi: 'ghi nhận thanh toán', en: 'loan payment' },
+    Loan_Facility: { vi: 'khoản vay (facility)', en: 'loan facility' },
+    Loan_Repayment_Schedule: { vi: 'dòng lịch trả nợ', en: 'repayment schedule row' },
+    ChatSession: { vi: 'phiên chat AI', en: 'AI chat session' },
+    Chat_Session: { vi: 'phiên chat AI', en: 'AI chat session' },
   };
-  const m = map[t];
-  if (m) return locale === 'vi' ? m.vi : m.en;
-  return t || (locale === 'vi' ? 'Đối tượng' : 'Entity');
+  if (map[t]) return map[t];
+  const human = t.replace(/_/g, ' ').trim() || (t ? t : 'record');
+  return { vi: human, en: human };
+}
+
+function bilingualDot(viPart: string, enPart: string): string {
+  return `${viPart} · ${enPart}`;
+}
+
+function idPart(entityId: number | null): string {
+  if (entityId == null || Number.isNaN(entityId)) return '';
+  return ` #${entityId}`;
+}
+
+/** @deprecated prefer entityLabelsViEn + bilingualDot */
+function entityDisplayName(entityType: string, locale: string): string {
+  const { vi, en } = entityLabelsViEn(entityType);
+  return locale === 'vi' ? vi : en;
 }
 
 function entityIdSuffix(entityId: number | null, locale: string): string {
@@ -140,256 +163,252 @@ function formatAuditTimeOnly(ts: string, locale: string) {
   });
 }
 
-function getActionLabel(row: AuditLogRow, locale: string): string {
+function getActionLabel(row: AuditLogRow, _locale: string): string {
   const action = String(row.action || '').trim().toUpperCase();
   const et = String(row.entityType || '').trim();
-  const idS = entityIdSuffix(row.entityId, locale);
-  const en = entityDisplayName(et, locale);
+  const idS = idPart(row.entityId);
+  const L = entityLabelsViEn(et);
 
   if (action === 'INSERT' && et === 'Customer') {
-    return locale === 'vi' ? `Thêm ${en}${idS}` : `Insert ${en.toLowerCase()}${idS}`;
+    return bilingualDot(`Thêm ${L.vi}${idS}`, `Insert ${L.en}${idS}`);
   }
   if (action === 'UPDATE' && et === 'Customer') {
-    return locale === 'vi' ? `Cập nhật ${en}${idS}` : `Update ${en.toLowerCase()}${idS}`;
+    return bilingualDot(`Cập nhật ${L.vi}${idS}`, `Update ${L.en}${idS}`);
   }
   if (action === 'DELETE' && et === 'Customer') {
-    return locale === 'vi' ? `Xóa ${en}${idS}` : `Delete ${en.toLowerCase()}${idS}`;
+    return bilingualDot(`Xóa ${L.vi}${idS}`, `Delete ${L.en}${idS}`);
   }
   if (action === 'APPROVE_CUSTOMER') {
-    return locale === 'vi' ? `Duyệt hồ sơ ${en}${idS}` : `Approve ${en.toLowerCase()} dossier${idS}`;
+    return bilingualDot(`Duyệt hồ sơ ${L.vi}${idS}`, `Approve ${L.en} dossier${idS}`);
   }
   if (action === 'REJECT_CUSTOMER') {
-    return locale === 'vi' ? `Từ chối hồ sơ ${en}${idS}` : `Reject ${en.toLowerCase()} dossier${idS}`;
+    return bilingualDot(`Từ chối hồ sơ ${L.vi}${idS}`, `Reject ${L.en} dossier${idS}`);
   }
   if (action === 'RESOLVE_ALERT') {
-    return locale === 'vi' ? `Xử lý ${en}${idS}` : `Resolve ${en.toLowerCase()}${idS}`;
+    return bilingualDot(`Xử lý ${L.vi}${idS}`, `Resolve ${L.en}${idS}`);
   }
   if (action === 'CREATE_USER') {
-    return locale === 'vi' ? `Tạo ${en}${idS}` : `Create ${en.toLowerCase()}${idS}`;
+    return bilingualDot(`Tạo ${L.vi}${idS}`, `Create ${L.en}${idS}`);
   }
   if (action === 'DELETE_USER') {
-    return locale === 'vi' ? `Xóa ${en}${idS}` : `Delete ${en.toLowerCase()}${idS}`;
+    return bilingualDot(`Xóa ${L.vi}${idS}`, `Delete ${L.en}${idS}`);
   }
   if (action === 'UPDATE_USER_STATUS') {
-    return locale === 'vi' ? `Cập nhật trạng thái ${en}${idS}` : `Update ${en.toLowerCase()} status${idS}`;
+    return bilingualDot(`Cập nhật trạng thái ${L.vi}${idS}`, `Update ${L.en} status${idS}`);
   }
   if (action === 'UPDATE_USER_ROLE') {
-    return locale === 'vi' ? `Cập nhật vai trò ${en}${idS}` : `Update ${en.toLowerCase()} role${idS}`;
+    return bilingualDot(`Cập nhật vai trò ${L.vi}${idS}`, `Update ${L.en} role${idS}`);
   }
   if (action === 'SET_PIN') {
-    return locale === 'vi' ? 'Thiết lập mã PIN' : 'Set security PIN';
+    return bilingualDot('Thiết lập mã PIN', 'Set security PIN');
   }
   if (action === 'CHANGE_PIN') {
-    return locale === 'vi' ? 'Đổi mã PIN' : 'Change PIN';
+    return bilingualDot('Đổi mã PIN', 'Change PIN');
   }
   if (action === 'ADMIN_SET_USER_PIN') {
-    return locale === 'vi' ? `Admin đặt PIN ${en}${idS}` : `Admin set PIN ${en.toLowerCase()}${idS}`;
+    return bilingualDot(`Admin đặt PIN cho ${L.vi}${idS}`, `Admin set PIN for ${L.en}${idS}`);
   }
   if (action === 'RESET_PASSWORD_WITH_PIN') {
-    return locale === 'vi' ? 'Đặt lại mật khẩu bằng PIN' : 'Reset password with PIN';
+    return bilingualDot('Đặt lại mật khẩu bằng PIN', 'Reset password with PIN');
   }
   if (action === 'CHANGE_EMAIL_WITH_PIN') {
-    return locale === 'vi' ? 'Đổi email (xác nhận PIN)' : 'Change email (PIN verified)';
+    return bilingualDot('Đổi email (xác nhận PIN)', 'Change email (PIN verified)');
   }
   if (action === 'UPDATE_PROFILE') {
-    return locale === 'vi' ? 'Cập nhật hồ sơ (tên/SĐT)' : 'Update profile (name/phone)';
+    return bilingualDot('Cập nhật hồ sơ (tên/SĐT)', 'Update profile (name/phone)');
   }
   if (action === 'UPDATE_AVATAR') {
-    return locale === 'vi' ? 'Cập nhật ảnh đại diện' : 'Update avatar';
+    return bilingualDot('Cập nhật ảnh đại diện', 'Update avatar');
   }
   if (action === 'IMPORT_CUSTOMERS') {
-    return locale === 'vi' ? 'Nhập danh sách khách hàng' : 'Import customers';
+    return bilingualDot('Nhập danh sách khách hàng', 'Import customers');
   }
   if (action === 'IMPORT_CUSTOMERS_FAILED' || action === 'UPLOAD_FAILED') {
-    return locale === 'vi' ? 'Nhập dữ liệu thất bại' : 'Import/upload failed';
+    return bilingualDot('Nhập / tải tệp thất bại', 'Import or upload failed');
   }
   if (action === 'APPROVE_REGISTRATION') {
-    return locale === 'vi' ? 'Duyệt đăng ký' : 'Approve registration';
+    return bilingualDot('Duyệt đăng ký người dùng', 'Approve user registration');
   }
   if (action === 'REJECT_REGISTRATION') {
-    return locale === 'vi' ? 'Từ chối đăng ký' : 'Reject registration';
+    return bilingualDot('Từ chối đăng ký người dùng', 'Reject user registration');
   }
 
   const raw = String(row.action || '').trim();
   const normalized = raw.toLowerCase().replace(/_/g, ' ');
-  if (normalized.includes('approve customer')) return locale === 'vi' ? 'Duyệt hồ sơ khách hàng' : 'Approve customer dossier';
-  if (normalized.includes('reject customer')) return locale === 'vi' ? 'Từ chối hồ sơ khách hàng' : 'Reject customer dossier';
+  if (normalized.includes('approve customer')) return bilingualDot('Duyệt hồ sơ khách hàng', 'Approve customer dossier');
+  if (normalized.includes('reject customer')) return bilingualDot('Từ chối hồ sơ khách hàng', 'Reject customer dossier');
   if (normalized.includes('approve registration') || normalized.includes('approve user')) {
-    return locale === 'vi' ? 'Duyệt người dùng' : 'Approve user';
+    return bilingualDot('Duyệt người dùng', 'Approve user');
   }
   if (normalized.includes('reject registration') || normalized.includes('reject user')) {
-    return locale === 'vi' ? 'Từ chối người dùng' : 'Reject user';
+    return bilingualDot('Từ chối người dùng', 'Reject user');
   }
   if (normalized.includes('request password reset')) {
-    return locale === 'vi' ? 'Yêu cầu đặt lại mật khẩu' : 'Request password reset';
+    return bilingualDot('Yêu cầu đặt lại mật khẩu', 'Request password reset');
   }
   if (normalized.includes('request email change')) {
-    return locale === 'vi' ? 'Yêu cầu đổi email' : 'Request email change';
+    return bilingualDot('Yêu cầu đổi email', 'Request email change');
   }
   if (normalized.includes('reset password')) {
-    return locale === 'vi' ? 'Đặt lại mật khẩu' : 'Reset password';
+    return bilingualDot('Đặt lại mật khẩu', 'Reset password');
   }
   if (normalized.includes('change email')) {
-    return locale === 'vi' ? 'Đổi email' : 'Change email';
+    return bilingualDot('Đổi email', 'Change email');
   }
   if (normalized.includes('verify email')) {
-    return locale === 'vi' ? 'Xác nhận liên kết đăng ký' : 'Confirm registration link';
+    return bilingualDot('Xác nhận liên kết đăng ký', 'Confirm registration link');
   }
   if (normalized.includes('resend verification email')) {
-    return locale === 'vi' ? 'Gửi lại liên kết xác nhận email' : 'Resend confirmation email';
+    return bilingualDot('Gửi lại email xác nhận', 'Resend confirmation email');
   }
   if (normalized.includes('register user')) {
-    return locale === 'vi' ? 'Đăng ký người dùng' : 'Register user';
+    return bilingualDot('Đăng ký người dùng', 'Register user');
   }
   if (normalized.includes('import customers')) {
-    return locale === 'vi' ? 'Nhập danh sách khách hàng' : 'Import customers';
+    return bilingualDot('Nhập danh sách khách hàng', 'Import customers');
   }
   if (normalized.includes('import customers failed') || normalized.includes('upload failed')) {
-    return locale === 'vi' ? 'Nhập dữ liệu thất bại' : 'Import failed';
+    return bilingualDot('Nhập dữ liệu thất bại', 'Import failed');
   }
-  if (normalized.includes('resolve alert')) return locale === 'vi' ? 'Xử lý cảnh báo' : 'Resolve alert';
-  if (normalized.includes('update avatar')) return locale === 'vi' ? 'Cập nhật ảnh đại diện' : 'Update avatar';
-  if (normalized.includes('update profile')) return locale === 'vi' ? 'Cập nhật hồ sơ người dùng' : 'Update user profile';
-  if (normalized.includes('change password')) return locale === 'vi' ? 'Đổi mật khẩu' : 'Change password';
+  if (normalized.includes('resolve alert')) return bilingualDot('Xử lý cảnh báo', 'Resolve alert');
+  if (normalized.includes('update avatar')) return bilingualDot('Cập nhật ảnh đại diện', 'Update avatar');
+  if (normalized.includes('update profile')) return bilingualDot('Cập nhật hồ sơ người dùng', 'Update user profile');
+  if (normalized.includes('change password')) return bilingualDot('Đổi mật khẩu', 'Change password');
   if (normalized.includes('admin') && normalized.includes('status')) {
-    return locale === 'vi' ? 'Cập nhật trạng thái người dùng' : 'Update user status';
+    return bilingualDot('Cập nhật trạng thái người dùng', 'Update user status');
   }
   if (normalized.includes('update user') || normalized.includes('user status')) {
-    return locale === 'vi' ? 'Cập nhật trạng thái người dùng' : 'Update user status';
+    return bilingualDot('Cập nhật trạng thái người dùng', 'Update user status');
   }
-  if (normalized.includes('delete')) return locale === 'vi' ? 'Xóa' : 'Delete';
-  if (normalized.includes('update')) return locale === 'vi' ? `Cập nhật ${en || 'bản ghi'}${idS}` : `Update ${(en || 'record').toLowerCase()}${idS}`;
-  if (normalized.includes('create')) return locale === 'vi' ? `Tạo ${en || 'bản ghi'}${idS}` : `Create ${(en || 'record').toLowerCase()}${idS}`;
-  if (normalized.includes('insert')) return locale === 'vi' ? `Thêm ${en || 'bản ghi'}${idS}` : `Insert ${(en || 'record').toLowerCase()}${idS}`;
-  return raw.replace(/_/g, ' ');
+  if (normalized.includes('delete')) {
+    return bilingualDot(`Xóa ${L.vi}${idS}`, `Delete ${L.en}${idS}`);
+  }
+  if (normalized.includes('update')) {
+    return bilingualDot(`Cập nhật ${L.vi}${idS}`, `Update ${L.en}${idS}`);
+  }
+  if (normalized.includes('create')) {
+    return bilingualDot(`Tạo ${L.vi}${idS}`, `Create ${L.en}${idS}`);
+  }
+  if (normalized.includes('insert')) {
+    return bilingualDot(`Thêm ${L.vi}${idS}`, `Insert ${L.en}${idS}`);
+  }
+  return bilingualDot(raw.replace(/_/g, ' '), raw.replace(/_/g, ' '));
 }
 
-function getActionShortDescription(row: AuditLogRow, locale: string): string {
+function getActionShortDescription(row: AuditLogRow, _locale: string): string {
   const action = String(row.action || '').trim().toUpperCase();
   const et = String(row.entityType || '').trim();
-  const idS = entityIdSuffix(row.entityId, locale);
-  const en = entityDisplayName(et, locale);
+  const idS = idPart(row.entityId);
+  const L = entityLabelsViEn(et);
 
   if (action === 'INSERT' && et === 'Customer') {
-    return locale === 'vi' ? `Thêm mới hồ sơ ${en}${idS}.` : `Created ${en.toLowerCase()} record${idS}.`;
+    return bilingualDot(`Đã thêm mới ${L.vi}${idS} vào hệ thống.`, `Created new ${L.en} record${idS}.`);
   }
   if (action === 'UPDATE' && et === 'Customer') {
-    return locale === 'vi' ? `Cập nhật dữ liệu ${en}${idS}.` : `Updated ${en.toLowerCase()} data${idS}.`;
+    return bilingualDot(`Đã cập nhật dữ liệu ${L.vi}${idS}.`, `Updated ${L.en} data${idS}.`);
   }
   if (action === 'DELETE' && et === 'Customer') {
-    return locale === 'vi' ? `Đã xóa hồ sơ ${en}${idS}.` : `Deleted ${en.toLowerCase()} record${idS}.`;
+    return bilingualDot(`Đã xóa hồ sơ ${L.vi}${idS}.`, `Deleted ${L.en} record${idS}.`);
   }
   if (action === 'APPROVE_CUSTOMER') {
-    return locale === 'vi' ? `Phê duyệt hồ sơ ${en}${idS}.` : `Approved ${en.toLowerCase()} dossier${idS}.`;
+    return bilingualDot(`Phê duyệt hồ sơ ${L.vi}${idS}.`, `Approved ${L.en} dossier${idS}.`);
   }
   if (action === 'REJECT_CUSTOMER') {
-    return locale === 'vi' ? `Từ chối hồ sơ ${en}${idS}.` : `Rejected ${en.toLowerCase()} dossier${idS}.`;
+    return bilingualDot(`Từ chối hồ sơ ${L.vi}${idS}.`, `Rejected ${L.en} dossier${idS}.`);
   }
   if (action === 'RESOLVE_ALERT') {
-    return locale === 'vi' ? `Đánh dấu xử lý ${en}${idS}.` : `Resolved ${en.toLowerCase()}${idS}.`;
+    return bilingualDot(`Đánh dấu đã xử lý ${L.vi}${idS}.`, `Marked ${L.en} as resolved${idS}.`);
   }
   if (action === 'CREATE_USER') {
-    return locale === 'vi' ? `Tạo tài khoản ${en}${idS}.` : `Created ${en.toLowerCase()} account${idS}.`;
+    return bilingualDot(`Tạo tài khoản ${L.vi}${idS}.`, `Created ${L.en} account${idS}.`);
   }
   if (action === 'DELETE_USER') {
-    return locale === 'vi' ? `Xóa tài khoản ${en}${idS}.` : `Deleted ${en.toLowerCase()} account${idS}.`;
+    return bilingualDot(`Xóa tài khoản ${L.vi}${idS}.`, `Deleted ${L.en} account${idS}.`);
   }
   if (action === 'UPDATE_USER_STATUS') {
-    return locale === 'vi' ? `Đổi trạng thái kích hoạt ${en}${idS}.` : `Changed activation status${idS}.`;
+    return bilingualDot(`Đổi trạng thái kích hoạt ${L.vi}${idS}.`, `Changed activation status for ${L.en}${idS}.`);
   }
   if (action === 'UPDATE_USER_ROLE') {
-    return locale === 'vi' ? `Đổi vai trò ${en}${idS}.` : `Changed role${idS}.`;
+    return bilingualDot(`Đổi vai trò ${L.vi}${idS}.`, `Changed role for ${L.en}${idS}.`);
   }
   if (action === 'SET_PIN') {
-    return locale === 'vi' ? 'Người dùng thiết lập mã PIN bảo mật.' : 'User set security PIN.';
+    return bilingualDot('Người dùng thiết lập mã PIN bảo mật.', 'User set a security PIN.');
   }
   if (action === 'CHANGE_PIN') {
-    return locale === 'vi' ? 'Người dùng đổi mã PIN bảo mật.' : 'User changed security PIN.';
+    return bilingualDot('Người dùng đổi mã PIN bảo mật.', 'User changed security PIN.');
   }
   if (action === 'ADMIN_SET_USER_PIN') {
-    return locale === 'vi' ? `Quản trị viên đặt lại PIN cho ${en}${idS}.` : `Administrator set PIN for ${en.toLowerCase()}${idS}.`;
+    return bilingualDot(`Quản trị viên đặt lại PIN cho ${L.vi}${idS}.`, `Administrator set PIN for ${L.en}${idS}.`);
   }
   if (action === 'RESET_PASSWORD_WITH_PIN') {
-    return locale === 'vi' ? 'Đặt lại mật khẩu sau khi xác minh PIN.' : 'Password reset after PIN verification.';
+    return bilingualDot('Đặt lại mật khẩu sau khi xác minh PIN.', 'Password reset after PIN verification.');
   }
   if (action === 'CHANGE_EMAIL_WITH_PIN') {
-    return locale === 'vi' ? 'Đổi email sau khi xác minh PIN.' : 'Email changed after PIN verification.';
+    return bilingualDot('Đổi email sau khi xác minh PIN.', 'Email changed after PIN verification.');
   }
   if (action === 'UPDATE_PROFILE') {
-    return locale === 'vi' ? 'Cập nhật họ tên hoặc số điện thoại hồ sơ.' : 'Updated name or phone on profile.';
+    return bilingualDot('Cập nhật họ tên hoặc số điện thoại trên hồ sơ.', 'Updated name or phone on the profile.');
   }
   if (action === 'UPDATE_AVATAR') {
-    return locale === 'vi' ? 'Cập nhật ảnh đại diện tài khoản.' : 'Updated profile avatar.';
+    return bilingualDot('Cập nhật ảnh đại diện tài khoản.', 'Updated account avatar.');
   }
   if (action === 'IMPORT_CUSTOMERS') {
-    return locale === 'vi' ? 'Nhập khách hàng từ tệp (batch).' : 'Imported customers from file (batch).';
+    return bilingualDot('Nhập khách hàng từ tệp (theo lô).', 'Imported customers from a file (batch).');
   }
   if (action === 'IMPORT_CUSTOMERS_FAILED' || action === 'UPLOAD_FAILED') {
-    return locale === 'vi' ? 'Nhập hoặc tải tệp thất bại.' : 'Import or file upload failed.';
+    return bilingualDot('Nhập hoặc tải tệp thất bại.', 'Import or file upload failed.');
   }
   if (action === 'APPROVE_REGISTRATION') {
-    return locale === 'vi' ? 'Phê duyệt yêu cầu đăng ký.' : 'Approved registration request.';
+    return bilingualDot('Phê duyệt yêu cầu đăng ký người dùng.', 'Approved user registration request.');
   }
   if (action === 'REJECT_REGISTRATION') {
-    return locale === 'vi' ? 'Từ chối yêu cầu đăng ký.' : 'Rejected registration request.';
+    return bilingualDot('Từ chối yêu cầu đăng ký người dùng.', 'Rejected user registration request.');
   }
 
   const normalized = String(row.action || '').toLowerCase().replace(/_/g, ' ');
-  if (normalized.includes('approve customer')) return locale === 'vi' ? 'Duyệt hồ sơ khách hàng.' : 'Approved customer dossier.';
-  if (normalized.includes('reject customer')) return locale === 'vi' ? 'Từ chối hồ sơ khách hàng.' : 'Rejected customer dossier.';
+  if (normalized.includes('approve customer')) return bilingualDot('Duyệt hồ sơ khách hàng.', 'Approved customer dossier.');
+  if (normalized.includes('reject customer')) return bilingualDot('Từ chối hồ sơ khách hàng.', 'Rejected customer dossier.');
   if (normalized.includes('approve registration') || normalized.includes('approve user')) {
-    return locale === 'vi' ? 'Phê duyệt đăng ký người dùng.' : 'Approved user registration.';
+    return bilingualDot('Phê duyệt đăng ký người dùng.', 'Approved user registration.');
   }
   if (normalized.includes('reject registration') || normalized.includes('reject user')) {
-    return locale === 'vi' ? 'Từ chối đăng ký người dùng.' : 'Rejected user registration.';
+    return bilingualDot('Từ chối đăng ký người dùng.', 'Rejected user registration.');
   }
-  if (normalized.includes('request password reset')) return locale === 'vi' ? 'Người dùng yêu cầu đặt lại mật khẩu.' : 'User requested password reset.';
-  if (normalized.includes('reset password')) return locale === 'vi' ? 'Mật khẩu đã được đặt lại.' : 'Password has been reset.';
-  if (normalized.includes('request email change')) return locale === 'vi' ? 'Người dùng yêu cầu thay đổi email.' : 'User requested email change.';
-  if (normalized.includes('change email')) return locale === 'vi' ? 'Email tài khoản đã được cập nhật.' : 'Account email has been updated.';
-  if (normalized.includes('update avatar')) return locale === 'vi' ? 'Cập nhật ảnh đại diện tài khoản.' : 'Updated account avatar.';
-  if (normalized.includes('update profile')) return locale === 'vi' ? 'Cập nhật thông tin hồ sơ người dùng.' : 'Updated user profile information.';
-  if (normalized.includes('change password')) return locale === 'vi' ? 'Đổi mật khẩu tài khoản.' : 'Changed account password.';
+  if (normalized.includes('request password reset')) return bilingualDot('Người dùng yêu cầu đặt lại mật khẩu.', 'User requested password reset.');
+  if (normalized.includes('reset password')) return bilingualDot('Mật khẩu đã được đặt lại.', 'Password has been reset.');
+  if (normalized.includes('request email change')) return bilingualDot('Người dùng yêu cầu thay đổi email.', 'User requested email change.');
+  if (normalized.includes('change email')) return bilingualDot('Email tài khoản đã được cập nhật.', 'Account email has been updated.');
+  if (normalized.includes('update avatar')) return bilingualDot('Cập nhật ảnh đại diện tài khoản.', 'Updated account avatar.');
+  if (normalized.includes('update profile')) return bilingualDot('Cập nhật thông tin hồ sơ người dùng.', 'Updated user profile information.');
+  if (normalized.includes('change password')) return bilingualDot('Đổi mật khẩu tài khoản.', 'Changed account password.');
   if (normalized.includes('update user') || normalized.includes('user status')) {
-    return locale === 'vi' ? 'Cập nhật trạng thái kích hoạt người dùng.' : 'Updated user activation status.';
+    return bilingualDot('Cập nhật trạng thái kích hoạt người dùng.', 'Updated user activation status.');
   }
   if (normalized.includes('verify email')) {
-    return locale === 'vi' ? 'Liên kết xác nhận trong email đăng ký đã được sử dụng.' : 'The registration confirmation link was used.';
+    return bilingualDot('Liên kết xác nhận trong email đăng ký đã được sử dụng.', 'The registration confirmation link was used.');
   }
   if (normalized.includes('resend verification email')) {
-    return locale === 'vi' ? 'Đã gửi lại email chứa liên kết xác nhận.' : 'Confirmation email was resent.';
+    return bilingualDot('Đã gửi lại email chứa liên kết xác nhận.', 'Confirmation email was resent.');
   }
-  if (normalized.includes('register user')) return locale === 'vi' ? 'Tạo mới yêu cầu đăng ký người dùng.' : 'Created a new user registration request.';
-  if (normalized.includes('import customers')) return locale === 'vi' ? 'Nhập dữ liệu khách hàng từ tệp.' : 'Imported customers from file.';
-  if (normalized.includes('resolve alert')) return locale === 'vi' ? 'Cảnh báo đã được xử lý.' : 'Alert has been resolved.';
+  if (normalized.includes('register user')) return bilingualDot('Tạo mới yêu cầu đăng ký người dùng.', 'Created a new user registration request.');
+  if (normalized.includes('import customers')) return bilingualDot('Nhập dữ liệu khách hàng từ tệp.', 'Imported customers from file.');
+  if (normalized.includes('resolve alert')) return bilingualDot('Cảnh báo đã được xử lý.', 'Alert has been resolved.');
   if (normalized.includes('update')) {
-    return locale === 'vi'
-      ? idS
-        ? `Cập nhật ${en}${idS}.`
-        : `Cập nhật ${en || 'dữ liệu hệ thống'}.`
-      : idS
-        ? `Updated ${en.toLowerCase()}${idS}.`
-        : `Updated ${(en || 'system data').toLowerCase()}.`;
+    return idS
+      ? bilingualDot(`Đã cập nhật ${L.vi}${idS}.`, `Updated ${L.en}${idS}.`)
+      : bilingualDot(`Cập nhật ${L.vi || 'dữ liệu hệ thống'}.`, `Updated ${L.en || 'system data'}.`);
   }
   if (normalized.includes('delete')) {
-    return locale === 'vi'
-      ? idS
-        ? `Xóa ${en}${idS}.`
-        : `Xóa ${en || 'dữ liệu'}.`
-      : idS
-        ? `Deleted ${en.toLowerCase()}${idS}.`
-        : `Deleted ${(en || 'data').toLowerCase()}.`;
+    return idS
+      ? bilingualDot(`Đã xóa ${L.vi}${idS}.`, `Deleted ${L.en}${idS}.`)
+      : bilingualDot(`Xóa ${L.vi || 'dữ liệu'}.`, `Deleted ${L.en || 'data'}.`);
   }
   if (normalized.includes('create') || normalized.includes('insert')) {
-    return locale === 'vi'
-      ? idS
-        ? `Thêm ${en}${idS}.`
-        : `Thêm ${en || 'bản ghi mới'}.`
-      : idS
-        ? `Inserted ${en.toLowerCase()}${idS}.`
-        : `Inserted ${(en || 'new record').toLowerCase()}.`;
+    return idS
+      ? bilingualDot(`Đã thêm ${L.vi}${idS}.`, `Inserted ${L.en}${idS}.`)
+      : bilingualDot(`Thêm ${L.vi || 'bản ghi mới'}.`, `Inserted ${L.en || 'new record'}.`);
   }
-  return locale === 'vi' ? 'Thao tác hệ thống.' : 'System action.';
+  return bilingualDot('Thao tác hệ thống hoặc không phân loại.', 'System or unclassified action.');
 }
 
 function getActionBadgeClass(row: AuditLogRow): string {
@@ -717,12 +736,18 @@ export default function AdminAuditLogsPage() {
                     <TableCell className="px-6 py-3 text-[13px] font-medium">
                       {resolveActorDisplay(r)}
                     </TableCell>
-                    <TableCell className="px-6 py-3">
-                      <Badge variant="outline" className={getActionBadgeClass(r)}>
+                    <TableCell className="px-6 py-3 align-top">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          getActionBadgeClass(r),
+                          'max-w-full whitespace-normal text-left font-normal leading-snug py-1.5 px-2.5',
+                        )}
+                      >
                         {getActionLabel(r, locale)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="px-6 py-3 text-[13px] text-muted-foreground">
+                    <TableCell className="px-6 py-3 align-top text-[13px] text-muted-foreground whitespace-normal leading-snug">
                       {getActionShortDescription(r, locale)}
                     </TableCell>
                     <TableCell className="px-4 py-3 text-center">

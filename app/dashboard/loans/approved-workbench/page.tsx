@@ -6,11 +6,12 @@ import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { notifyApiError, notifyError, notifySuccess } from '@/lib/notify';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ArrowLeft, Search } from 'lucide-react';
@@ -74,6 +75,14 @@ function canRecordInstallmentPayment(row: WorkbenchRow): boolean {
     .toLowerCase() !== 'paid';
 }
 
+/** Số còn phải trả cho kỳ đang xét (total_due − đã ghi nhận). */
+function currentInstallmentRemainingVnd(row: WorkbenchRow): number | null {
+  const due = row.next_total_due != null && Number.isFinite(Number(row.next_total_due)) ? Number(row.next_total_due) : null;
+  if (due == null) return null;
+  const paid = row.next_paid != null && Number.isFinite(Number(row.next_paid)) ? Number(row.next_paid) : 0;
+  return Math.max(0, Math.round(due - paid));
+}
+
 /** Lowercase + strip combining marks so "Nguyen" matches "Nguyễn". */
 function normalizeForSearch(s: string): string {
   return s
@@ -91,6 +100,16 @@ function rowMatchesQuery(row: WorkbenchRow, rawQuery: string): boolean {
   return name.includes(q) || ref.includes(q) || id.includes(q);
 }
 
+type PeriodStateFilter = 'all' | 'upcoming' | 'overdue' | 'partial' | 'paid';
+
+function rowMatchesPeriodState(row: WorkbenchRow, filter: PeriodStateFilter): boolean {
+  if (filter === 'all') return true;
+  const s = String(row.installment_state || '')
+    .trim()
+    .toLowerCase();
+  return s === filter;
+}
+
 export default function ApprovedLoanWorkbenchPage() {
   const { t, locale } = useI18n();
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
@@ -104,6 +123,7 @@ export default function ApprovedLoanWorkbenchPage() {
   const [paySaving, setPaySaving] = useState(false);
   const [ensuringApplicationId, setEnsuringApplicationId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [periodStateFilter, setPeriodStateFilter] = useState<PeriodStateFilter>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -123,8 +143,11 @@ export default function ApprovedLoanWorkbenchPage() {
   }, [load]);
 
   const filteredRows = useMemo(
-    () => rows.filter((r) => rowMatchesQuery(r, searchQuery)),
-    [rows, searchQuery],
+    () =>
+      rows.filter(
+        (r) => rowMatchesQuery(r, searchQuery) && rowMatchesPeriodState(r, periodStateFilter),
+      ),
+    [rows, searchQuery, periodStateFilter],
   );
 
   const openPay = async (row: WorkbenchRow) => {
@@ -203,14 +226,12 @@ export default function ApprovedLoanWorkbenchPage() {
         </Link>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('loans.workbench.title')}</h1>
-          <p className="text-muted-foreground mt-1 text-sm">{t('loans.workbench.desc')}</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>{t('loans.workbench.title')}</CardTitle>
-          <CardDescription>{t('loans.workbench.desc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {loading ? (
@@ -219,19 +240,36 @@ export default function ApprovedLoanWorkbenchPage() {
             <p className="text-sm text-muted-foreground">{t('loans.workbench.empty')}</p>
           ) : (
             <>
-              <div className="relative max-w-md">
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden
-                />
-                <Input
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t('loans.workbench.search_placeholder')}
-                  aria-label={t('loans.workbench.search_placeholder')}
-                  autoComplete="off"
-                />
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                <div className="relative min-w-[200px] max-w-md flex-1">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    className="pl-9"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t('loans.workbench.search_placeholder')}
+                    aria-label={t('loans.workbench.search_placeholder')}
+                    autoComplete="off"
+                  />
+                </div>
+                <Select
+                  value={periodStateFilter}
+                  onValueChange={(v) => setPeriodStateFilter(v as PeriodStateFilter)}
+                >
+                  <SelectTrigger className="w-full sm:w-[220px]" aria-label={t('loans.workbench.filter_period_state')}>
+                    <SelectValue placeholder={t('loans.workbench.filter_period_state')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('loans.workbench.filter_all')}</SelectItem>
+                    <SelectItem value="upcoming">{t('loans.workbench.installment_state.upcoming')}</SelectItem>
+                    <SelectItem value="partial">{t('loans.workbench.installment_state.partial')}</SelectItem>
+                    <SelectItem value="overdue">{t('loans.workbench.installment_state.overdue')}</SelectItem>
+                    <SelectItem value="paid">{t('loans.workbench.installment_state.paid')}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <p className="text-xs text-muted-foreground">
                 {t('loans.workbench.list_meta')
@@ -248,7 +286,7 @@ export default function ApprovedLoanWorkbenchPage() {
                         <TableRow className={scrollableTableHeaderRowClass}>
                           <TableHead>{t('loans.workbench.col.customer')}</TableHead>
                           <TableHead>{t('loans.workbench.col.ref')}</TableHead>
-                          <TableHead>{t('loans.workbench.col.amount')}</TableHead>
+                          <TableHead title={t('loans.workbench.col.amount_hint')}>{t('loans.workbench.col.amount')}</TableHead>
                           <TableHead>{t('loans.workbench.col.period_payment')}</TableHead>
                           <TableHead>{t('loans.workbench.col.installment_progress')}</TableHead>
                           <TableHead>{t('loans.workbench.col.due')}</TableHead>
@@ -264,10 +302,13 @@ export default function ApprovedLoanWorkbenchPage() {
                             <TableCell className="font-mono text-xs">
                               {r.application_ref_no || r.application_id}
                             </TableCell>
-                            <TableCell>
-                              {r.loan_amount != null
-                                ? formatVnd(Number(r.loan_amount), locale === 'vi' ? 'vi' : 'en')
-                                : '-'}
+                            <TableCell className="text-sm tabular-nums font-medium">
+                              {(() => {
+                                const rem = currentInstallmentRemainingVnd(r);
+                                return rem != null
+                                  ? formatVnd(rem, locale === 'vi' ? 'vi' : 'en')
+                                  : '-';
+                              })()}
                             </TableCell>
                             <TableCell className="text-sm tabular-nums font-medium">
                               {r.next_total_due != null && Number.isFinite(Number(r.next_total_due))
@@ -342,8 +383,10 @@ export default function ApprovedLoanWorkbenchPage() {
             <DialogTitle>{t('loans.workbench.record_payment')}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 py-2">
-            <p className="text-xs text-muted-foreground font-mono">
-              facility_id: {payRow?.facility_id ?? '-'} | {payRow?.application_ref_no}
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {t('loans.workbench.payment_target_note')
+                .replace('{facility_id}', String(payRow?.facility_id ?? '—'))
+                .replace('{application_ref}', String(payRow?.application_ref_no ?? '—'))}
             </p>
             <div className="space-y-2">
               <Label>{t('loans.workbench.payment_amount')}</Label>

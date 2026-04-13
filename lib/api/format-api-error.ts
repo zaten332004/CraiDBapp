@@ -111,6 +111,10 @@ const KNOWN_MESSAGE_ROWS: Array<{ en: string; vi: string }> = [
     en: "Failed to download export file.",
     vi: "Tải file export thất bại.",
   },
+  {
+    en: "This asset is already registered as collateral for another loan application.",
+    vi: "Tài sản này đã được đăng ký đảm bảo cho hồ sơ khác.",
+  },
 ];
 
 function translateSingleDetailLine(d: string, locale: UserFacingLocale): string {
