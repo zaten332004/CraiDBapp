@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Plus, Download } from 'lucide-react';
+import { Search, Plus, Download, Eye } from 'lucide-react';
 import { getUserRole } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
@@ -338,7 +338,7 @@ export default function CustomersPage() {
         </CardHeader>
         <CardContent>
           <ScrollableTableRegion>
-            <Table className="min-w-[720px] w-full">
+            <Table className="min-w-[800px] w-full">
               <TableHeader>
                 <TableRow className={scrollableTableHeaderRowClass}>
                   <TableHead className="py-1.5 min-w-[200px]">{t('customers.col_name_mail')}</TableHead>
@@ -346,12 +346,13 @@ export default function CustomersPage() {
                   <TableHead className="py-1.5 whitespace-nowrap">{t('customers.col_total_loan')}</TableHead>
                   <TableHead className="py-1.5">{t('customers.risk_level')}</TableHead>
                   <TableHead className="py-1.5 min-w-[220px]">{t('customers.col_status_portfolio')}</TableHead>
+                  <TableHead className="py-1.5 w-[100px] text-center">{t('customers.col_view_details')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell>
+                    <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
                   </TableRow>
                 ) : customers.map((customer, rowIdx) => (
                   <TableRow
@@ -392,6 +393,16 @@ export default function CustomersPage() {
                     </TableCell>
                     <TableCell className="py-1.5 text-[13px] text-muted-foreground max-w-[320px]">
                       {formatPortfolioSummary(t, customer.portfolioSummary, locale)}
+                    </TableCell>
+                    <TableCell className="py-1.5 text-center">
+                      <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" asChild>
+                        <Link
+                          href={`/dashboard/customers/${customer.id}`}
+                          aria-label={t('customers.col_view_details')}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

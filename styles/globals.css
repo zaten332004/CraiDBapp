@@ -464,6 +464,15 @@
   border-radius: 1rem;
 }
 
+/* Incoming bubble: default --border on pale card is low-contrast; blend toward foreground. */
+.ai-chat-bubble.ai-chat-bubble--in {
+  border-color: color-mix(in srgb, var(--border), var(--foreground) 20%);
+}
+
+.dark .ai-chat-bubble.ai-chat-bubble--in {
+  border-color: color-mix(in srgb, var(--border), var(--foreground) 14%);
+}
+
 /* Small diamond “hook” continuing the bubble border; points down-left (assistant). */
 .ai-chat-bubble--in::after {
   content: '';
@@ -475,11 +484,16 @@
   height: 11px;
   box-sizing: border-box;
   background: var(--background);
-  border-left: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-left: 1px solid color-mix(in srgb, var(--border), var(--foreground) 20%);
+  border-bottom: 1px solid color-mix(in srgb, var(--border), var(--foreground) 20%);
   border-bottom-left-radius: 2px;
   transform: rotate(45deg);
   pointer-events: none;
+}
+
+.dark .ai-chat-bubble--in::after {
+  border-left-color: color-mix(in srgb, var(--border), var(--foreground) 14%);
+  border-bottom-color: color-mix(in srgb, var(--border), var(--foreground) 14%);
 }
 
 /* Mirror: tail at bottom-right (user). */

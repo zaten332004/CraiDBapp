@@ -285,8 +285,8 @@ export default function NewCustomerPage() {
         </div>
       )}
 
-      <div className="grid max-w-6xl grid-cols-1 gap-6 xl:grid-cols-2">
-        <Card>
+      <div className="grid max-w-6xl grid-cols-1 items-start gap-6 xl:grid-cols-2">
+        <Card className="h-auto w-full min-w-0">
           <CardHeader>
             <CardTitle>{t('customers.new.card_title')}</CardTitle>
             <CardDescription>{t('customers.new.card_desc')}</CardDescription>
@@ -529,7 +529,7 @@ export default function NewCustomerPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="h-auto w-full min-w-0">
           <CardHeader>
             <CardTitle>{t('customers.new.loan_section_title')}</CardTitle>
             <CardDescription>{t('customers.new.loan_section_desc')}</CardDescription>

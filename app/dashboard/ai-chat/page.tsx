@@ -48,7 +48,6 @@ import { ChatMarkdown } from '@/components/ai-chat/chat-markdown';
 import {
   BarChart3,
   Bell,
-  CircleSlash,
   CircleX,
   FileText,
   Loader2,
@@ -1249,10 +1248,6 @@ export default function AIChatPage() {
         sideOffset={6}
         className="w-[min(calc(100vw-2rem),17rem)]"
       >
-        <DropdownMenuItem onClick={() => clearComposerToChatOnly()}>
-          <CircleSlash className="mr-2 h-4 w-4 shrink-0 opacity-80" />
-          {t('ai_chat.data_source_none')}
-        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
             setAiDataSource('customer');
@@ -1304,32 +1299,42 @@ export default function AIChatPage() {
 
   const renderComposerSourceHint = () => {
     if (aiDataSource === 'none') return null;
+    const sourceNameLabel =
+      aiDataSource === 'customer'
+        ? t('ai_chat.data_source_customer')
+        : aiDataSource === 'upload'
+          ? t('ai_chat.data_source_upload')
+          : aiDataSource === 'alerts'
+            ? t('ai_chat.data_source_alerts')
+            : t('ai_chat.data_source_powerbi');
     return (
-      <div className="flex items-start gap-0.5 px-1 text-xs text-muted-foreground">
+      <div className="flex items-start gap-2 px-1 text-xs text-muted-foreground">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="shrink-0 font-medium text-foreground/80">{t('ai_chat.data_source_active')}:</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 shrink-0 px-2.5 text-xs font-normal"
+            disabled={isSending || isUploadingFile}
+            aria-label={t('ai_chat.data_source_none')}
+            title={t('ai_chat.data_source_none')}
+            onClick={() => clearComposerToChatOnly()}
+          >
+            {t('ai_chat.chat_only_short')}
+          </Button>
           {aiDataSource === 'customer' && selectedCustomerIds.length > 0 ? (
-            <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">
-              {t('ai_chat.source_customer_list_note')}
-            </span>
-          ) : (
             <>
-              <span className="shrink-0">{t('ai_chat.data_source_active')}:</span>
               <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">
-                {aiDataSource === 'customer'
-                  ? t('ai_chat.data_source_customer')
-                  : aiDataSource === 'upload'
-                    ? t('ai_chat.data_source_upload')
-                    : aiDataSource === 'alerts'
-                      ? t('ai_chat.data_source_alerts')
-                      : t('ai_chat.data_source_powerbi')}
+                {t('ai_chat.source_customer_list_note')}
+              </span>
+              <span className="text-[11px] text-muted-foreground shrink-0">
+                {t('ai_chat.source_customer_list_count').replace('{n}', String(selectedCustomerIds.length))}
               </span>
             </>
+          ) : (
+            <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">{sourceNameLabel}</span>
           )}
-          {aiDataSource === 'customer' && selectedCustomerIds.length > 0 ? (
-            <span className="text-[11px] text-muted-foreground shrink-0">
-              {t('ai_chat.source_customer_list_count').replace('{n}', String(selectedCustomerIds.length))}
-            </span>
-          ) : null}
         </div>
         <Button
           type="button"

@@ -129,9 +129,6 @@ export default function NewLoanApplicationPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
-            <p className="text-xs text-muted-foreground">
-              <span className="text-destructive font-semibold">*</span> {t('customers.new_loan.required_legend')}
-            </p>
             <div className="space-y-2">
               <Label className="inline-flex items-center gap-1">
                 {t('customers.field.loan_purpose')}

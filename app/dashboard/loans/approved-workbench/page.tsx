@@ -7,6 +7,7 @@ import { browserApiFetchAuth } from '@/lib/api/browser';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { notifyApiError, notifyError, notifySuccess } from '@/lib/notify';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +17,8 @@ import { ArrowLeft, Search } from 'lucide-react';
 import { formatVnd, parseVndDigitsToNumber } from '@/lib/money';
 import { VndAmountInput } from '@/components/vnd-amount-input';
 import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
+import { badgeTone } from '@/lib/dashboard-badge-tones';
+import { cn } from '@/lib/utils';
 
 type WorkbenchRow = {
   application_id: number;
@@ -52,6 +55,23 @@ function installmentStateLabel(
   const key = `loans.workbench.installment_state.${state}`;
   const label = t(key);
   return label === key ? state : label;
+}
+
+function installmentStateBadgeClass(state: string | null | undefined): string {
+  const s = String(state || '')
+    .trim()
+    .toLowerCase();
+  if (s === 'paid') return badgeTone.emerald;
+  if (s === 'overdue') return badgeTone.red;
+  if (s === 'partial') return badgeTone.amber;
+  if (s === 'upcoming') return badgeTone.sky;
+  return badgeTone.slate;
+}
+
+function canRecordInstallmentPayment(row: WorkbenchRow): boolean {
+  return String(row.installment_state || '')
+    .trim()
+    .toLowerCase() !== 'paid';
 }
 
 /** Lowercase + strip combining marks so "Nguyen" matches "Nguyễn". */
@@ -266,7 +286,18 @@ export default function ApprovedLoanWorkbenchPage() {
                               )}
                             </TableCell>
                             <TableCell>{formatDueDate(r.next_due_date, locale)}</TableCell>
-                            <TableCell>{installmentStateLabel(t, r.installment_state)}</TableCell>
+                            <TableCell>
+                              {r.installment_state ? (
+                                <Badge
+                                  variant="outline"
+                                  className={cn('font-medium border', installmentStateBadgeClass(r.installment_state))}
+                                >
+                                  {installmentStateLabel(t, r.installment_state)}
+                                </Badge>
+                              ) : (
+                                '-'
+                              )}
+                            </TableCell>
                             <TableCell>{r.installment_dpd ?? 0}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
@@ -280,7 +311,14 @@ export default function ApprovedLoanWorkbenchPage() {
                                 <Button
                                   size="sm"
                                   onClick={() => void openPay(r)}
-                                  disabled={ensuringApplicationId === r.application_id}
+                                  disabled={
+                                    ensuringApplicationId === r.application_id || !canRecordInstallmentPayment(r)
+                                  }
+                                  title={
+                                    !canRecordInstallmentPayment(r)
+                                      ? t('loans.workbench.record_payment_disabled_paid')
+                                      : undefined
+                                  }
                                 >
                                   {t('loans.workbench.record_payment')}
                                 </Button>
