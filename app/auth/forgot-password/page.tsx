@@ -115,17 +115,20 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  const refreshPinRequestStatus = async (targetEmail: string) => {
-    if (!isValidEmail(targetEmail)) return;
+  const refreshPinRequestStatus = async (targetEmail: string): Promise<boolean | null> => {
+    if (!isValidEmail(targetEmail)) return null;
     try {
       const response = await fetch(`/api/v1/auth/forgot-pin/status?email=${encodeURIComponent(targetEmail.trim())}`, {
         method: 'GET',
       });
-      if (!response.ok) return;
+      if (!response.ok) return null;
       const data = await response.json().catch(() => ({}));
-      setPendingNewPin(Boolean(data?.has_pending_request));
+      const hasPending = Boolean(data?.has_pending_request);
+      setPendingNewPin(hasPending);
+      return hasPending;
     } catch {
       // best-effort only
+      return null;
     }
   };
 
@@ -137,8 +140,25 @@ export default function ForgotPasswordPage() {
     }
     setRefreshingPinStatus(true);
     try {
-      await refreshPinRequestStatus(target);
-      notifySuccess(isVi ? 'Đã làm mới trạng thái mã PIN.' : 'PIN status refreshed.');
+      const wasPending = pendingNewPin;
+      const latestPending = await refreshPinRequestStatus(target);
+      if (latestPending === null) {
+        notifyError(isVi ? 'Không thể làm mới trạng thái mã PIN.' : 'Could not refresh PIN status.');
+        return;
+      }
+      if (wasPending && !latestPending) {
+        notifySuccess(
+          isVi
+            ? 'Admin đã cập nhật PIN mới. Hãy nhập PIN mới bạn nhận được để đổi mật khẩu.'
+            : 'Admin has updated your new PIN. Enter the new PIN you received to reset password.',
+        );
+        return;
+      }
+      notifySuccess(
+        latestPending
+          ? (isVi ? 'Yêu cầu vẫn đang chờ admin xử lý.' : 'Your request is still pending admin review.')
+          : (isVi ? 'Đã làm mới trạng thái mã PIN.' : 'PIN status refreshed.'),
+      );
     } finally {
       setRefreshingPinStatus(false);
     }
