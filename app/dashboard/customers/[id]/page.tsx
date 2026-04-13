@@ -545,7 +545,7 @@ export default function CustomerDetailPage() {
             ) : null}
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {(
                 [
                   ['application_ref', 'customers.field.application_ref', customer.application_ref_no],

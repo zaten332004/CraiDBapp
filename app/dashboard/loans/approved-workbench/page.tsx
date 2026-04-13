@@ -31,6 +31,12 @@ type WorkbenchRow = {
   loan_purpose?: string | null;
   loan_amount?: number | null;
   loan_term?: number | null;
+  /** Annual rate in percent (e.g. 12 = 12% p.a.), same semantics as customer forms. */
+  annual_interest_rate?: number | null;
+  interest_rate?: number | null;
+  /** When the API returns cumulative paid on the facility, it overrides the installment-based estimate. */
+  total_paid?: number | null;
+  total_amount_paid?: number | null;
   facility_id?: number | null;
   next_installment_no?: number | null;
   next_schedule_id?: number | null;
@@ -40,6 +46,75 @@ type WorkbenchRow = {
   next_total_due?: number | null;
   next_paid?: number | null;
 };
+
+function principalVnd(row: WorkbenchRow): number | null {
+  const p = row.loan_amount;
+  if (p == null || !Number.isFinite(Number(p)) || Number(p) <= 0) return null;
+  return Math.round(Number(p));
+}
+
+function annualRatePct(row: WorkbenchRow): number {
+  const r = row.annual_interest_rate ?? row.interest_rate;
+  if (r == null || !Number.isFinite(Number(r))) return 0;
+  return Number(r);
+}
+
+/** Tổng gốc + lãi (lãi = gốc × lãi suất năm / 100). */
+function totalContractRepaymentVnd(row: WorkbenchRow): number | null {
+  const p = principalVnd(row);
+  if (p == null) return null;
+  const rate = annualRatePct(row);
+  return Math.round(p * (1 + rate / 100));
+}
+
+function termMonths(row: WorkbenchRow): number | null {
+  const n = row.loan_term;
+  if (n == null || !Number.isFinite(Number(n)) || Number(n) < 1) return null;
+  return Math.max(1, Math.round(Number(n)));
+}
+
+/** Số tiền mỗi kỳ = tổng phải trả / số tháng. */
+function flatPeriodPaymentVnd(row: WorkbenchRow): number | null {
+  const total = totalContractRepaymentVnd(row);
+  const months = termMonths(row);
+  if (total == null || months == null) return null;
+  return Math.round(total / months);
+}
+
+function currentInstallmentIndex1(row: WorkbenchRow): number {
+  const raw = row.next_installment_no;
+  if (raw == null || !Number.isFinite(Number(raw))) return 1;
+  return Math.max(1, Math.round(Number(raw)));
+}
+
+/**
+ * Ưu tiên total_paid / total_amount_paid từ API; nếu không có thì ước lượng theo kỳ đang xét
+ * và số đã trả cho kỳ hiện tại (next_paid).
+ */
+function cumulativePaidTowardLoanVnd(row: WorkbenchRow): number | null {
+  const total = totalContractRepaymentVnd(row);
+  const per = flatPeriodPaymentVnd(row);
+  if (total == null || per == null) return null;
+
+  const explicit = row.total_paid ?? row.total_amount_paid;
+  if (explicit != null && Number.isFinite(Number(explicit))) {
+    const v = Math.round(Number(explicit));
+    return Math.min(total, Math.max(0, v));
+  }
+
+  const inst = currentInstallmentIndex1(row);
+  const prior = (inst - 1) * per;
+  const cur = row.next_paid != null && Number.isFinite(Number(row.next_paid)) ? Math.round(Number(row.next_paid)) : 0;
+  return Math.min(total, Math.max(0, prior + Math.max(0, cur)));
+}
+
+/** Tổng còn phải trả cả khoản vay (giảm khi ghi nhận thanh toán). */
+function remainingTotalRepaymentVnd(row: WorkbenchRow): number | null {
+  const total = totalContractRepaymentVnd(row);
+  const paid = cumulativePaidTowardLoanVnd(row);
+  if (total == null || paid == null) return null;
+  return Math.max(0, total - paid);
+}
 
 function formatDueDate(iso: string | null | undefined, locale: string): string {
   if (!iso) return '-';
@@ -75,12 +150,12 @@ function canRecordInstallmentPayment(row: WorkbenchRow): boolean {
     .toLowerCase() !== 'paid';
 }
 
-/** Số còn phải trả cho kỳ đang xét (total_due − đã ghi nhận). */
-function currentInstallmentRemainingVnd(row: WorkbenchRow): number | null {
-  const due = row.next_total_due != null && Number.isFinite(Number(row.next_total_due)) ? Number(row.next_total_due) : null;
-  if (due == null) return null;
-  const paid = row.next_paid != null && Number.isFinite(Number(row.next_paid)) ? Number(row.next_paid) : 0;
-  return Math.max(0, Math.round(due - paid));
+/** Số còn phải trả trong kỳ hiện tại (theo kỳ cố định − đã ghi nhận cho kỳ đó). */
+function currentPeriodRemainingVnd(row: WorkbenchRow): number | null {
+  const per = flatPeriodPaymentVnd(row);
+  if (per == null) return null;
+  const paid = row.next_paid != null && Number.isFinite(Number(row.next_paid)) ? Math.round(Number(row.next_paid)) : 0;
+  return Math.max(0, per - Math.max(0, paid));
 }
 
 /** Lowercase + strip combining marks so "Nguyen" matches "Nguyễn". */
@@ -169,11 +244,22 @@ export default function ApprovedLoanWorkbenchPage() {
     }
     const rowForDialog: WorkbenchRow = { ...row, facility_id: facilityId };
     setPayRow(rowForDialog);
-    setPayAmountDigits(
-      rowForDialog.next_total_due != null && Number.isFinite(Number(rowForDialog.next_total_due))
-        ? String(Math.round(Number(rowForDialog.next_total_due)))
-        : '',
-    );
+    const perRem = currentPeriodRemainingVnd(rowForDialog);
+    const suggestDigits =
+      perRem != null
+        ? String(perRem)
+        : rowForDialog.next_total_due != null && Number.isFinite(Number(rowForDialog.next_total_due))
+          ? String(
+              Math.max(
+                0,
+                Math.round(Number(rowForDialog.next_total_due)) -
+                  (rowForDialog.next_paid != null && Number.isFinite(Number(rowForDialog.next_paid))
+                    ? Math.round(Number(rowForDialog.next_paid))
+                    : 0),
+              ),
+            )
+          : '';
+    setPayAmountDigits(suggestDigits);
     setPayDate(new Date().toISOString().slice(0, 10));
     setPayScheduleId(
       rowForDialog.next_schedule_id != null && Number.isFinite(Number(rowForDialog.next_schedule_id))
@@ -304,27 +390,37 @@ export default function ApprovedLoanWorkbenchPage() {
                             </TableCell>
                             <TableCell className="text-sm tabular-nums font-medium">
                               {(() => {
-                                const rem = currentInstallmentRemainingVnd(r);
+                                const rem = remainingTotalRepaymentVnd(r);
                                 return rem != null
                                   ? formatVnd(rem, locale === 'vi' ? 'vi' : 'en')
                                   : '-';
                               })()}
                             </TableCell>
                             <TableCell className="text-sm tabular-nums font-medium">
-                              {r.next_total_due != null && Number.isFinite(Number(r.next_total_due))
-                                ? formatVnd(Number(r.next_total_due), locale === 'vi' ? 'vi' : 'en')
-                                : '-'}
+                              {(() => {
+                                const per = flatPeriodPaymentVnd(r);
+                                return per != null
+                                  ? formatVnd(per, locale === 'vi' ? 'vi' : 'en')
+                                  : r.next_total_due != null && Number.isFinite(Number(r.next_total_due))
+                                    ? formatVnd(Number(r.next_total_due), locale === 'vi' ? 'vi' : 'en')
+                                    : '-';
+                              })()}
                             </TableCell>
                             <TableCell className="text-sm tabular-nums">
-                              {r.next_total_due != null && Number.isFinite(Number(r.next_total_due)) ? (
-                                <>
-                                  {formatVnd(Number(r.next_paid ?? 0), locale === 'vi' ? 'vi' : 'en')}
-                                  <span className="text-muted-foreground"> / </span>
-                                  {formatVnd(Number(r.next_total_due), locale === 'vi' ? 'vi' : 'en')}
-                                </>
-                              ) : (
-                                '-'
-                              )}
+                              {(() => {
+                                const per = flatPeriodPaymentVnd(r);
+                                const due = per ?? (r.next_total_due != null && Number.isFinite(Number(r.next_total_due))
+                                  ? Math.round(Number(r.next_total_due))
+                                  : null);
+                                if (due == null) return '-';
+                                return (
+                                  <>
+                                    {formatVnd(Number(r.next_paid ?? 0), locale === 'vi' ? 'vi' : 'en')}
+                                    <span className="text-muted-foreground"> / </span>
+                                    {formatVnd(due, locale === 'vi' ? 'vi' : 'en')}
+                                  </>
+                                );
+                              })()}
                             </TableCell>
                             <TableCell>{formatDueDate(r.next_due_date, locale)}</TableCell>
                             <TableCell>

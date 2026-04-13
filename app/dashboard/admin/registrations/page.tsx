@@ -20,17 +20,12 @@ import { notifyError, notifySuccess } from '@/lib/notify';
 import { badgeTone } from '@/lib/dashboard-badge-tones';
 import { rowNavigationPointerHandlers } from '@/lib/ui/row-navigation-click';
 import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
-
-type RegistrationType = 'manager' | 'analyst';
-
-type RegistrationRow = {
-  id: string;
-  name: string;
-  email: string;
-  type: string;
-  requestedAt?: string | null;
-  raw: unknown;
-};
+import {
+  extractRegistrationList,
+  normalizeRegistrationRow,
+  type RegistrationRow,
+  type RegistrationType,
+} from '@/lib/admin/registration-list';
 
 type PinResetRequestRow = {
   userId: string;
@@ -38,34 +33,6 @@ type PinResetRequestRow = {
   email: string;
   requestedAt: string | null;
 };
-
-function usernameFromEmail(email: unknown) {
-  const raw = String(email ?? '').trim();
-  if (!raw) return '';
-  const atIndex = raw.indexOf('@');
-  if (atIndex <= 0) return raw;
-  return raw.slice(0, atIndex).trim();
-}
-
-function normalizeRegistration(item: any, fallbackType: RegistrationType = 'analyst'): RegistrationRow | null {
-  if (!item || typeof item !== 'object') return null;
-  const id = String(item.user_id ?? item.userId ?? item.id ?? item.registration_id ?? item.registrationId ?? '').trim();
-  if (!id) return null;
-  const email = String(item.email ?? '').trim() || '—';
-  const preferredUsername =
-    usernameFromEmail(email) ||
-    String(item.username ?? '').trim() ||
-    String(item.name ?? item.full_name ?? item.fullName ?? '').trim();
-  const name = preferredUsername || id;
-  const typeRaw = String(
-    item.user_type ?? item.userType ?? item.reg_type ?? item.type ?? item.role ?? fallbackType,
-  )
-    .trim()
-    .toLowerCase();
-  const type: RegistrationType = typeRaw === 'manager' ? 'manager' : 'analyst';
-  const requestedAt = String(item.requested_at ?? item.requestedAt ?? item.created_at ?? item.createdAt ?? '') || null;
-  return { id, name, email, type, requestedAt, raw: item };
-}
 
 function formatDateTime(value: unknown, locale: string) {
   const raw = String(value ?? '').trim();
@@ -121,15 +88,6 @@ export default function AdminRegistrationsPage() {
   const [pinResetPin, setPinResetPin] = useState('');
   const [pinResetReason, setPinResetReason] = useState('');
 
-  const extractList = (data: any) =>
-    Array.isArray(data)
-      ? data
-      : Array.isArray(data?.items)
-        ? data.items
-        : Array.isArray(data?.value)
-          ? data.value
-          : [];
-
   const loadPending = async (status: 'pending' | 'approved' | 'rejected' = statusFilter) => {
     setIsLoading(true);
     try {
@@ -137,8 +95,8 @@ export default function AdminRegistrationsPage() {
         method: 'GET',
       });
 
-      const rows = extractList(data)
-        .map((x: any) => normalizeRegistration(x))
+      const rows = extractRegistrationList(data)
+        .map((x) => normalizeRegistrationRow(x))
         .filter(Boolean) as RegistrationRow[];
 
       const sorted = rows
