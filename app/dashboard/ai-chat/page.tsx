@@ -1623,7 +1623,7 @@ export default function AIChatPage() {
               ) : null}
               <div className="flex min-h-0 flex-1 flex-col pr-0">
                 <ScrollArea className="min-h-0 flex-1 pr-4">
-                <div className="space-y-4 pb-6">
+                <div className="space-y-4 pb-6 pt-4">
                   {messages.map((message) => (
                     <div
                       key={message.id}
