@@ -27,6 +27,7 @@ export default function ForgotPasswordPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pendingNewPin, setPendingNewPin] = useState(false);
+  const [refreshingPinStatus, setRefreshingPinStatus] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -125,6 +126,21 @@ export default function ForgotPasswordPage() {
       setPendingNewPin(Boolean(data?.has_pending_request));
     } catch {
       // best-effort only
+    }
+  };
+
+  const handleRefreshPinStatus = async () => {
+    const target = email.trim();
+    if (!isValidEmail(target)) {
+      notifyError(isVi ? 'Email không đúng định dạng.' : 'Email format is invalid.');
+      return;
+    }
+    setRefreshingPinStatus(true);
+    try {
+      await refreshPinRequestStatus(target);
+      notifySuccess(isVi ? 'Đã làm mới trạng thái mã PIN.' : 'PIN status refreshed.');
+    } finally {
+      setRefreshingPinStatus(false);
     }
   };
 
@@ -273,9 +289,23 @@ export default function ForgotPasswordPage() {
                       : (isVi ? 'Quên mã PIN? Gửi yêu cầu cho admin' : 'Forgot PIN? Send request to admin')}
                   </Button>
                   {pendingNewPin ? (
-                    <p className="text-xs text-muted-foreground">
-                      {isVi ? 'Đang chờ admin cấp mã PIN mới.' : 'Waiting for admin to issue a new PIN.'}
-                    </p>
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-muted-foreground">
+                        {isVi ? 'Đang chờ admin cấp mã PIN mới.' : 'Waiting for admin to issue a new PIN.'}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => void handleRefreshPinStatus()}
+                        disabled={loading || refreshingPinStatus}
+                      >
+                        {refreshingPinStatus
+                          ? (isVi ? 'Đang làm mới...' : 'Refreshing...')
+                          : (isVi ? 'Refresh trạng thái PIN mới' : 'Refresh new PIN status')}
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
               </div>
