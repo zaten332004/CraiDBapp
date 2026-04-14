@@ -101,6 +101,12 @@ export default function NewCustomerPage() {
     { value: 'business', labelVi: 'Kinh doanh', labelEn: 'Business' },
   ] as const;
 
+  const GENDER_OPTIONS = [
+    { value: 'male', labelVi: 'Nam', labelEn: 'Male' },
+    { value: 'female', labelVi: 'Nữ', labelEn: 'Female' },
+    { value: 'other', labelVi: 'Khác', labelEn: 'Other' },
+  ] as const;
+
   const needsCollateral = useMemo(() => {
     const lt = normalizeLoanTypeValue(formData.loan_type);
     return lt === 'secured' || lt === 'mortgage';
@@ -388,11 +394,7 @@ export default function NewCustomerPage() {
                     readOnly
                     disabled={isLoading}
                     className="bg-muted/60 font-mono text-sm"
-                    aria-describedby="customer-code-hint"
                   />
-                  <p id="customer-code-hint" className="text-xs text-muted-foreground">
-                    {t('customers.new.customer_code_hint')}
-                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -431,15 +433,22 @@ export default function NewCustomerPage() {
                   <Label htmlFor="gender" required>
                     {t('customers.new.label.gender')}
                   </Label>
-                  <Input
-                    id="gender"
-                    name="gender"
-                    placeholder={t('customers.new.ph.gender')}
+                  <Select
                     value={formData.gender}
-                    onChange={handleChange}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, gender: value }))}
                     disabled={isLoading}
-                    required
-                  />
+                  >
+                    <SelectTrigger id="gender" className="w-full">
+                      <SelectValue placeholder={t('customers.new.gender_placeholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GENDER_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {locale === 'vi' ? opt.labelVi : opt.labelEn}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
