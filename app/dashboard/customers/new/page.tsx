@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,9 +17,12 @@ import { formatUserFacingFetchError, type UserFacingLocale } from '@/lib/api/for
 import { notifyError, notifySuccess } from '@/lib/notify';
 import {
   isValidEmail,
+  isValidCustomerContactPhone,
   isValidVietnamNationalId,
+  normalizeVietnamPhone,
   sanitizeVietnamNationalId,
 } from '@/lib/validation/account';
+import { generateCustomerCode } from '@/lib/customers/generate-customer-code';
 import { parseVndDigitsToNumber } from '@/lib/money';
 import { VndAmountInput } from '@/components/vnd-amount-input';
 
@@ -46,6 +49,17 @@ function getAdultDateMax(): string {
   return `${year}-${month}-${day}`;
 }
 
+function normalizeLoanTypeValue(value: string) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (['secured', 'unsecured', 'mortgage', 'business'].includes(normalized)) return normalized;
+  if (normalized.includes('tài sản')) return 'secured';
+  if (normalized.includes('tín chấp')) return 'unsecured';
+  if (normalized.includes('thế chấp')) return 'mortgage';
+  if (normalized.includes('kinh doanh')) return 'business';
+  return normalized;
+}
+
 export default function NewCustomerPage() {
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -53,9 +67,9 @@ export default function NewCustomerPage() {
   const isViewer = role === 'viewer';
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [isLoading, setIsLoading] = useState(false);
+  const [customerCode] = useState(() => generateCustomerCode());
   const [formData, setFormData] = useState({
     full_name: '',
-    external_customer_ref: '',
     email: '',
     phone_number: '',
     date_of_birth: '',
@@ -87,16 +101,10 @@ export default function NewCustomerPage() {
     { value: 'business', labelVi: 'Kinh doanh', labelEn: 'Business' },
   ] as const;
 
-  const normalizeLoanType = (value: string) => {
-    const normalized = String(value || '').trim().toLowerCase();
-    if (!normalized) return '';
-    if (['secured', 'unsecured', 'mortgage', 'business'].includes(normalized)) return normalized;
-    if (normalized.includes('tài sản')) return 'secured';
-    if (normalized.includes('tín chấp')) return 'unsecured';
-    if (normalized.includes('thế chấp')) return 'mortgage';
-    if (normalized.includes('kinh doanh')) return 'business';
-    return normalized;
-  };
+  const needsCollateral = useMemo(() => {
+    const lt = normalizeLoanTypeValue(formData.loan_type);
+    return lt === 'secured' || lt === 'mortgage';
+  }, [formData.loan_type]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -149,7 +157,7 @@ export default function NewCustomerPage() {
       }
       const trimmedFullName = formData.full_name.trim();
       const trimmedEmail = formData.email.trim();
-      const normalizedLoanType = normalizeLoanType(formData.loan_type);
+      const normalizedLoanType = normalizeLoanTypeValue(formData.loan_type);
       const trimmedLoanPurpose = formData.loan_purpose.trim();
       const normalizedNationalId = sanitizeVietnamNationalId(formData.national_id);
       const monthlyIncome = parseVndDigitsToNumber(formData.monthly_income);
@@ -163,6 +171,19 @@ export default function NewCustomerPage() {
       if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
         throw new Error(t('customers.new.err.email'));
       }
+      const normalizedPhone = normalizeVietnamPhone(formData.phone_number);
+      if (!isValidCustomerContactPhone(formData.phone_number)) {
+        throw new Error(t('customers.new.err.phone'));
+      }
+      if (!formData.date_of_birth.trim()) {
+        throw new Error(t('customers.new.err.date_of_birth'));
+      }
+      if (age == null || age < 18) {
+        throw new Error(t('customers.new.err.age'));
+      }
+      if (!formData.gender.trim()) {
+        throw new Error(t('customers.new.err.gender'));
+      }
       if (!isValidVietnamNationalId(normalizedNationalId)) {
         throw new Error(t('customers.new.err.national_id'));
       }
@@ -175,8 +196,20 @@ export default function NewCustomerPage() {
       if (!formData.nationality.trim()) {
         throw new Error(t('customers.new.err.nationality'));
       }
-      if (formData.date_of_birth.trim() && (age == null || age < 18)) {
-        throw new Error(t('customers.new.err.age'));
+      if (!formData.marital_status.trim()) {
+        throw new Error(t('customers.new.err.marital_status'));
+      }
+      if (!formData.occupation.trim()) {
+        throw new Error(t('customers.new.err.occupation'));
+      }
+      if (!formData.employment_status.trim()) {
+        throw new Error(t('customers.new.err.employment_status'));
+      }
+      if (!formData.permanent_address.trim()) {
+        throw new Error(t('customers.new.err.permanent_address'));
+      }
+      if (!formData.current_address.trim()) {
+        throw new Error(t('customers.new.err.current_address'));
       }
       if (!normalizedLoanType) {
         throw new Error(t('customers.new.err.loan_type'));
@@ -193,6 +226,22 @@ export default function NewCustomerPage() {
       if (!Number.isInteger(requestedTermMonths) || requestedTermMonths <= 0) {
         throw new Error(t('customers.new.err.term'));
       }
+      const annualRate = formData.annual_interest_rate.trim()
+        ? parseFloat(formData.annual_interest_rate.replace(',', '.'))
+        : NaN;
+      if (!Number.isFinite(annualRate) || annualRate <= 0) {
+        throw new Error(t('customers.new.err.annual_interest_rate'));
+      }
+      const collateralNeeds = normalizedLoanType === 'secured' || normalizedLoanType === 'mortgage';
+      const collateralVal = formData.collateral_value ? parseVndDigitsToNumber(formData.collateral_value) : NaN;
+      if (collateralNeeds) {
+        if (!formData.collateral_id.trim()) {
+          throw new Error(t('customers.new.err.collateral_secured'));
+        }
+        if (!Number.isFinite(collateralVal) || collateralVal <= 0) {
+          throw new Error(t('customers.new.err.collateral_secured'));
+        }
+      }
       if (await checkDuplicateNationalId(normalizedNationalId)) {
         throw new Error(t('customers.new.err.duplicate_id'));
       }
@@ -203,8 +252,8 @@ export default function NewCustomerPage() {
         body: JSON.stringify({
           full_name: trimmedFullName,
           email: trimmedEmail,
-          external_customer_ref: formData.external_customer_ref.trim() || undefined,
-          phone_number: formData.phone_number || undefined,
+          external_customer_ref: customerCode,
+          phone_number: normalizedPhone,
           date_of_birth: formData.date_of_birth || undefined,
           gender: formData.gender || undefined,
           national_id: normalizedNationalId,
@@ -224,8 +273,8 @@ export default function NewCustomerPage() {
           loan_amount: requestedLoanAmount,
           requested_term_months: requestedTermMonths,
           loan_term_months: requestedTermMonths,
-          annual_interest_rate: formData.annual_interest_rate ? parseFloat(formData.annual_interest_rate) : undefined,
-          interest_rate: formData.annual_interest_rate ? parseFloat(formData.annual_interest_rate) : undefined,
+          annual_interest_rate: annualRate,
+          interest_rate: annualRate,
           application_status: 'pending',
           collateral_id: formData.collateral_id.trim() || undefined,
           collateral_value: formData.collateral_value ? parseVndDigitsToNumber(formData.collateral_value) : undefined,
@@ -329,19 +378,27 @@ export default function NewCustomerPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="external_customer_ref">{t('customers.new.label.external_ref')}</Label>
+                  <Label htmlFor="customer_code_display" required>
+                    {t('customers.customer_id')}
+                  </Label>
                   <Input
-                    id="external_customer_ref"
-                    name="external_customer_ref"
-                    placeholder={t('customers.new.ph.external_ref')}
-                    value={formData.external_customer_ref}
-                    onChange={handleChange}
+                    id="customer_code_display"
+                    name="customer_code_display"
+                    value={customerCode}
+                    readOnly
                     disabled={isLoading}
+                    className="bg-muted/60 font-mono text-sm"
+                    aria-describedby="customer-code-hint"
                   />
+                  <p id="customer-code-hint" className="text-xs text-muted-foreground">
+                    {t('customers.new.customer_code_hint')}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone_number">{t('common.phone')}</Label>
+                  <Label htmlFor="phone_number" required>
+                    {t('common.phone')}
+                  </Label>
                   <Input
                     id="phone_number"
                     name="phone_number"
@@ -349,13 +406,16 @@ export default function NewCustomerPage() {
                     value={formData.phone_number}
                     onChange={handleChange}
                     disabled={isLoading}
+                    required
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="date_of_birth">{t('customers.new.label.date_of_birth')}</Label>
+                  <Label htmlFor="date_of_birth" required>
+                    {t('customers.new.label.date_of_birth')}
+                  </Label>
                   <Input
                     id="date_of_birth"
                     name="date_of_birth"
@@ -364,10 +424,13 @@ export default function NewCustomerPage() {
                     value={formData.date_of_birth}
                     onChange={handleChange}
                     disabled={isLoading}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="gender">{t('customers.new.label.gender')}</Label>
+                  <Label htmlFor="gender" required>
+                    {t('customers.new.label.gender')}
+                  </Label>
                   <Input
                     id="gender"
                     name="gender"
@@ -375,6 +438,7 @@ export default function NewCustomerPage() {
                     value={formData.gender}
                     onChange={handleChange}
                     disabled={isLoading}
+                    required
                   />
                 </div>
               </div>
@@ -445,7 +509,9 @@ export default function NewCustomerPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="marital_status">{t('customers.new.label.marital_status')}</Label>
+                  <Label htmlFor="marital_status" required>
+                    {t('customers.new.label.marital_status')}
+                  </Label>
                   <Input
                     id="marital_status"
                     name="marital_status"
@@ -453,10 +519,13 @@ export default function NewCustomerPage() {
                     value={formData.marital_status}
                     onChange={handleChange}
                     disabled={isLoading}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="occupation">{t('customers.new.label.occupation')}</Label>
+                  <Label htmlFor="occupation" required>
+                    {t('customers.new.label.occupation')}
+                  </Label>
                   <Input
                     id="occupation"
                     name="occupation"
@@ -464,13 +533,16 @@ export default function NewCustomerPage() {
                     value={formData.occupation}
                     onChange={handleChange}
                     disabled={isLoading}
+                    required
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="employment_status">{t('customers.new.label.employment_status')}</Label>
+                  <Label htmlFor="employment_status" required>
+                    {t('customers.new.label.employment_status')}
+                  </Label>
                   <Input
                     id="employment_status"
                     name="employment_status"
@@ -478,6 +550,7 @@ export default function NewCustomerPage() {
                     value={formData.employment_status}
                     onChange={handleChange}
                     disabled={isLoading}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -498,7 +571,9 @@ export default function NewCustomerPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="permanent_address">{t('customers.new.label.permanent_address')}</Label>
+                <Label htmlFor="permanent_address" required>
+                  {t('customers.new.label.permanent_address')}
+                </Label>
                 <Input
                   id="permanent_address"
                   name="permanent_address"
@@ -506,11 +581,14 @@ export default function NewCustomerPage() {
                   value={formData.permanent_address}
                   onChange={handleChange}
                   disabled={isLoading}
+                  required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="current_address">{t('customers.new.label.current_address')}</Label>
+                <Label htmlFor="current_address" required>
+                  {t('customers.new.label.current_address')}
+                </Label>
                 <Input
                   id="current_address"
                   name="current_address"
@@ -518,6 +596,7 @@ export default function NewCustomerPage() {
                   value={formData.current_address}
                   onChange={handleChange}
                   disabled={isLoading}
+                  required
                 />
               </div>
 
@@ -611,7 +690,9 @@ export default function NewCustomerPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="annual_interest_rate">{t('customers.new.label.annual_interest_rate')}</Label>
+                <Label htmlFor="annual_interest_rate" required>
+                  {t('customers.new.label.annual_interest_rate')}
+                </Label>
                 <Input
                   id="annual_interest_rate"
                   name="annual_interest_rate"
@@ -621,10 +702,13 @@ export default function NewCustomerPage() {
                   value={formData.annual_interest_rate}
                   onChange={handleChange}
                   disabled={isLoading}
+                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="collateral_id">{t('customers.new.label.collateral_id')}</Label>
+                <Label htmlFor="collateral_id" required={needsCollateral}>
+                  {t('customers.new.label.collateral_id')}
+                </Label>
                 <Input
                   id="collateral_id"
                   name="collateral_id"
@@ -633,12 +717,15 @@ export default function NewCustomerPage() {
                   value={formData.collateral_id}
                   onChange={handleChange}
                   disabled={isLoading}
+                  required={needsCollateral}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="collateral_value">{t('customers.new.label.collateral_value')}</Label>
+              <Label htmlFor="collateral_value" required={needsCollateral}>
+                {t('customers.new.label.collateral_value')}
+              </Label>
               <VndAmountInput
                 id="collateral_value"
                 name="collateral_value"
@@ -647,6 +734,7 @@ export default function NewCustomerPage() {
                 onDigitsChange={(digits) => setFormData((prev) => ({ ...prev, collateral_value: digits }))}
                 placeholder={t('customers.new.ph.collateral_value')}
                 disabled={isLoading}
+                required={needsCollateral}
               />
             </div>
 

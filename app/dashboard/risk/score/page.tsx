@@ -311,7 +311,7 @@ export default function RiskScorePage() {
     if (!loadedCustomerId) {
       const msg = locale === 'vi'
         ? 'Vui lòng nhập mã khách hàng hợp lệ để tải hồ sơ trước khi chấm điểm.'
-        : 'Please enter a valid customer ID to load profile data before scoring.';
+        : 'Please enter a valid customer code to load profile data before scoring.';
       setIsLoading(false);
       notifyError(t('toast.risk_score_failed'), { description: msg });
       return;

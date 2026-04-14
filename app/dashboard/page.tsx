@@ -13,6 +13,7 @@ import { formatDateTimeVietnam, formatDateVietnam } from '@/lib/datetime';
 import { formatCompactVnd } from '@/lib/money';
 import { RECHART_MARGIN, RECHART_Y_WIDTH } from '@/lib/recharts-layout';
 import { extractRegistrationList, normalizeRegistrationRow } from '@/lib/admin/registration-list';
+import { formatAlertMessageForDisplay } from '@/lib/alerts/alert-message-display';
 
 type PortfolioKPI = {
   total_exposure: number;
@@ -232,7 +233,9 @@ export default function DashboardPage() {
                           {item.customer_name ||
                             `${t('dashboard.customer_fallback')} #${item.alert_id}`}
                         </p>
-                        <p className="text-sm text-muted-foreground">{item.message}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatAlertMessageForDisplay(item.message, locale)}
+                        </p>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {formatDateTimeVietnam(item.created_at, locale)}

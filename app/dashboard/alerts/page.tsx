@@ -39,6 +39,7 @@ import { formatDateTimeVietnam } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 import { badgeTone } from '@/lib/dashboard-badge-tones';
+import { formatAlertMessageForDisplay } from '@/lib/alerts/alert-message-display';
 
 const ALERTS_LIST_PATH = '/dashboard/alerts';
 
@@ -109,14 +110,6 @@ const formatStatusLabel = (status: string, locale: string) => {
   if (normalized === 'open') return 'Open';
   if (normalized === 'resolved') return 'Resolved';
   return 'Pending';
-};
-
-/** Bỏ hậu tố "(resolved: ...)" khỏi nội dung hiển thị; trạng thái đã có cột riêng. */
-const alertMessageDisplayCore = (raw: string) => {
-  const full = String(raw ?? '').trim();
-  const idx = full.search(/\s*\(resolved:/i);
-  if (idx < 0) return full;
-  return full.slice(0, idx).trim() || full;
 };
 
 const formatAlertTypeLabel = (alertType: string, locale: string) => {
@@ -197,6 +190,7 @@ export default function AlertsPage() {
         String(alert.alert_type ?? ''),
         typeLabel,
         String(alert.message ?? ''),
+        formatAlertMessageForDisplay(String(alert.message ?? ''), locale),
         String(alert.severity ?? ''),
         formatStatusLabel(alert.status, locale).toLowerCase(),
       ]
@@ -359,9 +353,9 @@ export default function AlertsPage() {
                             </p>
                             <p
                               className="line-clamp-2 break-words text-[13px] text-muted-foreground"
-                              title={alertMessageDisplayCore(alert.message)}
+                              title={formatAlertMessageForDisplay(alert.message, locale)}
                             >
-                              {alertMessageDisplayCore(alert.message)}
+                              {formatAlertMessageForDisplay(alert.message, locale)}
                             </p>
                           </div>
                         </TableCell>

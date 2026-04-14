@@ -24,10 +24,7 @@ function Label({ className, children, required, ...props }: LabelProps) {
     >
       {children}
       {required ? (
-        <span
-          className="shrink-0 font-normal text-red-400/80 dark:text-red-300/70"
-          aria-hidden="true"
-        >
+        <span className="shrink-0 font-normal text-red-600 dark:text-red-400" aria-hidden="true">
           *
         </span>
       ) : null}

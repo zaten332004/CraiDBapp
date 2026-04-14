@@ -523,34 +523,12 @@ export default function CustomerDetailPage() {
           <CardHeader>
             <CardTitle>{t('customers.detail.loan_section_title')}</CardTitle>
             <CardDescription>{t('customers.detail.loan_section_desc')}</CardDescription>
-            {loanApplications.length > 1 ? (
-              <div className="mt-4 space-y-2">
-                <Label className="text-xs text-muted-foreground">{t('customers.detail.select_application')}</Label>
-                <Select
-                  value={String(customer.application_id ?? '')}
-                  onValueChange={(v) => router.replace(buildCustomerUrl(v))}
-                >
-                  <SelectTrigger className="max-w-md">
-                    <SelectValue placeholder={t('customers.detail.select_application')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loanApplications.map((a) => (
-                      <SelectItem key={String(a.application_id)} value={String(a.application_id)}>
-                        {(a.application_ref_no as string) || `#${a.application_id}`} — {String(a.loan_status || '')}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {(
                 [
                   ['application_ref', 'customers.field.application_ref', customer.application_ref_no],
-                  ['application_date', 'customers.field.application_date', customer.application_date],
-                  ['created_by', 'customers.field.created_by', customer.created_by || '-'],
                   [
                     'approved_by',
                     'customers.field.approved_by',
@@ -558,6 +536,8 @@ export default function CustomerDetailPage() {
                       ? `${customer.approved_by}${customer.approved_at ? ` (${formatDateTimeVietnam(customer.approved_at, locale)})` : ''}`
                       : '-',
                   ],
+                  ['created_by', 'customers.field.created_by', customer.created_by || '-'],
+                  ['application_date', 'customers.field.application_date', customer.application_date],
                   [
                     'loan_type',
                     'customers.field.loan_type',
@@ -657,6 +637,22 @@ export default function CustomerDetailPage() {
                             }}
                           />
                         )
+                      ) : fieldId === 'application_ref' && loanApplications.length > 1 ? (
+                        <Select
+                          value={String(customer.application_id ?? '')}
+                          onValueChange={(v) => router.replace(buildCustomerUrl(v))}
+                        >
+                          <SelectTrigger className="h-9 w-full">
+                            <SelectValue placeholder={t('customers.detail.select_application')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {loanApplications.map((a) => (
+                              <SelectItem key={String(a.application_id)} value={String(a.application_id)}>
+                                {(a.application_ref_no as string) || `#${a.application_id}`} — {String(a.loan_status || '')}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       ) : fieldId === 'risk_level' ? (
                         <Badge variant="outline" className={riskBadgeClass}>
                           {riskBadgeLabel}

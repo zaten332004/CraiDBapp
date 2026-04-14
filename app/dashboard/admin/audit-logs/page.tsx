@@ -507,11 +507,11 @@ function parseAuditPayload(value: unknown): Record<string, any> {
 
 function fieldLabel(key: string, locale: string) {
   const map: Record<string, string> = {
-    customer_id: locale === 'vi' ? 'Mã khách hàng' : 'Customer ID',
+    customer_id: locale === 'vi' ? 'ID hệ thống (số)' : 'System record ID',
     full_name: locale === 'vi' ? 'Họ và tên' : 'Full name',
     age: locale === 'vi' ? 'Tuổi' : 'Age',
     monthly_income: locale === 'vi' ? 'Thu nhập tháng' : 'Monthly income',
-    external_customer_ref: locale === 'vi' ? 'Mã tham chiếu' : 'External customer ref',
+    external_customer_ref: locale === 'vi' ? 'Mã khách hàng' : 'Customer code',
     date_of_birth: locale === 'vi' ? 'Ngày sinh' : 'Date of birth',
     gender: locale === 'vi' ? 'Giới tính' : 'Gender',
     national_id: locale === 'vi' ? 'Số định danh' : 'National ID',

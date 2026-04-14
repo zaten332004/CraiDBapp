@@ -6,6 +6,26 @@ export function isValidVietnamPhone(value: string): boolean {
   return /^0\d{9}$/.test(value.trim());
 }
 
+/** Chuẩn hóa số điện thoại VN từ ô nhập (cho phép +84…) về dạng 0xxxxxxxxx. */
+export function normalizeVietnamPhone(value: string): string {
+  const t = String(value ?? '')
+    .trim()
+    .replace(/\s/g, '');
+  let out: string;
+  if (t.startsWith('+84')) {
+    const rest = t.slice(3).replace(/\D/g, '');
+    out = rest.length ? `0${rest}` : '';
+  } else {
+    out = t.replace(/\D/g, '');
+  }
+  if (out.startsWith('0') && out.length > 10) out = out.slice(0, 10);
+  return out;
+}
+
+export function isValidCustomerContactPhone(value: string): boolean {
+  return isValidVietnamPhone(normalizeVietnamPhone(value));
+}
+
 export function isNumericPin(value: string, length = 6): boolean {
   return new RegExp(`^\\d{${length}}$`).test(value.trim());
 }
