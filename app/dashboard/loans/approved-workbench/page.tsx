@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
@@ -21,6 +22,7 @@ import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/componen
 import { badgeTone } from '@/lib/dashboard-badge-tones';
 import { cn } from '@/lib/utils';
 import { normalizeLoanPurposePolicy } from '@/lib/loans/policy';
+import { rowNavigationPointerHandlers } from '@/lib/ui/row-navigation-click';
 
 type WorkbenchRow = {
   application_id: number;
@@ -274,7 +276,14 @@ function interestFormulaLabel(row: WorkbenchRow, locale: string): string {
     : 'Reducing balance: equal principal + interest on outstanding';
 }
 
+function customerRepaymentHref(row: WorkbenchRow): string | null {
+  const customerId = row.customer_id != null && Number.isFinite(Number(row.customer_id)) ? Number(row.customer_id) : null;
+  if (!customerId) return null;
+  return `/dashboard/customers/${customerId}?application_id=${row.application_id}&returnTo=${encodeURIComponent('/dashboard/loans/approved-workbench')}&view=repayment`;
+}
+
 export default function ApprovedLoanWorkbenchPage() {
+  const router = useRouter();
   const { t, locale } = useI18n();
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [rows, setRows] = useState<WorkbenchRow[]>([]);
@@ -288,6 +297,7 @@ export default function ApprovedLoanWorkbenchPage() {
   const [ensuringApplicationId, setEnsuringApplicationId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [periodStateFilter, setPeriodStateFilter] = useState<PeriodStateFilter>('all');
+  const rowPointerDownAtRef = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -466,18 +476,39 @@ export default function ApprovedLoanWorkbenchPage() {
                         <TableRow className={scrollableTableHeaderRowClass}>
                           <TableHead className="min-w-[170px] text-[12px]">{t('loans.workbench.col.customer')}</TableHead>
                           <TableHead className="min-w-[120px] text-[12px]">{t('customers.field.loan_purpose')}</TableHead>
-                          <TableHead className="min-w-[110px] text-[12px]" title={t('loans.workbench.col.amount_hint')}>{t('loans.workbench.col.amount')}</TableHead>
+                          <TableHead className="min-w-[105px] text-[12px]" title={t('loans.workbench.col.amount_hint')}>{t('loans.workbench.col.amount')}</TableHead>
                           <TableHead className="min-w-[110px] text-[12px]">{t('loans.workbench.col.period_payment')}</TableHead>
                           <TableHead className="min-w-[130px] text-[12px]">{t('loans.workbench.col.installment_progress')}</TableHead>
                           <TableHead className="min-w-[100px] text-[12px]">{t('loans.workbench.col.due')}</TableHead>
                           <TableHead className="min-w-[100px] text-[12px]">{t('loans.workbench.col.state')}</TableHead>
-                          <TableHead className="min-w-[80px] text-[12px]">{t('loans.workbench.col.dpd')}</TableHead>
-                          <TableHead className="min-w-[120px] text-right text-[12px]">{t('loans.workbench.record_payment')}</TableHead>
+                          <TableHead className="min-w-[76px] text-[12px]">{t('loans.workbench.col.dpd')}</TableHead>
+                          <TableHead className="min-w-[92px] text-right text-[12px]">{t('loans.workbench.record_payment')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredRows.map((r) => (
-                          <TableRow key={r.application_id}>
+                        {filteredRows.map((r) => {
+                          const href = customerRepaymentHref(r);
+                          const rowNavHandlers = href
+                            ? rowNavigationPointerHandlers(() => {
+                                // Only treat quick click as row activation; long hold should not open detail.
+                                if (Date.now() - rowPointerDownAtRef.current > 320) return;
+                                router.push(href);
+                              })
+                            : null;
+                          return (
+                          <TableRow
+                            key={r.application_id}
+                            className={cn(
+                              href && 'cursor-pointer hover:bg-muted/45',
+                            )}
+                            onPointerDown={(e) => {
+                              rowPointerDownAtRef.current = Date.now();
+                              rowNavHandlers?.onPointerDown(e);
+                            }}
+                            onClick={(e) => {
+                              rowNavHandlers?.onClick(e);
+                            }}
+                          >
                             <TableCell className="font-medium leading-tight">
                               <span className="block truncate" title={r.customer_name || '-'}>
                                 {r.customer_name || '-'}
@@ -543,18 +574,14 @@ export default function ApprovedLoanWorkbenchPage() {
                             </TableCell>
                             <TableCell className="tabular-nums">{r.installment_dpd ?? 0}</TableCell>
                             <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" asChild>
-                                  <Link
-                                    href={`/dashboard/customers/${r.customer_id}?application_id=${r.application_id}&returnTo=${encodeURIComponent('/dashboard/loans/approved-workbench')}&view=repayment`}
-                                  >
-                                    {locale === 'vi' ? 'Mở KH' : 'Open'}
-                                  </Link>
-                                </Button>
+                              <div className="flex justify-end">
                                 <Button
                                   size="sm"
                                   className="h-7 px-2 text-[11px]"
-                                  onClick={() => void openPay(r)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void openPay(r);
+                                  }}
                                   disabled={
                                     ensuringApplicationId === r.application_id || !canRecordInstallmentPayment(r)
                                   }
@@ -569,7 +596,7 @@ export default function ApprovedLoanWorkbenchPage() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        )})}
                       </TableBody>
                     </Table>
                   </ScrollableTableRegion>
