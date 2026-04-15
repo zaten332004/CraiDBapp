@@ -20,7 +20,7 @@ export function ScrollableTableRegion({
   return (
     <div
       className={cn(
-        'min-h-0 max-h-[min(58vh,40rem,calc(100dvh-12rem))] overflow-y-auto overflow-x-auto overscroll-y-contain rounded-xl border border-border bg-card',
+        'min-h-0 max-h-[min(58vh,40rem,calc(100dvh-12rem))] overflow-y-auto overflow-x-hidden overscroll-y-contain rounded-xl border border-border bg-card',
         className,
       )}
     >

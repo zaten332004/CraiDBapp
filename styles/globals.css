@@ -488,7 +488,7 @@
 
 .ai-chat-bubble-wrap {
   position: relative;
-  padding-bottom: 6px;
+  padding-bottom: 0;
 }
 
 .ai-chat-bubble {
@@ -531,36 +531,13 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.28);
 }
 
-/* Đuôi trái (AI): mềm hơn, chỉ giữ viền đáy để không quá đậm */
+/* Bỏ hoàn toàn đuôi chat: bubble liền mạch */
 .ai-chat-bubble--in::after {
-  content: '';
-  position: absolute;
-  left: 1rem;
-  bottom: -7px;
-  width: 14px;
-  height: 8px;
-  background: var(--ai-chat-bubble-fill);
-  border-bottom: 1px solid color-mix(in srgb, var(--ai-chat-bubble-edge), transparent 35%);
-  border-bottom-left-radius: 4px;
-  transform: skewX(26deg);
-  pointer-events: none;
-  z-index: 0;
+  content: none;
 }
 
-/* Đuôi phải (user): mềm hơn, chỉ giữ viền đáy để không quá đậm */
 .ai-chat-bubble--out::after {
-  content: '';
-  position: absolute;
-  right: 1rem;
-  bottom: -7px;
-  width: 14px;
-  height: 8px;
-  background: var(--ai-chat-bubble-fill);
-  border-bottom: 1px solid color-mix(in srgb, var(--ai-chat-bubble-edge), transparent 35%);
-  border-bottom-right-radius: 4px;
-  transform: skewX(-26deg);
-  pointer-events: none;
-  z-index: 0;
+  content: none;
 }
 
 /* Nội dung bong bóng luôn trên đuôi */

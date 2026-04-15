@@ -519,6 +519,7 @@ export default function AIChatPage() {
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const [dropChatHighlight, setDropChatHighlight] = useState(false);
   const dragChatDepthRef = useRef(0);
+  const [sendingStepIndex, setSendingStepIndex] = useState(0);
 
   const hasConversation = useMemo(() => {
     if (messages.some((m) => m.sender === 'user')) return true;
@@ -532,6 +533,18 @@ export default function AIChatPage() {
     if (aiDataSource === 'customer') return selectedCustomerIds.length > 0;
     return true;
   }, [input, pendingFiles.length, aiDataSource, selectedCustomerIds.length]);
+
+  const sendingSteps = useMemo(
+    () => [
+      t('ai_chat.loading_step.read'),
+      t('ai_chat.loading_step.context'),
+      t('ai_chat.loading_step.match'),
+      t('ai_chat.loading_step.search'),
+      t('ai_chat.loading_step.summarize'),
+      t('ai_chat.loading_step.finalize'),
+    ],
+    [t],
+  );
 
   useEffect(() => {
     if (sourceInitDoneRef.current) return;
@@ -781,6 +794,17 @@ export default function AIChatPage() {
       });
     });
   }, [sessionId, messages, isLoading, isSending]);
+
+  useEffect(() => {
+    if (!isSending) {
+      setSendingStepIndex(0);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setSendingStepIndex((prev) => (prev + 1) % sendingSteps.length);
+    }, 1350);
+    return () => window.clearInterval(timer);
+  }, [isSending, sendingSteps.length]);
 
   const resolveModelLabel = (tier: ModelTier, fallback?: string | null) => {
     if (fallback) return fallback;
@@ -1692,8 +1716,17 @@ export default function AIChatPage() {
                   {isSending && (
                     <div className="flex justify-start">
                       <div className="max-w-4xl min-w-0 ai-chat-bubble-wrap">
-                        <div className="ai-chat-bubble ai-chat-bubble--in px-4 py-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                        <div className="ai-chat-bubble ai-chat-bubble--in px-4 py-2.5">
+                          <div className="flex min-w-[240px] items-center gap-2.5">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent [animation-delay:0ms]" />
+                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent [animation-delay:180ms]" />
+                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent [animation-delay:360ms]" />
+                            </span>
+                            <span className="text-xs font-medium text-foreground/85">
+                              {sendingSteps[sendingStepIndex] || sendingSteps[0]}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -198,14 +198,14 @@ export default function RiskDistributionPage() {
                 <Tooltip
                   formatter={(value: number, name: string) =>
                     name === 'expectedLoss'
-                      ? [formatCompactVnd(Number(value), locale === 'vi' ? 'vi' : 'en'), locale === 'vi' ? 'Tổn thất kỳ vọng' : 'Expected loss']
+                      ? [formatCompactVnd(Number(value), locale === 'vi' ? 'vi' : 'en'), locale === 'vi' ? 'Tổn thất' : 'Expected loss']
                       : [`${Number(value).toFixed(2)}%`, name === 'avgPd' ? 'Avg PD' : 'NPL']
                   }
                 />
                 <Legend />
                 <Line yAxisId="left" type="monotone" dataKey="avgPd" stroke="#6366f1" strokeWidth={2} name="Avg PD %" />
                 <Line yAxisId="left" type="monotone" dataKey="npl" stroke="#fb7185" strokeWidth={2} name="NPL %" />
-                <Line yAxisId="right" type="monotone" dataKey="expectedLoss" stroke="#22c1d6" strokeWidth={2} name={locale === 'vi' ? 'Tổn thất kỳ vọng' : 'Expected loss'} />
+                <Line yAxisId="right" type="monotone" dataKey="expectedLoss" stroke="#22c1d6" strokeWidth={2} name={locale === 'vi' ? 'Tổn thất' : 'Expected loss'} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
