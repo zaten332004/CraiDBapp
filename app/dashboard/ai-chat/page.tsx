@@ -94,7 +94,7 @@ type ChatMessage = {
   id: string;
   text: string;
   sender: ChatSender;
-  timestamp: Date;
+  timestamp: Date | null;
   sources?: string[];
   attachments?: MessageAttachment[];
   raw?: unknown;
@@ -349,6 +349,73 @@ function normalizeSession(item: any): ChatSession | null {
   return { id, title, updatedAt, pinned, raw: item };
 }
 
+function parseBackendChatTimestamp(value: unknown): Date | null {
+  if (value == null || value === '') return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  // Unix epoch sent as seconds or milliseconds.
+  if (/^\d+$/.test(raw)) {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    const ms = raw.length <= 10 ? n * 1000 : n;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  // Explicit timezone (Z / +07:00 / -05:00): trust payload.
+  const hasTimezone = /(?:z|[+-]\d{2}:\d{2})$/i.test(raw);
+  const normalized = raw.replace(' ', 'T');
+  if (hasTimezone) {
+    const d = new Date(normalized);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  // Backend often sends naive datetime. Treat it as Asia/Ho_Chi_Minh local time.
+  const m = normalized.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[tT](\d{2}):(\d{2})(?::(\d{2}))?)?$/,
+  );
+  if (m) {
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    const day = Number(m[3]);
+    const hour = Number(m[4] ?? 0);
+    const minute = Number(m[5] ?? 0);
+    const second = Number(m[6] ?? 0);
+    if (
+      [year, month, day, hour, minute, second].every(Number.isFinite) &&
+      month >= 1 &&
+      month <= 12 &&
+      day >= 1 &&
+      day <= 31 &&
+      hour >= 0 &&
+      hour <= 23 &&
+      minute >= 0 &&
+      minute <= 59 &&
+      second >= 0 &&
+      second <= 59
+    ) {
+      // Convert local +07:00 to UTC.
+      const utcMs = Date.UTC(year, month - 1, day, hour - 7, minute, second);
+      const d = new Date(utcMs);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+  }
+
+  const fallback = new Date(normalized);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function formatChatMessageTime(ts: Date | null, locale: string): string {
+  if (!ts || Number.isNaN(ts.getTime())) return '--:--';
+  return ts.toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Ho_Chi_Minh',
+  });
+}
+
 function normalizeHistoryMessage(item: any, idx: number): ChatMessage | null {
   if (!item || typeof item !== 'object') return null;
   const role = String(item.sender ?? item.role ?? item.type ?? '').toLowerCase();
@@ -357,12 +424,13 @@ function normalizeHistoryMessage(item: any, idx: number): ChatMessage | null {
   const attachments = sender === 'user' ? normalizeMessageAttachments(item.attachments) : [];
   if (!text && attachments.length === 0) return null;
   const tsRaw = item.timestamp ?? item.created_at ?? item.createdAt ?? item.time ?? null;
-  const ts = tsRaw ? new Date(String(tsRaw)) : new Date();
+  const ts = parseBackendChatTimestamp(tsRaw);
+  const tsForId = ts?.getTime() ?? Date.now();
   return {
-    id: String(item.id ?? `${sender}-${idx}-${ts.getTime()}`),
+    id: String(item.id ?? `${sender}-${idx}-${tsForId}`),
     text,
     sender,
-    timestamp: Number.isFinite(ts.getTime()) ? ts : new Date(),
+    timestamp: ts,
     sources: Array.isArray(item.sources) ? item.sources.map(String) : undefined,
     attachments: attachments.length ? attachments : undefined,
     raw: item,
@@ -1696,7 +1764,7 @@ export default function AIChatPage() {
                             <p className="text-sm whitespace-pre-wrap break-words">{message.text}</p>
                           ) : null}
                           <span className="text-xs text-muted-foreground mt-3 block">
-                            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {formatChatMessageTime(message.timestamp, locale)}
                           </span>
                         </div>
 

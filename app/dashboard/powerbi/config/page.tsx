@@ -1228,7 +1228,7 @@ export default function PowerBIConfigPage() {
           </DialogHeader>
           <div className="h-[calc(88vh-110px)] overflow-hidden rounded-md border border-border">
             {selectedSchemaDetail ? (
-              <ScrollableTableRegion className="h-full rounded-none border-0">
+              <ScrollableTableRegion className="h-full max-h-none rounded-none border-0">
                 <Table>
                   <TableHeader>
                     <TableRow className={scrollableTableHeaderRowClass}>
