@@ -2,18 +2,21 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useI18n } from '@/components/i18n-provider';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { notifyError } from '@/lib/notify';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { RECHART_MARGIN, RECHART_Y_WIDTH } from '@/lib/recharts-layout';
+import { formatDateVietnam } from '@/lib/datetime';
+import { formatCompactVnd } from '@/lib/money';
 
 type RiskDistributionResponse = {
   chart_data: Array<{ bucket: string; value: number; count?: number }>;
   score_buckets?: Array<{ range: string; count: number }>;
   score_stats?: { mean?: number; median?: number; std_dev?: number };
 };
+type PortfolioTrend = { points: Array<{ timestamp: string; value: number }> };
 
 const DEFAULT_SCORE_BINS: Array<{ range: string; count: number }> = [
   { range: '0-20', count: 0 },
@@ -33,12 +36,19 @@ export default function RiskDistributionPage() {
     median: 0,
     std_dev: 0,
   });
+  const [qualityTrendData, setQualityTrendData] = useState<Array<{ month: string; avgPd: number; npl: number; expectedLoss: number }>>([]);
+  const [riskExposureData, setRiskExposureData] = useState<Array<{ name: string; value: number }>>([]);
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        const dist = await browserApiFetchAuth<RiskDistributionResponse>('/portfolio/risk-distribution', { method: 'GET' });
+        const [dist, avgPdTrend, nplTrend, expectedLossTrend] = await Promise.all([
+          browserApiFetchAuth<RiskDistributionResponse>('/portfolio/risk-distribution', { method: 'GET' }),
+          browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=avg_pd&interval=month', { method: 'GET' }).catch(() => null),
+          browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=npl_ratio&interval=month', { method: 'GET' }).catch(() => null),
+          browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=expected_loss&interval=month', { method: 'GET' }).catch(() => null),
+        ]);
         if (cancelled) return;
         const distMap = Object.fromEntries((dist.chart_data || []).map((item) => [item.bucket, Number(item.count ?? item.value ?? 0)]));
         setRiskData([
@@ -65,6 +75,27 @@ export default function RiskDistributionPage() {
           median: Number(ss?.median ?? 0),
           std_dev: Number(ss?.std_dev ?? 0),
         });
+        const avgPdPoints = avgPdTrend?.points || [];
+        const nplPoints = nplTrend?.points || [];
+        const expectedLossPoints = expectedLossTrend?.points || [];
+        const nplMap = new Map(nplPoints.map((p) => [String(p.timestamp || ''), Number(p.value || 0)]));
+        const expectedLossMap = new Map(expectedLossPoints.map((p) => [String(p.timestamp || ''), Number(p.value || 0)]));
+        setQualityTrendData(
+          avgPdPoints.map((point) => {
+            const ts = String(point.timestamp || '');
+            return {
+              month: formatDateVietnam(point.timestamp, locale, { month: 'short' }),
+              avgPd: Number((Number(point.value || 0) * 100).toFixed(2)),
+              npl: Number(((nplMap.get(ts) ?? 0) * 100).toFixed(2)),
+              expectedLoss: Number(expectedLossMap.get(ts) ?? 0),
+            };
+          }),
+        );
+        setRiskExposureData([
+          { name: locale === 'vi' ? 'Rủi ro thấp' : 'Low risk', value: Number(distMap.low || 0) * 35 },
+          { name: locale === 'vi' ? 'Rủi ro trung bình' : 'Medium risk', value: Number(distMap.medium || 0) * 65 },
+          { name: locale === 'vi' ? 'Rủi ro cao' : 'High risk', value: Number(distMap.high || 0) * 100 },
+        ]);
       } catch (err) {
         if (!cancelled) notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
       }
@@ -73,7 +104,7 @@ export default function RiskDistributionPage() {
     return () => {
       cancelled = true;
     };
-  }, [msgLocale, t]);
+  }, [locale, msgLocale, t]);
 
   const riskDataLocalized = riskData.map((x) => ({ ...x, name: t(`risk.level.${x.level}`) }));
   const totalCustomers = useMemo(() => riskData.reduce((sum, item) => sum + Number(item.value || 0), 0), [riskData]);
@@ -83,7 +114,7 @@ export default function RiskDistributionPage() {
   }, [riskData]);
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
+    <div className="motion-enter flex flex-col gap-5 lg:gap-6 p-4 sm:p-5 lg:p-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('portfolio.risk_dist.title')}</h1>
         <p className="text-muted-foreground mt-2">
@@ -91,7 +122,7 @@ export default function RiskDistributionPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+      <div className="motion-stagger grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
         <Card>
           <CardHeader>
             <CardTitle>{t('portfolio.risk_dist.level_title')}</CardTitle>
@@ -134,6 +165,69 @@ export default function RiskDistributionPage() {
                 <YAxis width={RECHART_Y_WIDTH.count} tickMargin={6} tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#06b6d4" name={t('customers.count')} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="motion-stagger grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>{locale === 'vi' ? 'Xu hướng chất lượng danh mục' : 'Portfolio quality trend'}</CardTitle>
+            <CardDescription>
+              {locale === 'vi'
+                ? 'Theo dõi Avg PD, NPL và tổn thất kỳ vọng theo thời gian.'
+                : 'Track Avg PD, NPL and expected loss over time.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={qualityTrendData} margin={RECHART_MARGIN.lineDualY}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" tickMargin={8} />
+                <YAxis yAxisId="left" tickFormatter={(v) => `${Number(v).toFixed(0)}%`} width={RECHART_Y_WIDTH.score} tickMargin={8} />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tickFormatter={(v) => formatCompactVnd(Number(v), locale === 'vi' ? 'vi' : 'en')}
+                  width={RECHART_Y_WIDTH.money}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
+                />
+                <Tooltip
+                  formatter={(value: number, name: string) =>
+                    name === 'expectedLoss'
+                      ? [formatCompactVnd(Number(value), locale === 'vi' ? 'vi' : 'en'), locale === 'vi' ? 'Tổn thất kỳ vọng' : 'Expected loss']
+                      : [`${Number(value).toFixed(2)}%`, name === 'avgPd' ? 'Avg PD' : 'NPL']
+                  }
+                />
+                <Legend />
+                <Line yAxisId="left" type="monotone" dataKey="avgPd" stroke="#6366f1" strokeWidth={2} name="Avg PD %" />
+                <Line yAxisId="left" type="monotone" dataKey="npl" stroke="#fb7185" strokeWidth={2} name="NPL %" />
+                <Line yAxisId="right" type="monotone" dataKey="expectedLoss" stroke="#22c1d6" strokeWidth={2} name={locale === 'vi' ? 'Tổn thất kỳ vọng' : 'Expected loss'} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{locale === 'vi' ? 'Điểm phơi nhiễm theo mức rủi ro' : 'Exposure index by risk level'}</CardTitle>
+            <CardDescription>
+              {locale === 'vi'
+                ? 'Chỉ số so sánh phơi nhiễm tương đối giữa các nhóm rủi ro.'
+                : 'Relative exposure index comparison across risk groups.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={riskExposureData} margin={RECHART_MARGIN.barScoreBuckets}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tickMargin={8} />
+                <YAxis width={RECHART_Y_WIDTH.count} tickMargin={6} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(value: number) => [value, locale === 'vi' ? 'Chỉ số phơi nhiễm' : 'Exposure index']} />
+                <Bar dataKey="value" fill="#0ea5a6" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

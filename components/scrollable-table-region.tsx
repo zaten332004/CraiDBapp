@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
  * while `ScrollableTableRegion` scrolls; avoids nested `overflow-x` on the table wrapper breaking `position: sticky`.
  */
 export const scrollableTableHeaderRowClass =
-  'border-b border-border [&_th]:sticky [&_th]:top-0 [&_th]:z-[1] [&_th]:bg-muted/95 [&_th]:align-middle [&_th]:shadow-sm [&_th]:backdrop-blur-sm hover:[&_th]:bg-muted/90';
+  'border-b border-border [&_th]:sticky [&_th]:top-0 [&_th]:z-[1] [&_th]:bg-muted/95 dark:[&_th]:bg-[#3f4653] [&_th]:align-middle [&_th]:shadow-sm [&_th]:backdrop-blur-sm hover:[&_th]:bg-muted/90 dark:hover:[&_th]:bg-[#465060]';
 
 /** Wraps wide data tables: caps height and scrolls inside so long lists do not stretch the whole dashboard. */
 export function ScrollableTableRegion({

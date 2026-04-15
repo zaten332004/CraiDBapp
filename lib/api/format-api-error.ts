@@ -175,6 +175,12 @@ function translateSingleDetailLine(d: string, locale: UserFacingLocale): string 
     return locale === "vi" ? `Tải lên thất bại (mã HTTP ${code}).` : `Upload failed (HTTP ${code}).`;
   }
 
+  if (/upload content not found for job/i.test(line) || /upload not found \(expired job, api restarted, or set upload_jobs_storage_dir\)/i.test(line)) {
+    return locale === "vi"
+      ? "Không tìm thấy dữ liệu upload (job đã hết hạn, API khởi động lại, hoặc chưa cấu hình UPLOAD_JOBS_STORAGE_DIR)."
+      : "Upload data not found (expired job, API restarted, or UPLOAD_JOBS_STORAGE_DIR is not configured).";
+  }
+
   if (locale === "vi") {
     if (line.startsWith("Input should be a valid integer")) {
       return "Giá trị phải là số nguyên hợp lệ.";

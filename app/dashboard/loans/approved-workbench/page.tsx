@@ -396,7 +396,7 @@ export default function ApprovedLoanWorkbenchPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
+    <div className="motion-enter flex flex-col gap-5 p-4 sm:p-5 lg:p-6">
       <div className="flex items-center gap-4">
         <Link href="/dashboard/customers">
           <Button variant="ghost" size="sm">

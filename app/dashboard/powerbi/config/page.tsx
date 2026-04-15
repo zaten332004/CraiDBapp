@@ -712,7 +712,7 @@ export default function PowerBIConfigPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
+    <div className="motion-enter flex flex-col gap-5 lg:gap-6 p-4 sm:p-5 lg:p-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('powerbi.title')}</h1>
         <p className="text-muted-foreground mt-2">
@@ -721,7 +721,7 @@ export default function PowerBIConfigPage() {
       </div>
 
       <div className="space-y-8">
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 xl:items-stretch">
+        <div className="motion-stagger grid grid-cols-1 gap-6 xl:grid-cols-2 xl:items-stretch">
           <Card className="flex flex-col">
             <CardHeader>
               <CardTitle className="text-xl">{t('powerbi.config_title')}</CardTitle>
@@ -889,11 +889,11 @@ export default function PowerBIConfigPage() {
                   </div>
                   {workspaces.length > 0 ? (
                     <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm">
-                      <Table>
+                      <Table className="table-fixed">
                         <TableHeader>
                           <TableRow className={scrollableTableHeaderRowClass}>
-                            <TableHead>ID</TableHead>
-                            <TableHead>{t('common.name')}</TableHead>
+                            <TableHead className="w-[68%]">ID</TableHead>
+                            <TableHead className="w-[32%]">{t('common.name')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -902,7 +902,7 @@ export default function PowerBIConfigPage() {
                               key={w.id}
                               className={w.id === selectedWorkspaceId ? 'bg-secondary/60' : undefined}
                             >
-                              <TableCell className="font-mono text-xs">{w.id}</TableCell>
+                              <TableCell className="w-[68%] font-mono text-xs">{w.id}</TableCell>
                               <TableCell>{w.name}</TableCell>
                             </TableRow>
                           ))}
@@ -960,11 +960,11 @@ export default function PowerBIConfigPage() {
                   </div>
                   {datasets.length > 0 ? (
                     <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm">
-                      <Table>
+                      <Table className="table-fixed">
                         <TableHeader>
                           <TableRow className={scrollableTableHeaderRowClass}>
-                            <TableHead>ID</TableHead>
-                            <TableHead>{t('common.name')}</TableHead>
+                            <TableHead className="w-[68%]">ID</TableHead>
+                            <TableHead className="w-[32%]">{t('common.name')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -973,7 +973,7 @@ export default function PowerBIConfigPage() {
                               key={d.id}
                               className={d.id === selectedDatasetId ? 'bg-secondary/60' : undefined}
                             >
-                              <TableCell className="font-mono text-xs">{d.id}</TableCell>
+                              <TableCell className="w-[68%] font-mono text-xs">{d.id}</TableCell>
                               <TableCell>{d.name}</TableCell>
                             </TableRow>
                           ))}
@@ -1147,7 +1147,7 @@ export default function PowerBIConfigPage() {
 
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground">{t('powerbi.rules_ref_extended')}</p>
-              <p className="text-xs text-muted-foreground">{t('powerbi.table_suggestions_extended_hint')}</p>
+              <p className="table-note text-xs">{t('powerbi.table_suggestions_extended_hint')}</p>
               <div className="flex flex-wrap gap-2">
                 {POWER_BI_REFERENCE_EXTENDED_TABLES.filter((name) => !tableSuggestions.includes(name)).map(
                   (name) => (

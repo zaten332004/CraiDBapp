@@ -1367,7 +1367,7 @@ export default function AIChatPage() {
   };
 
   return (
-    <div className="flex flex-row items-stretch gap-0 md:gap-3 p-6 md:p-8 h-[calc(100vh-5rem)] min-h-0">
+    <div className="motion-enter flex flex-row items-stretch gap-0 md:gap-3 p-4 sm:p-5 lg:p-6 h-[calc(100vh-5rem)] min-h-0">
       <input
         ref={fileInputRef}
         type="file"
@@ -1406,7 +1406,7 @@ export default function AIChatPage() {
         )}
       >
         <div className="flex h-full min-h-0 w-full min-w-0 flex-col pr-0 sm:pr-1">
-          <Card className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border shadow-sm">
+          <Card className="motion-pop flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border shadow-sm">
             <CardHeader className="shrink-0 space-y-3 pb-2 px-4">
               <div className="flex items-center gap-2">
                 <Button
@@ -1533,7 +1533,7 @@ export default function AIChatPage() {
         </header>
         <div
           className={cn(
-            'flex min-h-0 flex-1 flex-col min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card px-4 shadow-md md:px-5',
+            'motion-pop flex min-h-0 flex-1 flex-col min-w-0 overflow-hidden rounded-xl border-2 border-border bg-card px-4 shadow-md md:px-5',
             !hasConversation && 'py-6',
             hasConversation && 'pb-2 pt-0',
           )}

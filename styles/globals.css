@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #f3f5f9;
+  --background: #eef3fb;
   --foreground: #131722;
   --card: #ffffff;
   --card-foreground: #131722;
@@ -12,16 +12,16 @@
   --popover-foreground: #131722;
   --primary: #3a5682;
   --primary-foreground: #f4f7fb;
-  --secondary: #ebeff5;
+  --secondary: #e5edf8;
   --secondary-foreground: #1a2230;
-  --muted: #e8ecf2;
-  --muted-foreground: #5c6578;
+  --muted: #dde7f5;
+  --muted-foreground: #4f5d74;
   --accent: #3a6ea5;
   --accent-foreground: #0f1729;
   --destructive: #a84854;
   --destructive-foreground: #6d333c;
-  --border: #dde3ec;
-  --input: #d2dae6;
+  --border: #cdd9ea;
+  --input: #c2d1e6;
   --ring: color-mix(in srgb, #3a6ea5, transparent 45%);
   --chart-1: #3a6ea5;
   --chart-2: #5b7fb8;
@@ -62,15 +62,15 @@
   --popover-foreground: #f2f3f5;
   --primary: #6d9ed6;
   --primary-foreground: #111214;
-  --secondary: #3f4248;
+  --secondary: #434851;
   --secondary-foreground: #f2f3f5;
-  --muted: #3f4248;
-  --muted-foreground: #949ba4;
+  --muted: #404650;
+  --muted-foreground: #aab3c0;
   --accent: #404249;
   --accent-foreground: #f2f3f5;
   --destructive: #f38b8f;
   --destructive-foreground: #1e1516;
-  --border: #3f4147;
+  --border: #4b515d;
   --input: #1e1f22;
   --ring: color-mix(in srgb, #6d9ed6, transparent 45%);
   --chart-1: #6d9ed6;
@@ -398,6 +398,21 @@
   border-width: 1px;
 }
 
+@keyframes toast-fade-up-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.98);
+  }
+}
+
+.app-toaster [data-sonner-toast][data-removed='true'] {
+  animation: toast-fade-up-out 260ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
+}
+
 .app-toaster [data-sonner-toast][data-type='success'] {
   border-color: color-mix(in srgb, #15803d, transparent 72%) !important;
   background: color-mix(in srgb, #f0fdf4, var(--background) 35%) !important;
@@ -512,6 +527,7 @@
   background: var(--ai-chat-bubble-fill);
   box-shadow: 0 0 0 1px var(--ai-chat-bubble-edge);
   transform: rotate(45deg);
+  clip-path: inset(50% 0 0 0);
   pointer-events: none;
 }
 
@@ -528,6 +544,7 @@
   background: var(--ai-chat-bubble-fill);
   box-shadow: 0 0 0 1px var(--ai-chat-bubble-edge);
   transform: rotate(-45deg);
+  clip-path: inset(50% 0 0 0);
   pointer-events: none;
 }
 
@@ -535,4 +552,57 @@
 .ai-chat-bubble > * {
   position: relative;
   z-index: 1;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Clear, visible UI animations (balanced + noticeable)                       */
+/* -------------------------------------------------------------------------- */
+@keyframes ui-enter-clear {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ui-pop-clear {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.motion-enter {
+  animation: ui-enter-clear 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.motion-pop {
+  animation: ui-pop-clear 300ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.motion-stagger > * {
+  animation: ui-pop-clear 360ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.motion-stagger > *:nth-child(1) { animation-delay: 30ms; }
+.motion-stagger > *:nth-child(2) { animation-delay: 70ms; }
+.motion-stagger > *:nth-child(3) { animation-delay: 110ms; }
+.motion-stagger > *:nth-child(4) { animation-delay: 150ms; }
+.motion-stagger > *:nth-child(5) { animation-delay: 190ms; }
+.motion-stagger > *:nth-child(6) { animation-delay: 230ms; }
+
+.table-note {
+  @apply text-sm leading-relaxed text-muted-foreground;
+}
+
+.dark .table-note {
+  color: color-mix(in srgb, var(--foreground), #d7dfeb 42%);
+  font-weight: 500;
 }

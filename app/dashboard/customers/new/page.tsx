@@ -13,7 +13,7 @@ import { Loader2, ArrowLeft } from 'lucide-react';
 import { authJsonHeaders } from '@/lib/auth/token';
 import { getUserRole } from '@/lib/auth/token';
 import { useI18n } from '@/components/i18n-provider';
-import { formatUserFacingFetchError, type UserFacingLocale } from '@/lib/api/format-api-error';
+import { formatUserFacingApiError, formatUserFacingFetchError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import {
   isValidEmail,
@@ -321,9 +321,8 @@ export default function NewCustomerPage() {
       });
       router.push('/dashboard/customers');
     } catch (err) {
-      const message = err instanceof Error ? err.message : t('common.error');
       notifyError(t('toast.customer_create_failed'), {
-        description: message,
+        description: formatUserFacingApiError(err, msgLocale),
         details: [
           `${t('common.full_name')}: ${formData.full_name || '-'}`,
           `${t('common.email')}: ${formData.email || '-'}`,
@@ -335,7 +334,7 @@ export default function NewCustomerPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
+    <div className="motion-enter flex flex-col gap-5 lg:gap-6 p-4 sm:p-5 lg:p-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/dashboard/customers">
@@ -359,7 +358,7 @@ export default function NewCustomerPage() {
         </div>
       )}
 
-      <div className="grid max-w-6xl grid-cols-1 items-start gap-6 xl:grid-cols-2">
+      <div className="grid w-full grid-cols-1 items-start gap-5 2xl:grid-cols-2">
         <Card className="h-auto w-full min-w-0">
           <CardHeader>
             <CardTitle>{t('customers.new.card_title')}</CardTitle>

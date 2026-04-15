@@ -237,48 +237,64 @@ export default function RiskAnalyzePage() {
 
   const dynamicInsights = useMemo(() => {
     const s = analysisSummary;
+    const riskBand =
+      s.highPct >= 35 ? (locale === 'vi' ? 'cao' : 'high') : s.highPct >= 20 ? (locale === 'vi' ? 'trung bình' : 'medium') : (locale === 'vi' ? 'thấp' : 'low');
+    const actionTextVi =
+      s.highPct >= 35
+        ? 'Ưu tiên khoanh vùng nhóm rủi ro cao, rà soát hồ sơ có khoản vay lớn và bổ sung điều kiện kiểm soát.'
+        : s.highPct >= 20
+          ? 'Tăng tần suất giám sát theo tuần cho nhóm rủi ro trung bình/cao và cập nhật chính sách duyệt.'
+          : 'Duy trì giám sát định kỳ, tập trung mở rộng nhóm khách hàng có hồ sơ thu nhập ổn định.';
+    const actionTextEn =
+      s.highPct >= 35
+        ? 'Prioritize high-risk segmentation, review large-ticket applications, and add tighter control conditions.'
+        : s.highPct >= 20
+          ? 'Increase weekly monitoring for medium/high-risk cohorts and tighten approval policy updates.'
+          : 'Maintain periodic monitoring and focus growth on customers with stable income profiles.';
     if (locale === 'vi') {
       return [
-        `Danh mục hiện có ${s.total} hồ sơ: ${s.low} rủi ro thấp, ${s.medium} trung bình, ${s.high} rủi ro cao.`,
-        `Tỷ trọng rủi ro cao đang ở mức ${s.highPct}%${s.highPct >= 30 ? ', cần ưu tiên giám sát và tái thẩm định.' : ', đang trong ngưỡng có thể kiểm soát.'}`,
-        `Thu nhập bình quân khoảng ${formatCompactVnd(s.avgIncome, 'vi')} và khoản vay bình quân khoảng ${formatCompactVnd(s.avgLoan, 'vi')}.`,
-        `Yếu tố tác động mạnh nhất hiện tại là "${s.topFactor?.factor ?? '—'}" (${s.topFactor?.impact ?? 0}%).`,
+        `Danh mục hiện có ${s.total} hồ sơ: ${s.low} rủi ro thấp, ${s.medium} trung bình, ${s.high} rủi ro cao. Phân bổ này phản ánh mức chịu rủi ro tổng thể đang ở ngưỡng ${riskBand}.`,
+        `Tỷ trọng rủi ro cao đang ở mức ${s.highPct}%. ${s.highPct >= 30 ? 'Đây là mức cần can thiệp sớm để tránh dồn nợ xấu về cuối kỳ.' : 'Mức này còn trong kiểm soát nhưng cần theo dõi xu hướng tăng liên tục.'}`,
+        `Thu nhập bình quân khoảng ${formatCompactVnd(s.avgIncome, 'vi')} và khoản vay bình quân khoảng ${formatCompactVnd(s.avgLoan, 'vi')}. Tỷ lệ thu nhập/vay ~ ${s.ratio.toFixed(2)} cho thấy sức chịu trả nợ của danh mục ở mức ${riskLabel(s.medianBand)}.`,
+        `Yếu tố tác động mạnh nhất hiện tại là "${s.topFactor?.factor ?? '—'}" (${s.topFactor?.impact ?? 0}%). Khi yếu tố này biến động bất lợi, xác suất dịch chuyển hồ sơ sang nhóm rủi ro cao sẽ tăng rõ rệt.`,
+        `Khuyến nghị hành động: ${actionTextVi}`,
       ];
     }
     return [
-      `Portfolio has ${s.total} records: ${s.low} low-risk, ${s.medium} medium-risk, ${s.high} high-risk.`,
-      `High-risk share is ${s.highPct}%${s.highPct >= 30 ? ', so closer monitoring is recommended.' : ', currently in a controllable range.'}`,
-      `Average income is around ${formatCompactVnd(s.avgIncome, 'en')} and average loan is around ${formatCompactVnd(s.avgLoan, 'en')}.`,
-      `The strongest impact factor right now is "${s.topFactor?.factor ?? '—'}" (${s.topFactor?.impact ?? 0}%).`,
+      `Portfolio has ${s.total} records: ${s.low} low-risk, ${s.medium} medium-risk, and ${s.high} high-risk. This mix indicates an overall ${riskBand} risk posture.`,
+      `High-risk share is ${s.highPct}%. ${s.highPct >= 30 ? 'This level requires early intervention to prevent late-cycle default accumulation.' : 'This remains controllable, but trend acceleration should still be monitored.'}`,
+      `Average income is around ${formatCompactVnd(s.avgIncome, 'en')} and average loan is around ${formatCompactVnd(s.avgLoan, 'en')}. The income-to-loan ratio of ${s.ratio.toFixed(2)} aligns with ${riskLabel(s.medianBand)} risk resilience.`,
+      `The strongest impact factor is "${s.topFactor?.factor ?? '—'}" (${s.topFactor?.impact ?? 0}%). Adverse movement in this factor can materially increase migration into higher-risk cohorts.`,
+      `Recommended action: ${actionTextEn}`,
     ];
   }, [analysisSummary, locale]);
 
   const dynamicCorrelationSummary = useMemo(() => {
     const s = analysisSummary;
     if (locale === 'vi') {
-      return `Phân tích dữ liệu thực cho thấy tỷ lệ thu nhập/khoản vay trung bình là ${s.ratio.toFixed(2)}; tương ứng mức rủi ro ${riskLabel(s.medianBand)}.`;
+      return `Phân tích dữ liệu thực cho thấy tỷ lệ thu nhập/khoản vay trung bình là ${s.ratio.toFixed(2)}, tương ứng mức rủi ro ${riskLabel(s.medianBand)}. Kết quả tương quan cho thấy khi thu nhập tăng tương đối so với quy mô khoản vay, rủi ro có xu hướng giảm; tuy nhiên đây là mối liên hệ thống kê, không khẳng định quan hệ nhân quả tuyệt đối cho từng hồ sơ.`;
     }
-    return `Live-data analysis shows an average income-to-loan ratio of ${s.ratio.toFixed(2)}, which aligns with ${riskLabel(s.medianBand)} risk.`;
+    return `Live-data analysis shows an average income-to-loan ratio of ${s.ratio.toFixed(2)}, which aligns with ${riskLabel(s.medianBand)} risk. The correlation suggests that stronger income relative to loan size generally lowers risk, but this remains a statistical relationship rather than strict causality at individual-case level.`;
   }, [analysisSummary, locale]);
 
   const dynamicIndicators = useMemo(() => {
     const s = analysisSummary;
     if (locale === 'vi') {
       return [
-        `Tỷ lệ thu nhập/khoản vay >= 2.5: xu hướng ${riskLabel('low')}.`,
-        `Tỷ lệ thu nhập/khoản vay từ 1.5-2.5: xu hướng ${riskLabel('medium')}.`,
-        `Tỷ lệ thu nhập/khoản vay < 1.5: xu hướng ${riskLabel('high')}.`,
+        `Tỷ lệ thu nhập/khoản vay >= 2.5: xu hướng ${riskLabel('low')} — có thể ưu tiên tăng hạn mức thận trọng cho nhóm hồ sơ tốt.`,
+        `Tỷ lệ thu nhập/khoản vay từ 1.5-2.5: xu hướng ${riskLabel('medium')} — nên giữ điều kiện phê duyệt chuẩn và theo dõi lịch trả nợ sát hơn.`,
+        `Tỷ lệ thu nhập/khoản vay < 1.5: xu hướng ${riskLabel('high')} — cần siết điều kiện, tăng tài sản bảo đảm hoặc giảm hạn mức đề xuất.`,
       ];
     }
     return [
-      `Income-to-loan ratio >= 2.5: tends toward ${riskLabel('low')} risk.`,
-      `Income-to-loan ratio 1.5-2.5: tends toward ${riskLabel('medium')} risk.`,
-      `Income-to-loan ratio < 1.5: tends toward ${riskLabel('high')} risk.`,
+      `Income-to-loan ratio >= 2.5: tends toward ${riskLabel('low')} risk — suitable for cautious limit expansion in strong profiles.`,
+      `Income-to-loan ratio 1.5-2.5: tends toward ${riskLabel('medium')} risk — keep baseline approval constraints and tighter repayment monitoring.`,
+      `Income-to-loan ratio < 1.5: tends toward ${riskLabel('high')} risk — tighten conditions, require stronger collateral, or reduce proposed limits.`,
     ];
   }, [locale]);
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
+    <div className="motion-enter flex flex-col gap-5 lg:gap-6 p-4 sm:p-5 lg:p-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('risk.analyze.title')}</h1>
@@ -374,7 +390,7 @@ export default function RiskAnalyzePage() {
                   {dynamicInsights.map((insight, idx) => (
                     <div key={idx} className="flex gap-3">
                       <div className="h-2 w-2 rounded-full bg-accent mt-2 flex-shrink-0" />
-                      <p className="text-sm text-muted-foreground">{insight}</p>
+                      <p className="table-note">{insight}</p>
                     </div>
                   ))}
                 </div>
@@ -500,13 +516,13 @@ export default function RiskAnalyzePage() {
               <CardTitle>{t('risk.analyze.findings_title')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
+              <p className="table-note">
                 {dynamicCorrelationSummary}
               </p>
               <div className="rounded-lg border border-border/60 bg-secondary p-3">
                 <p className="text-sm font-medium">{t('risk.analyze.strong_indicators')}</p>
                 <ScrollableListRegion className="mt-2 max-h-[min(40vh,16rem)] border-0 bg-transparent p-0 shadow-none">
-                  <ul className="space-y-1 pr-1 text-sm text-muted-foreground">
+                  <ul className="space-y-1 pr-1 table-note">
                     {dynamicIndicators.map((item, idx) => (
                       <li key={idx}>• {item}</li>
                     ))}

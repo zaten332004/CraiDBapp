@@ -383,8 +383,7 @@ export default function RiskScorePage() {
       setIsExplanationOpen(false);
       await syncCustomerAfterScoring(data?.risk_label, data?.risk_score, data?.cic_score);
     } catch (err) {
-      const message = err instanceof Error ? err.message : apiErr(err);
-      notifyError(t('toast.risk_score_failed'), { description: message });
+      notifyError(t('toast.risk_score_failed'), { description: apiErr(err) });
     } finally {
       setIsLoading(false);
     }

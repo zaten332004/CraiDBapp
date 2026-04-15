@@ -12,7 +12,7 @@ import { formatDateVietnam } from '@/lib/datetime';
 import { formatCompactVnd } from '@/lib/money';
 import { RECHART_MARGIN, RECHART_Y_WIDTH } from '@/lib/recharts-layout';
 
-type PortfolioKPI = { total_exposure: number; avg_pd: number; npl_ratio: number };
+type PortfolioKPI = { total_exposure: number; avg_pd: number; npl_ratio: number; expected_loss?: number; var_99?: number };
 type PortfolioTrend = { points: Array<{ timestamp: string; value: number }> };
 type RiskDistribution = { chart_data: Array<{ bucket: string; value: number; count?: number }> };
 type Concentration = { items: Array<{ name: string; exposure: number }> };
@@ -54,7 +54,8 @@ export default function PortfolioOverviewPage() {
   const moneyLocale = locale === 'vi' ? 'vi' : 'en';
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [kpi, setKpi] = useState<PortfolioKPI | null>(null);
-  const [trendData, setTrendData] = useState<Array<{ month: string; value: number; score: number }>>([]);
+  const [trendData, setTrendData] = useState<Array<{ month: string; value: number; avgPd: number; npl: number }>>([]);
+  const [lossTrendData, setLossTrendData] = useState<Array<{ month: string; expectedLoss: number; var99: number }>>([]);
   const [riskDistribution, setRiskDistribution] = useState<Array<{ level: string; value: number; count: number; fill: string }>>([]);
   /** Gom theo Customer.occupation (backend group_by=occupation). */
   const [sectorByOccupation, setSectorByOccupation] = useState<Array<{ name: string; exposure: number }>>([]);
@@ -64,9 +65,13 @@ export default function PortfolioOverviewPage() {
     let cancelled = false;
     const load = async () => {
       try {
-        const [kpiData, trend, dist, concSector] = await Promise.all([
+        const [kpiData, trend, avgPdTrend, nplTrend, expectedLossTrend, var99Trend, dist, concSector] = await Promise.all([
           browserApiFetchAuth<PortfolioKPI>('/portfolio/kpi', { method: 'GET' }),
           browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=total_exposure&interval=month', { method: 'GET' }),
+          browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=avg_pd&interval=month', { method: 'GET' }).catch(() => null),
+          browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=npl_ratio&interval=month', { method: 'GET' }).catch(() => null),
+          browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=expected_loss&interval=month', { method: 'GET' }).catch(() => null),
+          browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=var_99&interval=month', { method: 'GET' }).catch(() => null),
           browserApiFetchAuth<RiskDistribution>('/portfolio/risk-distribution', { method: 'GET' }),
           browserApiFetchAuth<Concentration>('/portfolio/concentration?group_by=occupation&top_n=20', { method: 'GET' }),
         ]);
@@ -74,13 +79,27 @@ export default function PortfolioOverviewPage() {
         setKpi(kpiData);
         const distMap = Object.fromEntries((dist.chart_data || []).map((item) => [item.bucket, item.value]));
         const countMap = Object.fromEntries((dist.chart_data || []).map((item) => [item.bucket, Number(item.count || 0)]));
-        const avgScore = (Number(distMap.low || 0) * 85 + Number(distMap.medium || 0) * 65 + Number(distMap.high || 0) * 35)
-          / Math.max(Number(distMap.low || 0) + Number(distMap.medium || 0) + Number(distMap.high || 0), 1);
-        setTrendData((trend.points || []).map((item) => ({
-          month: formatDateVietnam(item.timestamp, 'vi', { month: 'short' }),
-          value: Number(item.value || 0),
-          score: Number(avgScore.toFixed(1)),
-        })));
+        const avgPdMap = new Map((avgPdTrend?.points || []).map((item) => [String(item.timestamp || ''), Number(item.value || 0)]));
+        const nplMap = new Map((nplTrend?.points || []).map((item) => [String(item.timestamp || ''), Number(item.value || 0)]));
+        const expectedLossMap = new Map((expectedLossTrend?.points || []).map((item) => [String(item.timestamp || ''), Number(item.value || 0)]));
+        const var99Map = new Map((var99Trend?.points || []).map((item) => [String(item.timestamp || ''), Number(item.value || 0)]));
+        setTrendData((trend.points || []).map((item) => {
+          const ts = String(item.timestamp || '');
+          return {
+            month: formatDateVietnam(item.timestamp, locale, { month: 'short' }),
+            value: Number(item.value || 0),
+            avgPd: Number(((avgPdMap.get(ts) ?? Number(kpiData.avg_pd || 0)) * 100).toFixed(2)),
+            npl: Number(((nplMap.get(ts) ?? Number(kpiData.npl_ratio || 0)) * 100).toFixed(2)),
+          };
+        }));
+        setLossTrendData((trend.points || []).map((item) => {
+          const ts = String(item.timestamp || '');
+          return {
+            month: formatDateVietnam(item.timestamp, locale, { month: 'short' }),
+            expectedLoss: Number(expectedLossMap.get(ts) ?? Number(kpiData.expected_loss || 0)),
+            var99: Number(var99Map.get(ts) ?? Number(kpiData.var_99 || 0)),
+          };
+        }));
         setRiskDistribution([
           { level: 'low', value: Number(distMap.low || 0), count: countMap.low || 0, fill: CHART_COLORS.lowRisk },
           { level: 'medium', value: Number(distMap.medium || 0), count: countMap.medium || 0, fill: CHART_COLORS.mediumRisk },
@@ -96,7 +115,7 @@ export default function PortfolioOverviewPage() {
     };
     void load();
     return () => { cancelled = true; };
-  }, [msgLocale, t]);
+  }, [locale, msgLocale, t]);
 
   const riskDistributionLocalized = riskDistribution.map((x) => ({ ...x, name: t(`risk.level.${x.level}`) }));
   const { sectorBreakdownLocalized, sectorOthersSummary } = useMemo(() => {
@@ -129,27 +148,37 @@ export default function PortfolioOverviewPage() {
     { titleKey: 'portfolio.kpi.avg_score', value: `${Math.round((1 - (kpi?.avg_pd || 0)) * 100)}` },
     { titleKey: 'portfolio.kpi.customer_count', value: `${portfolioCustomerCount}` },
     { titleKey: 'portfolio.kpi.health', value: (kpi?.npl_ratio || 0) < 0.1 ? 'Good' : 'Watch' },
+    {
+      titleKey: locale === 'vi' ? 'Tổn thất kỳ vọng' : 'Expected loss',
+      value: formatCompactVnd(Number(kpi?.expected_loss || 0), moneyLocale),
+    },
+    {
+      titleKey: 'VaR 99%',
+      value: formatCompactVnd(Number(kpi?.var_99 || 0), moneyLocale),
+    },
   ], [kpi, portfolioCustomerCount, moneyLocale]);
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
+    <div className="motion-enter flex flex-col gap-5 lg:gap-6 p-4 sm:p-5 lg:p-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('portfolio.overview.title')}</h1>
         <p className="text-muted-foreground mt-2">{t('portfolio.overview.desc')}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="motion-stagger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {portfolioMetrics.map((metric, idx) => (
           <Card key={idx}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{t(metric.titleKey)}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {metric.titleKey.includes('.') ? t(metric.titleKey) : metric.titleKey}
+              </CardTitle>
             </CardHeader>
             <CardContent><div className="text-2xl font-bold">{metric.value}</div></CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+      <div className="motion-stagger grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
         <Card>
           <CardHeader>
             <CardTitle>{t('portfolio.overview.trend_title')}</CardTitle>
@@ -167,11 +196,25 @@ export default function PortfolioOverviewPage() {
                   tickMargin={8}
                   tick={{ fontSize: 11 }}
                 />
-                <YAxis yAxisId="right" orientation="right" width={RECHART_Y_WIDTH.score} tickMargin={8} />
-                <Tooltip formatter={(value: number, name: string) => name === t('portfolio.overview.legend_value') ? [formatCompactVnd(Number(value), moneyLocale), name] : [value, name]} />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  width={RECHART_Y_WIDTH.score}
+                  tickMargin={8}
+                  tickFormatter={(v) => `${Number(v).toFixed(0)}%`}
+                />
+                <Tooltip
+                  formatter={(value: number, name: string) => {
+                    if (name === t('portfolio.overview.legend_value')) {
+                      return [formatCompactVnd(Number(value), moneyLocale), name];
+                    }
+                    return [`${Number(value).toFixed(2)}%`, name];
+                  }}
+                />
                 <Legend />
                 <Line yAxisId="left" type="monotone" dataKey="value" stroke={CHART_COLORS.exposure} strokeWidth={2} name={t('portfolio.overview.legend_value')} />
-                <Line yAxisId="right" type="monotone" dataKey="score" stroke={CHART_COLORS.avgScore} strokeWidth={2} name={t('portfolio.overview.legend_avg_score')} />
+                <Line yAxisId="right" type="monotone" dataKey="avgPd" stroke={CHART_COLORS.avgScore} strokeWidth={2} name="Avg PD %" />
+                <Line yAxisId="right" type="monotone" dataKey="npl" stroke={CHART_COLORS.highRisk} strokeWidth={2} name="NPL %" />
               </LineChart>
             </ResponsiveContainer>
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -186,6 +229,12 @@ export default function PortfolioOverviewPage() {
                 className="border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-400/60 dark:bg-indigo-500/32 dark:text-indigo-50"
               >
                 {t('portfolio.overview.chart_badge_avg_score')}
+              </Badge>
+              <Badge
+                variant="outline"
+                className="border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-400/60 dark:bg-rose-500/32 dark:text-rose-50"
+              >
+                NPL %
               </Badge>
             </div>
           </CardContent>
@@ -210,6 +259,44 @@ export default function PortfolioOverviewPage() {
               </PieChart>
             </ResponsiveContainer>
             <p className="mt-3 text-xs text-muted-foreground">{t('portfolio.overview.risk_color_legend')}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{locale === 'vi' ? 'Xu hướng tổn thất & VaR' : 'Loss & VaR trend'}</CardTitle>
+            <CardDescription>
+              {locale === 'vi'
+                ? 'Biến động tổn thất kỳ vọng và VaR 99% theo chu kỳ.'
+                : 'Expected loss and VaR 99% movement over periods.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={lossTrendData} margin={RECHART_MARGIN.lineDualY}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" tickMargin={8} />
+                <YAxis
+                  tickFormatter={(value) => formatCompactVnd(Number(value), moneyLocale)}
+                  width={RECHART_Y_WIDTH.money}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
+                />
+                <Tooltip
+                  formatter={(value: number, name: string) => [
+                    formatCompactVnd(Number(value), moneyLocale),
+                    name === 'expectedLoss'
+                      ? locale === 'vi'
+                        ? 'Tổn thất kỳ vọng'
+                        : 'Expected loss'
+                      : 'VaR 99%',
+                  ]}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="expectedLoss" stroke="#22c1d6" strokeWidth={2} name={locale === 'vi' ? 'Tổn thất kỳ vọng' : 'Expected loss'} />
+                <Line type="monotone" dataKey="var99" stroke="#f97316" strokeWidth={2} name="VaR 99%" />
+              </LineChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>

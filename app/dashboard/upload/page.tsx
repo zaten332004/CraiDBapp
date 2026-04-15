@@ -196,9 +196,8 @@ export default function UploadPage() {
         setIsUploading(false);
       }, 2000);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       notifyError(t('toast.upload_import_failed'), {
-        description: message,
+        description: apiErr(error),
         details: [
           `File: ${file?.name || '-'}`,
           `Size: ${file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : '-'}`,

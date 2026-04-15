@@ -15,7 +15,7 @@ export function AppToaster({ ...props }: ToasterProps) {
       theme={theme as ToasterProps['theme']}
       position="top-center"
       closeButton={false}
-      duration={4000}
+      duration={4600}
       visibleToasts={4}
       expand={false}
       offset={20}

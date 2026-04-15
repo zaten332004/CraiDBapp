@@ -42,6 +42,7 @@ export const API_GROUPS: ApiGroup[] = [
       { method: "POST", path: "/auth/register/approve", auth: "admin" },
       { method: "POST", path: "/auth/register/reject", auth: "admin" },
       { method: "GET", path: "/auth/register/registration/{user_id}", auth: "admin" },
+      { method: "GET", path: "/auth/register/list?status_filter=pending", auth: "admin" },
     ],
   },
   {
@@ -76,7 +77,12 @@ export const API_GROUPS: ApiGroup[] = [
       { method: "GET", path: "/portfolio/kpi", auth: "auth" },
       { method: "GET", path: "/portfolio/risk-distribution", auth: "auth" },
       { method: "GET", path: "/portfolio/concentration", auth: "auth" },
-      { method: "GET", path: "/portfolio/trend", auth: "auth" },
+      {
+        method: "GET",
+        path: "/portfolio/trend?metric=total_exposure|avg_pd|npl_ratio|expected_loss|var_99&interval=month",
+        auth: "auth",
+      },
+      { method: "GET", path: "/portfolio/risk-factor-impact", auth: "auth" },
       { method: "POST", path: "/portfolio/compare", auth: "auth" },
     ],
   },
