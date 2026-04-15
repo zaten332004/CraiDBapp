@@ -219,7 +219,11 @@ export function AppSidebar() {
     );
   };
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
+  const isActive = (href: string) => {
+    // Keep Dashboard active only on the exact page, not on all dashboard sub-routes.
+    if (href === '/dashboard') return pathname === '/dashboard';
+    return pathname === href || pathname.startsWith(href + '/');
+  };
   const isAdmin = role === 'admin';
   const isViewer = role === 'viewer';
   const isAnalyst = role === 'analyst';

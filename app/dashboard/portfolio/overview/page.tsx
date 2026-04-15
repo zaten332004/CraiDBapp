@@ -55,7 +55,6 @@ export default function PortfolioOverviewPage() {
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [kpi, setKpi] = useState<PortfolioKPI | null>(null);
   const [trendData, setTrendData] = useState<Array<{ month: string; value: number; avgPd: number; npl: number }>>([]);
-  const [lossTrendData, setLossTrendData] = useState<Array<{ month: string; expectedLoss: number; var99: number }>>([]);
   const [riskDistribution, setRiskDistribution] = useState<Array<{ level: string; value: number; count: number; fill: string }>>([]);
   /** Gom theo Customer.occupation (backend group_by=occupation). */
   const [sectorByOccupation, setSectorByOccupation] = useState<Array<{ name: string; exposure: number }>>([]);
@@ -65,13 +64,11 @@ export default function PortfolioOverviewPage() {
     let cancelled = false;
     const load = async () => {
       try {
-        const [kpiData, trend, avgPdTrend, nplTrend, expectedLossTrend, var99Trend, dist, concSector] = await Promise.all([
+        const [kpiData, trend, avgPdTrend, nplTrend, dist, concSector] = await Promise.all([
           browserApiFetchAuth<PortfolioKPI>('/portfolio/kpi', { method: 'GET' }),
           browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=total_exposure&interval=month', { method: 'GET' }),
           browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=avg_pd&interval=month', { method: 'GET' }).catch(() => null),
           browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=npl_ratio&interval=month', { method: 'GET' }).catch(() => null),
-          browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=expected_loss&interval=month', { method: 'GET' }).catch(() => null),
-          browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=var_99&interval=month', { method: 'GET' }).catch(() => null),
           browserApiFetchAuth<RiskDistribution>('/portfolio/risk-distribution', { method: 'GET' }),
           browserApiFetchAuth<Concentration>('/portfolio/concentration?group_by=occupation&top_n=20', { method: 'GET' }),
         ]);
@@ -81,8 +78,6 @@ export default function PortfolioOverviewPage() {
         const countMap = Object.fromEntries((dist.chart_data || []).map((item) => [item.bucket, Number(item.count || 0)]));
         const avgPdMap = new Map((avgPdTrend?.points || []).map((item) => [String(item.timestamp || ''), Number(item.value || 0)]));
         const nplMap = new Map((nplTrend?.points || []).map((item) => [String(item.timestamp || ''), Number(item.value || 0)]));
-        const expectedLossMap = new Map((expectedLossTrend?.points || []).map((item) => [String(item.timestamp || ''), Number(item.value || 0)]));
-        const var99Map = new Map((var99Trend?.points || []).map((item) => [String(item.timestamp || ''), Number(item.value || 0)]));
         setTrendData((trend.points || []).map((item) => {
           const ts = String(item.timestamp || '');
           return {
@@ -90,14 +85,6 @@ export default function PortfolioOverviewPage() {
             value: Number(item.value || 0),
             avgPd: Number(((avgPdMap.get(ts) ?? Number(kpiData.avg_pd || 0)) * 100).toFixed(2)),
             npl: Number(((nplMap.get(ts) ?? Number(kpiData.npl_ratio || 0)) * 100).toFixed(2)),
-          };
-        }));
-        setLossTrendData((trend.points || []).map((item) => {
-          const ts = String(item.timestamp || '');
-          return {
-            month: formatDateVietnam(item.timestamp, locale, { month: 'short' }),
-            expectedLoss: Number(expectedLossMap.get(ts) ?? Number(kpiData.expected_loss || 0)),
-            var99: Number(var99Map.get(ts) ?? Number(kpiData.var_99 || 0)),
           };
         }));
         setRiskDistribution([
@@ -149,6 +136,16 @@ export default function PortfolioOverviewPage() {
     { titleKey: 'portfolio.kpi.customer_count', value: `${portfolioCustomerCount}` },
     { titleKey: 'portfolio.kpi.health', value: (kpi?.npl_ratio || 0) < 0.1 ? 'Good' : 'Watch' },
   ], [kpi, portfolioCustomerCount, moneyLocale]);
+  const exposureIndexData = useMemo(
+    () =>
+      riskDistribution.map((item) => ({
+        level: t(`risk.level.${item.level}`),
+        index: Math.round(
+          item.count * (item.level === 'high' ? 100 : item.level === 'medium' ? 65 : 35),
+        ),
+      })),
+    [riskDistribution, t],
+  );
 
   return (
     <div className="motion-enter flex flex-col gap-5 lg:gap-6 p-4 sm:p-5 lg:p-6">
@@ -157,7 +154,7 @@ export default function PortfolioOverviewPage() {
         <p className="text-muted-foreground mt-2">{t('portfolio.overview.desc')}</p>
       </div>
 
-      <div className="motion-stagger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="motion-stagger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {portfolioMetrics.map((metric, idx) => (
           <Card key={idx}>
             <CardHeader className="pb-2">
@@ -256,38 +253,32 @@ export default function PortfolioOverviewPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{locale === 'vi' ? 'Xu hướng tổn thất & VaR' : 'Loss & VaR trend'}</CardTitle>
+            <CardTitle>{locale === 'vi' ? 'Chỉ số phơi nhiễm theo nhóm rủi ro' : 'Exposure index by risk segment'}</CardTitle>
             <CardDescription>
               {locale === 'vi'
-                ? 'Biến động tổn thất kỳ vọng và VaR 99% theo chu kỳ.'
-                : 'Expected loss and VaR 99% movement over periods.'}
+                ? 'Biểu đồ cột dựa trên số lượng hồ sơ từng nhóm rủi ro (Low x35, Medium x65, High x100).'
+                : 'Bar chart weighted by record count per risk level (Low x35, Medium x65, High x100).'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={lossTrendData} margin={RECHART_MARGIN.lineDualY}>
+              <BarChart data={exposureIndexData} margin={RECHART_MARGIN.barScoreBuckets}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tickMargin={8} />
+                <XAxis dataKey="level" tickMargin={8} />
                 <YAxis
-                  tickFormatter={(value) => formatCompactVnd(Number(value), moneyLocale)}
-                  width={RECHART_Y_WIDTH.money}
+                  width={RECHART_Y_WIDTH.count}
                   tickMargin={8}
                   tick={{ fontSize: 11 }}
                 />
                 <Tooltip
-                  formatter={(value: number, name: string) => [
-                    formatCompactVnd(Number(value), moneyLocale),
-                    name === 'expectedLoss'
-                      ? locale === 'vi'
-                        ? 'Tổn thất kỳ vọng'
-                        : 'Expected loss'
-                      : 'VaR 99%',
+                  formatter={(value: number) => [
+                    value,
+                    locale === 'vi' ? 'Chỉ số phơi nhiễm' : 'Exposure index',
                   ]}
                 />
                 <Legend />
-                <Line type="monotone" dataKey="expectedLoss" stroke="#22c1d6" strokeWidth={2} name={locale === 'vi' ? 'Tổn thất kỳ vọng' : 'Expected loss'} />
-                <Line type="monotone" dataKey="var99" stroke="#f97316" strokeWidth={2} name="VaR 99%" />
-              </LineChart>
+                <Bar dataKey="index" fill="#f97316" radius={[6, 6, 0, 0]} name={locale === 'vi' ? 'Chỉ số phơi nhiễm' : 'Exposure index'} />
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>

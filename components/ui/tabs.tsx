@@ -100,7 +100,7 @@ const TabsList = React.forwardRef<
       ref={setRefs}
       data-slot="tabs-list"
       className={cn(
-        'relative isolate inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground',
+        'relative isolate inline-flex h-9 w-fit items-center justify-center overflow-hidden rounded-lg bg-muted p-[3px] text-muted-foreground',
         className,
       )}
       {...props}
@@ -108,7 +108,7 @@ const TabsList = React.forwardRef<
       <span
         aria-hidden
         className={cn(
-          'pointer-events-none absolute z-0 rounded-md bg-background shadow-sm ring-1 ring-black/[0.04] will-change-[left,top,width,height] transition-[left,top,width,height,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:will-change-auto motion-reduce:transition-none dark:ring-white/10',
+          'pointer-events-none absolute z-0 rounded-md bg-background shadow-sm ring-1 ring-black/[0.04] will-change-[left,top,width,height,opacity,transform] transition-[left,top,width,height,opacity,transform] duration-380 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:will-change-auto motion-reduce:transition-none dark:ring-white/10',
         )}
         style={{
           left: indicator.left,
@@ -116,6 +116,7 @@ const TabsList = React.forwardRef<
           width: indicator.width,
           height: indicator.height,
           opacity: indicator.opacity,
+          transform: indicator.opacity ? 'translateY(0)' : 'translateY(-2px)',
         }}
       />
       {children}
@@ -132,7 +133,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        'relative z-[1] inline-flex h-[calc(100%-1px)] flex-1 origin-center items-center justify-center gap-1.5 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-muted-foreground transition-[color,transform,opacity] duration-200 ease-out hover:text-foreground/90 data-[state=active]:text-foreground data-[state=inactive]:motion-safe:hover:scale-[1.03] data-[state=inactive]:motion-safe:active:scale-[0.98] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
+        'relative z-[1] inline-flex h-[calc(100%-1px)] flex-1 origin-center items-center justify-center gap-1.5 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-muted-foreground transition-[color,transform,opacity] duration-220 ease-out hover:text-foreground/90 data-[state=active]:text-foreground data-[state=active]:motion-safe:animate-in data-[state=active]:motion-safe:fade-in-0 data-[state=active]:motion-safe:zoom-in-95 data-[state=active]:motion-safe:duration-200 data-[state=inactive]:motion-safe:hover:scale-[1.03] data-[state=inactive]:motion-safe:active:scale-[0.98] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none motion-reduce:data-[state=active]:animate-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
         className,
       )}
       {...props}

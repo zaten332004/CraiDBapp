@@ -150,11 +150,13 @@
      * Global fluid scale: makes rem-based spacing/text auto adapt across screens
      * without hard-coding per-page sizes.
      */
-    font-size: clamp(14px, 0.25vw + 13px, 16px);
+    font-size: clamp(12px, 0.35vw + 11.2px, 16px);
   }
   body {
     @apply bg-background text-foreground transition-colors duration-300;
     min-width: 320px;
+    max-width: 100vw;
+    overflow-x: hidden;
     background-image: var(--app-bg);
     background-attachment: fixed;
     background-repeat: no-repeat;
@@ -387,21 +389,30 @@
   }
 }
 
-/* Global toast behavior: top-center + drop-down animation + status colors */
-@keyframes toast-drop-in {
+/* Global toast behavior: top-center + visible fade + slide-down */
+@keyframes toast-fade-slide-down-in {
   0% {
     opacity: 0;
-    transform: translateY(-18px) scale(0.98);
+    transform: translate3d(0, -20px, 0) scale(0.98);
+  }
+  70% {
+    opacity: 1;
+    transform: translate3d(0, 2px, 0) scale(1);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 .app-toaster [data-sonner-toast] {
-  animation: toast-drop-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
   border-width: 1px;
+  transform-origin: top center;
+}
+
+.app-toaster [data-sonner-toast][data-mounted='true'],
+.app-toaster [data-sonner-toast][data-visible='true'] {
+  animation: toast-fade-slide-down-in 340ms cubic-bezier(0.18, 0.88, 0.22, 1) both !important;
 }
 
 @keyframes toast-fade-up-out {
@@ -520,56 +531,34 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.28);
 }
 
-/* Đuôi trái (AI) - hai lớp (viền + nền) để nối mạch với thân bubble */
+/* Đuôi trái (AI): mềm hơn, chỉ giữ viền đáy để không quá đậm */
 .ai-chat-bubble--in::after {
   content: '';
   position: absolute;
   left: 1rem;
-  bottom: -9px;
-  width: 16px;
-  height: 11px;
-  background: var(--ai-chat-bubble-edge);
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.ai-chat-bubble--in::before {
-  content: '';
-  position: absolute;
-  left: calc(1rem + 1px);
-  bottom: -8px;
+  bottom: -7px;
   width: 14px;
-  height: 10px;
+  height: 8px;
   background: var(--ai-chat-bubble-fill);
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  border-bottom: 1px solid color-mix(in srgb, var(--ai-chat-bubble-edge), transparent 35%);
+  border-bottom-left-radius: 4px;
+  transform: skewX(26deg);
   pointer-events: none;
   z-index: 0;
 }
 
-/* Đuôi phải (user) - hai lớp (viền + nền) để nối mạch với thân bubble */
+/* Đuôi phải (user): mềm hơn, chỉ giữ viền đáy để không quá đậm */
 .ai-chat-bubble--out::after {
   content: '';
   position: absolute;
   right: 1rem;
-  bottom: -9px;
-  width: 16px;
-  height: 11px;
-  background: var(--ai-chat-bubble-edge);
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.ai-chat-bubble--out::before {
-  content: '';
-  position: absolute;
-  right: calc(1rem + 1px);
-  bottom: -8px;
+  bottom: -7px;
   width: 14px;
-  height: 10px;
+  height: 8px;
   background: var(--ai-chat-bubble-fill);
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  border-bottom: 1px solid color-mix(in srgb, var(--ai-chat-bubble-edge), transparent 35%);
+  border-bottom-right-radius: 4px;
+  transform: skewX(-26deg);
   pointer-events: none;
   z-index: 0;
 }
@@ -631,4 +620,131 @@
 .dark .table-note {
   color: color-mix(in srgb, var(--foreground), #d7dfeb 42%);
   font-weight: 500;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Global UI motion pass (interactive + surface + overlays)                   */
+/* -------------------------------------------------------------------------- */
+:root {
+  --ui-motion-fast: 180ms;
+  --ui-motion-base: 260ms;
+  --ui-motion-slow: 360ms;
+  --ui-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes ui-surface-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* Surface cards */
+[data-slot='card'] {
+  transition:
+    transform var(--ui-motion-base) var(--ui-motion-ease),
+    box-shadow var(--ui-motion-base) var(--ui-motion-ease),
+    border-color var(--ui-motion-fast) ease,
+    background-color var(--ui-motion-fast) ease;
+}
+
+@media (hover: hover) {
+  [data-slot='card']:hover {
+    transform: translate3d(0, -2px, 0);
+    box-shadow: 0 10px 24px color-mix(in srgb, #000, transparent 88%);
+    border-color: color-mix(in srgb, var(--border), var(--primary) 20%);
+  }
+}
+
+/* Interactive controls */
+[data-slot='button'],
+[data-slot='toggle'],
+[data-slot='tabs-trigger'],
+[data-slot='select-trigger'],
+[data-slot='pagination-link'],
+[data-slot='sidebar-menu-button'],
+[data-slot='sidebar-menu-sub-button'] {
+  transition:
+    transform var(--ui-motion-fast) var(--ui-motion-ease),
+    box-shadow var(--ui-motion-fast) ease,
+    background-color var(--ui-motion-fast) ease,
+    border-color var(--ui-motion-fast) ease,
+    color var(--ui-motion-fast) ease;
+}
+
+@media (hover: hover) {
+  [data-slot='button']:hover,
+  [data-slot='toggle']:hover,
+  [data-slot='select-trigger']:hover {
+    transform: translate3d(0, -1px, 0);
+    box-shadow: 0 8px 20px color-mix(in srgb, #000, transparent 90%);
+  }
+}
+
+[data-slot='button']:active,
+[data-slot='toggle']:active,
+[data-slot='pagination-link']:active {
+  transform: translate3d(0, 0, 0) scale(0.98);
+}
+
+/* Inputs and editable fields */
+[data-slot='input'],
+textarea,
+[data-slot='input-group'] {
+  transition:
+    border-color var(--ui-motion-fast) ease,
+    box-shadow var(--ui-motion-fast) ease,
+    background-color var(--ui-motion-fast) ease;
+}
+
+/* Data rows */
+[data-slot='table-row'] {
+  transition:
+    background-color var(--ui-motion-fast) ease,
+    box-shadow var(--ui-motion-fast) ease,
+    transform var(--ui-motion-fast) ease;
+}
+
+@media (hover: hover) {
+  [data-slot='table-row']:hover {
+    transform: translate3d(1px, 0, 0);
+  }
+}
+
+/* Overlays and floating surfaces */
+[data-slot='dialog-content'][data-state='open'],
+[data-slot='alert-dialog-content'][data-state='open'],
+[data-slot='sheet-content'][data-state='open'],
+[data-slot='popover-content'][data-state='open'],
+[data-slot='dropdown-menu-content'][data-state='open'] {
+  animation: ui-surface-in var(--ui-motion-slow) var(--ui-motion-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='card'],
+  [data-slot='button'],
+  [data-slot='toggle'],
+  [data-slot='tabs-trigger'],
+  [data-slot='select-trigger'],
+  [data-slot='pagination-link'],
+  [data-slot='sidebar-menu-button'],
+  [data-slot='sidebar-menu-sub-button'],
+  [data-slot='input'],
+  textarea,
+  [data-slot='input-group'],
+  [data-slot='table-row'] {
+    transition: none !important;
+  }
+
+  [data-slot='dialog-content'][data-state='open'],
+  [data-slot='alert-dialog-content'][data-state='open'],
+  [data-slot='sheet-content'][data-state='open'],
+  [data-slot='popover-content'][data-state='open'],
+  [data-slot='dropdown-menu-content'][data-state='open'] {
+    animation: none !important;
+  }
 }

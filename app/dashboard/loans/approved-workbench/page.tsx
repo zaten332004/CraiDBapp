@@ -461,19 +461,19 @@ export default function ApprovedLoanWorkbenchPage() {
               ) : (
                 <div className="rounded-lg border border-border bg-muted/30 shadow-sm">
                   <ScrollableTableRegion className="rounded-lg border-0 bg-transparent">
-                    <Table className="w-full min-w-[980px] table-auto text-xs sm:text-sm">
+                    <Table className="w-full min-w-[860px] table-auto text-xs sm:min-w-[940px] sm:text-sm">
                       <TableHeader>
                         <TableRow className={scrollableTableHeaderRowClass}>
-                          <TableHead className="min-w-[150px] text-[12px]">{t('loans.workbench.col.customer')}</TableHead>
-                          <TableHead className="min-w-[130px] text-[12px]">{t('loans.workbench.col.ref')}</TableHead>
-                          <TableHead className="min-w-[200px] text-[12px]">{t('customers.field.loan_purpose')}</TableHead>
-                          <TableHead className="min-w-[140px] text-[12px]" title={t('loans.workbench.col.amount_hint')}>{t('loans.workbench.col.amount')}</TableHead>
-                          <TableHead className="min-w-[140px] text-[12px]">{t('loans.workbench.col.period_payment')}</TableHead>
-                          <TableHead className="min-w-[170px] text-[12px]">{t('loans.workbench.col.installment_progress')}</TableHead>
-                          <TableHead className="min-w-[120px] text-[12px]">{t('loans.workbench.col.due')}</TableHead>
-                          <TableHead className="min-w-[120px] text-[12px]">{t('loans.workbench.col.state')}</TableHead>
+                          <TableHead className="min-w-[130px] text-[12px]">{t('loans.workbench.col.customer')}</TableHead>
+                          <TableHead className="min-w-[110px] text-[12px]">{t('loans.workbench.col.ref')}</TableHead>
+                          <TableHead className="min-w-[170px] text-[12px]">{t('customers.field.loan_purpose')}</TableHead>
+                          <TableHead className="min-w-[120px] text-[12px]" title={t('loans.workbench.col.amount_hint')}>{t('loans.workbench.col.amount')}</TableHead>
+                          <TableHead className="min-w-[120px] text-[12px]">{t('loans.workbench.col.period_payment')}</TableHead>
+                          <TableHead className="min-w-[150px] text-[12px]">{t('loans.workbench.col.installment_progress')}</TableHead>
+                          <TableHead className="min-w-[110px] text-[12px]">{t('loans.workbench.col.due')}</TableHead>
+                          <TableHead className="min-w-[110px] text-[12px]">{t('loans.workbench.col.state')}</TableHead>
                           <TableHead className="min-w-[90px] text-[12px]">{t('loans.workbench.col.dpd')}</TableHead>
-                          <TableHead className="min-w-[150px] text-right text-[12px]">{t('loans.workbench.record_payment')}</TableHead>
+                          <TableHead className="min-w-[130px] text-right text-[12px]">{t('loans.workbench.record_payment')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -492,9 +492,6 @@ export default function ApprovedLoanWorkbenchPage() {
                             <TableCell className="text-[11px] leading-tight">
                               <div className="font-medium truncate" title={loanPurposeLabel(r, locale)}>
                                 {loanPurposeLabel(r, locale)}
-                              </div>
-                              <div className="text-muted-foreground truncate" title={interestFormulaLabel(r, locale)}>
-                                {interestFormulaLabel(r, locale)}
                               </div>
                             </TableCell>
                             <TableCell className="tabular-nums font-medium">

@@ -708,7 +708,7 @@ export default function AdminAuditLogsPage() {
           </div>
         </CardHeader>
         <CardContent className="pt-0 pb-3">
-          <ScrollableTableRegion className="min-h-[200px] overflow-x-hidden">
+          <ScrollableTableRegion className="min-h-[420px] max-h-[calc(100dvh-15rem)] overflow-x-hidden">
             <Table className="w-full table-fixed text-xs">
               <colgroup>
                 <col className="w-[12%]" />

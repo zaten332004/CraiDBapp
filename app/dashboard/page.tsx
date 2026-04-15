@@ -293,34 +293,63 @@ export default function DashboardPage() {
                 <CardDescription>{t('dashboard.recent_alerts_desc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 pb-4">
-                <div className="h-34">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={riskMixData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis
-                        dataKey="level"
-                        tickFormatter={(v) => t(`risk.level.${String(v).toLowerCase()}`)}
-                        tickMargin={8}
-                      />
-                      <YAxis width={RECHART_Y_WIDTH.count} tickMargin={6} tick={{ fontSize: 11 }} />
-                      <Tooltip
-                        formatter={(value: number) => [value, locale === 'vi' ? 'Số lượng hồ sơ' : 'Record count']}
-                        labelFormatter={(label) => t(`risk.level.${String(label).toLowerCase()}`)}
-                      />
-                      <Bar dataKey="count" fill="#06b6d4" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="rounded-lg border border-border bg-muted/15 p-3">
+                    <p className="text-sm font-semibold text-foreground">
+                      {locale === 'vi' ? 'Phân bổ hồ sơ theo mức rủi ro' : 'Record distribution by risk level'}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {locale === 'vi'
+                        ? 'Biểu đồ cho biết số lượng hồ sơ trong từng nhóm rủi ro thấp, trung bình và cao.'
+                        : 'This chart shows how many records fall into low, medium, and high risk groups.'}
+                    </p>
+                    <div className="mt-3 h-36">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={riskMixData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis
+                            dataKey="level"
+                            tickFormatter={(v) => t(`risk.level.${String(v).toLowerCase()}`)}
+                            tickMargin={8}
+                          />
+                          <YAxis width={RECHART_Y_WIDTH.count} tickMargin={6} tick={{ fontSize: 11 }} />
+                          <Tooltip
+                            formatter={(value: number) => [value, locale === 'vi' ? 'Số lượng hồ sơ' : 'Record count']}
+                            labelFormatter={(label) => t(`risk.level.${String(label).toLowerCase()}`)}
+                          />
+                          <Bar dataKey="count" fill="#06b6d4" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border bg-muted/15 p-3">
+                    <p className="text-sm font-semibold text-foreground">
+                      {locale === 'vi' ? 'Mức độ nghiêm trọng của cảnh báo mở' : 'Open alert severity breakdown'}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {locale === 'vi'
+                        ? 'Biểu đồ cho biết số lượng cảnh báo theo mức độ: cao, trung bình, thấp để ưu tiên xử lý.'
+                        : 'This chart summarizes open alerts by severity (high, medium, low) for prioritization.'}
+                    </p>
+                    <div className="mt-3 h-30">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={alertSeverityData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="level" tickMargin={8} />
+                          <YAxis width={RECHART_Y_WIDTH.count} tickMargin={6} tick={{ fontSize: 11 }} />
+                          <Tooltip formatter={(value: number) => [value, locale === 'vi' ? 'Cảnh báo' : 'Alerts']} />
+                          <Bar dataKey="count" fill="#f97316" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
                 </div>
-                <div className="h-28">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={alertSeverityData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="level" tickMargin={8} />
-                      <YAxis width={RECHART_Y_WIDTH.count} tickMargin={6} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(value: number) => [value, locale === 'vi' ? 'Cảnh báo' : 'Alerts']} />
-                      <Bar dataKey="count" fill="#f97316" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+
+                <div className="pt-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    {locale === 'vi' ? 'Cảnh báo gần nhất' : 'Recent alerts'}
+                  </p>
                 </div>
                 {recentAlerts.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
