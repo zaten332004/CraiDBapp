@@ -9,6 +9,7 @@ import { PageTransition } from '@/components/page-transition'
 import { RouteTransitionListener } from '@/components/route-transition-listener'
 import { AppToaster } from '@/components/app-toaster'
 import { SessionActivityTracker } from '@/components/session-activity-tracker'
+import { DisplayScaleAdapter } from '@/components/display-scale-adapter'
 
 export const metadata: Metadata = {
   title: 'CRAI DB - Intelligent Credit Risk Analytics Platform',
@@ -40,6 +41,7 @@ export default async function RootLayout({
       <body className={`font-sans antialiased`} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <I18nProvider initialLocale={initialLocale}>
+            <DisplayScaleAdapter />
             <RouteTransitionListener />
             <SessionActivityTracker />
             <PageTransition>{children}</PageTransition>

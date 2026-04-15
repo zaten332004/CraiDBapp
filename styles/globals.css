@@ -4,6 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --display-scale-adjust: 1;
   --background: #eef3fb;
   --foreground: #131722;
   --card: #ffffff;
@@ -150,7 +151,7 @@
      * Global fluid scale: makes rem-based spacing/text auto adapt across screens
      * without hard-coding per-page sizes.
      */
-    font-size: clamp(12px, 0.35vw + 11.2px, 16px);
+    font-size: calc(clamp(12px, 0.35vw + 11.2px, 16px) * var(--display-scale-adjust, 1));
   }
   body {
     @apply bg-background text-foreground transition-colors duration-300;
