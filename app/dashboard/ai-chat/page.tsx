@@ -166,6 +166,7 @@ function normalizeCustomerListResponse(data: unknown): { items: unknown[]; total
 const PENDING_FILES_STORAGE_KEY = 'crs_ai_chat_pending_uploads_v1';
 const LAST_AI_CHAT_MODEL_STORAGE_KEY = 'crs_ai_chat_last_model_v1';
 const SESSION_MODEL_STORAGE_PREFIX = 'crs_ai_chat_session_model_v1:';
+const SESSION_MESSAGES_STORAGE_PREFIX = 'crs_ai_chat_session_messages_v1:';
 
 function readStoredLastAiChatModel(): string {
   if (typeof window === 'undefined') return '';
@@ -207,6 +208,61 @@ function writeStoredSessionModel(sessionId: string, model: string) {
     window.localStorage.setItem(`${SESSION_MODEL_STORAGE_PREFIX}${sid}`, s);
   } catch {
     // ignore quota / private mode
+  }
+}
+
+function readStoredSessionMessages(sessionId: string): ChatMessage[] {
+  if (typeof window === 'undefined') return [];
+  const sid = String(sessionId || '').trim();
+  if (!sid) return [];
+  try {
+    const raw = window.sessionStorage.getItem(`${SESSION_MESSAGES_STORAGE_PREFIX}${sid}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((x): ChatMessage | null => {
+        if (!x || typeof x !== 'object') return null;
+        const o = x as Record<string, unknown>;
+        const tsRaw = Number(o.timestamp_ms);
+        const ts = Number.isFinite(tsRaw) && tsRaw > 0 ? new Date(tsRaw) : null;
+        return {
+          id: String(o.id ?? '').trim() || `cached-${Date.now()}-${Math.random()}`,
+          text: String(o.text ?? ''),
+          sender: String(o.sender) === 'user' ? 'user' : 'assistant',
+          timestamp: ts && !Number.isNaN(ts.getTime()) ? ts : null,
+          sources: Array.isArray(o.sources) ? o.sources.map(String) : undefined,
+          attachments: normalizeMessageAttachments(o.attachments),
+          raw: o.raw,
+        };
+      })
+      .filter(Boolean) as ChatMessage[];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredSessionMessages(sessionId: string, messages: ChatMessage[]) {
+  if (typeof window === 'undefined') return;
+  const sid = String(sessionId || '').trim();
+  if (!sid) return;
+  try {
+    if (!messages.length) {
+      window.sessionStorage.removeItem(`${SESSION_MESSAGES_STORAGE_PREFIX}${sid}`);
+      return;
+    }
+    const payload = messages.map((m) => ({
+      id: m.id,
+      text: m.text,
+      sender: m.sender,
+      timestamp_ms: m.timestamp && !Number.isNaN(m.timestamp.getTime()) ? m.timestamp.getTime() : null,
+      sources: m.sources ?? null,
+      attachments: m.attachments ?? null,
+      raw: m.raw ?? null,
+    }));
+    window.sessionStorage.setItem(`${SESSION_MESSAGES_STORAGE_PREFIX}${sid}`, JSON.stringify(payload));
+  } catch {
+    // ignore quota/private mode
   }
 }
 const ATTACHMENT_PREVIEW_ROW_CAP_SEND = 50;
@@ -371,35 +427,14 @@ function parseBackendChatTimestamp(value: unknown): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
-  // Backend often sends naive datetime. Treat it as Asia/Ho_Chi_Minh local time.
+  // Backend often sends naive datetime. Treat it as UTC to avoid timezone drift
+  // when rendering to Asia/Ho_Chi_Minh.
   const m = normalized.match(
     /^(\d{4})-(\d{2})-(\d{2})(?:[tT](\d{2}):(\d{2})(?::(\d{2}))?)?$/,
   );
   if (m) {
-    const year = Number(m[1]);
-    const month = Number(m[2]);
-    const day = Number(m[3]);
-    const hour = Number(m[4] ?? 0);
-    const minute = Number(m[5] ?? 0);
-    const second = Number(m[6] ?? 0);
-    if (
-      [year, month, day, hour, minute, second].every(Number.isFinite) &&
-      month >= 1 &&
-      month <= 12 &&
-      day >= 1 &&
-      day <= 31 &&
-      hour >= 0 &&
-      hour <= 23 &&
-      minute >= 0 &&
-      minute <= 59 &&
-      second >= 0 &&
-      second <= 59
-    ) {
-      // Convert local +07:00 to UTC.
-      const utcMs = Date.UTC(year, month - 1, day, hour - 7, minute, second);
-      const d = new Date(utcMs);
-      return Number.isNaN(d.getTime()) ? null : d;
-    }
+    const asUtc = new Date(`${normalized}Z`);
+    return Number.isNaN(asUtc.getTime()) ? null : asUtc;
   }
 
   const fallback = new Date(normalized);
@@ -725,6 +760,11 @@ export default function AIChatPage() {
   }, [sessionId, modelOptions, userRole]);
 
   useEffect(() => {
+    if (!sessionId?.trim()) return;
+    writeStoredSessionMessages(sessionId, messages);
+  }, [sessionId, messages]);
+
+  useEffect(() => {
     if (!previewAttachment?.id) {
       setResolvedAttachment(null);
       setAttachmentDetailLoading(false);
@@ -999,6 +1039,11 @@ export default function AIChatPage() {
     setMessages([]);
     setIsLoading(true);
     try {
+      const cached = readStoredSessionMessages(id);
+      if (cached.length > 0) {
+        setMessages(cached);
+        return;
+      }
       const list = await fetchHistoryMessages(id);
       setMessages(list);
     } catch (err) {
@@ -1154,26 +1199,19 @@ export default function AIChatPage() {
 
       if (created && newSid) {
         setSessionId(newSid);
-        try {
-          const list = await fetchHistoryMessages(newSid);
-          setMessages(list);
-        } catch (histErr) {
-          notifyError(t('toast.load_failed'), { description: apiErr(histErr) });
-          const reply =
-            String(data?.response ?? data?.reply ?? data?.message ?? '').trim() || t('ai_chat.default_reply');
-          setMessages((prev) => [
-            ...prev.filter((m) => m.id !== userMessage.id),
-            userMessage,
-            {
-              id: `a-${Date.now() + 1}`,
-              text: reply,
-              sender: 'assistant',
-              timestamp: new Date(),
-              sources: Array.isArray(data?.sources) ? data.sources.map(String) : undefined,
-              raw: data,
-            },
-          ]);
-        }
+        const reply =
+          String(data?.response ?? data?.reply ?? data?.message ?? '').trim() || t('ai_chat.default_reply');
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `a-${Date.now() + 1}`,
+            text: reply,
+            sender: 'assistant',
+            timestamp: new Date(),
+            sources: Array.isArray(data?.sources) ? data.sources.map(String) : undefined,
+            raw: data,
+          },
+        ]);
         void loadSessions();
       } else {
         const reply = String(data?.response ?? data?.reply ?? data?.message ?? '').trim() || t('ai_chat.default_reply');
