@@ -32,6 +32,11 @@ import { VndAmountInput } from '@/components/vnd-amount-input';
 import { getUserRole } from '@/lib/auth/token';
 import { badgeTone } from '@/lib/dashboard-badge-tones';
 import { sanitizeDashboardReturnTo } from '@/lib/dashboard-return-to';
+import {
+  interestRateRangeByPurpose,
+  minimumLoanAmountByType,
+  normalizeLoanPurposePolicy,
+} from '@/lib/loans/policy';
 
 export default function CustomerDetailPage() {
   const { locale, t } = useI18n();
@@ -97,20 +102,26 @@ export default function CustomerDetailPage() {
   });
 
   const LOAN_TYPE_OPTIONS = [
-    { value: 'secured', labelVi: 'Có tài sản bảo đảm', labelEn: 'Secured' },
     { value: 'unsecured', labelVi: 'Tín chấp', labelEn: 'Unsecured' },
     { value: 'mortgage', labelVi: 'Thế chấp', labelEn: 'Mortgage' },
-    { value: 'business', labelVi: 'Kinh doanh', labelEn: 'Business' },
+  ] as const;
+  const LOAN_PURPOSE_OPTIONS = [
+    { value: 'installment', labelVi: 'Vay trả góp', labelEn: 'Installment loan' },
+    { value: 'overdraft', labelVi: 'Vay thấu chi', labelEn: 'Overdraft' },
+    { value: 'credit_card', labelVi: 'Thẻ tín dụng', labelEn: 'Credit card' },
   ] as const;
 
   const normalizeLoanType = (value: unknown): string => {
     const normalized = String(value ?? '').trim().toLowerCase();
     if (!normalized) return '';
-    if (['secured', 'unsecured', 'mortgage', 'business'].includes(normalized)) return normalized;
-    if (normalized.includes('tài sản')) return 'secured';
+    if (normalized === 'unsecured' || normalized === 'mortgage') return normalized;
+    // Backward compatibility for legacy values.
+    if (normalized === 'secured') return 'mortgage';
+    if (normalized === 'business') return 'unsecured';
+    if (normalized.includes('tài sản')) return 'mortgage';
     if (normalized.includes('tín chấp')) return 'unsecured';
     if (normalized.includes('thế chấp')) return 'mortgage';
-    if (normalized.includes('kinh doanh')) return 'business';
+    if (normalized.includes('kinh doanh')) return 'unsecured';
     return normalized;
   };
 
@@ -142,7 +153,7 @@ export default function CustomerDetailPage() {
           permanent_address: String(customerData.permanent_address ?? ''),
           current_address: String(customerData.current_address ?? ''),
           loan_type: normalizeLoanType(customerData.loan_type ?? customerData.product_type),
-          loan_purpose: String(customerData.loan_purpose ?? ''),
+          loan_purpose: normalizeLoanPurposePolicy(customerData.loan_purpose),
           requested_loan_amount: vndDigitsFromUnknown(
             customerData.requested_loan_amount ?? customerData.loan_amount,
           ),
@@ -244,6 +255,9 @@ export default function CustomerDetailPage() {
       unsecured: 'Tín chấp',
       mortgage: 'Thế chấp',
       business: 'Kinh doanh',
+      installment: 'Vay trả góp',
+      overdraft: 'Vay thấu chi',
+      credit_card: 'Thẻ tín dụng',
       personal: 'Cá nhân',
       employed: 'Đang làm việc',
       unemployed: 'Thất nghiệp',
@@ -277,6 +291,34 @@ export default function CustomerDetailPage() {
     if (!customer) return;
     setIsSaving(true);
     try {
+      const normalizedLoanType = normalizeLoanType(editForm.loan_type);
+      const normalizedLoanPurpose = normalizeLoanPurposePolicy(editForm.loan_purpose);
+      const requestedLoanAmount = editForm.requested_loan_amount
+        ? parseVndDigitsToNumber(editForm.requested_loan_amount)
+        : null;
+      const annualRate = editForm.annual_interest_rate ? Number(editForm.annual_interest_rate) : null;
+      const minAmount = minimumLoanAmountByType(normalizedLoanType);
+      if (minAmount != null && requestedLoanAmount != null && Number.isFinite(requestedLoanAmount) && requestedLoanAmount < minAmount) {
+        const minLabel = formatVnd(minAmount, locale === 'vi' ? 'vi' : 'en');
+        throw new Error(
+          locale === 'vi'
+            ? `Khoản vay tối thiểu cho loại vay đã chọn là ${minLabel}.`
+            : `Minimum loan amount for the selected loan type is ${minLabel}.`,
+        );
+      }
+      const rateRange = interestRateRangeByPurpose(normalizedLoanPurpose);
+      if (
+        rateRange &&
+        annualRate != null &&
+        Number.isFinite(annualRate) &&
+        (annualRate < rateRange.minAnnualRate || annualRate > rateRange.maxAnnualRate)
+      ) {
+        throw new Error(
+          locale === 'vi'
+            ? `Lãi suất năm cho mục đích vay đã chọn phải trong khoảng ${rateRange.minAnnualRate}% - ${rateRange.maxAnnualRate}%.`
+            : `Annual interest rate for selected loan purpose must be within ${rateRange.minAnnualRate}% - ${rateRange.maxAnnualRate}%.`,
+        );
+      }
       const payload: Record<string, any> = {
         application_id: customer.application_id ?? undefined,
         phone_number: sanitizePhoneInput(editForm.phone_number || ''),
@@ -286,15 +328,15 @@ export default function CustomerDetailPage() {
         monthly_income: editForm.monthly_income ? parseVndDigitsToNumber(editForm.monthly_income) : null,
         permanent_address: editForm.permanent_address || null,
         current_address: editForm.current_address || null,
-        loan_type: normalizeLoanType(editForm.loan_type) || null,
-        product_type: normalizeLoanType(editForm.loan_type) || null,
-        loan_purpose: editForm.loan_purpose || null,
-        requested_loan_amount: editForm.requested_loan_amount ? parseVndDigitsToNumber(editForm.requested_loan_amount) : null,
-        loan_amount: editForm.requested_loan_amount ? parseVndDigitsToNumber(editForm.requested_loan_amount) : null,
+        loan_type: normalizedLoanType || null,
+        product_type: normalizedLoanType || null,
+        loan_purpose: normalizedLoanPurpose || null,
+        requested_loan_amount: requestedLoanAmount,
+        loan_amount: requestedLoanAmount,
         requested_term_months: editForm.requested_term_months ? Number(editForm.requested_term_months) : null,
         loan_term_months: editForm.requested_term_months ? Number(editForm.requested_term_months) : null,
-        annual_interest_rate: editForm.annual_interest_rate ? Number(editForm.annual_interest_rate) : null,
-        interest_rate: editForm.annual_interest_rate ? Number(editForm.annual_interest_rate) : null,
+        annual_interest_rate: annualRate,
+        interest_rate: annualRate,
         collateral_id: editForm.collateral_id || null,
         collateral_value: editForm.collateral_value ? parseVndDigitsToNumber(editForm.collateral_value) : null,
         collateral_amount: editForm.collateral_value ? parseVndDigitsToNumber(editForm.collateral_value) : null,
@@ -371,11 +413,11 @@ export default function CustomerDetailPage() {
   };
 
   if (!customer) {
-    return <div className="p-8 text-sm text-muted-foreground">{t('customers.detail.loading')}</div>;
+    return <div className="p-4 sm:p-6 lg:p-8 text-sm text-muted-foreground">{t('customers.detail.loading')}</div>;
   }
 
   return (
-    <div className="flex flex-col gap-8 p-8">
+    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -604,7 +646,23 @@ export default function CustomerDetailPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                        ) : fieldId === 'loan_amount' ? (
+                      ) : fieldId === 'loan_purpose' ? (
+                        <Select
+                          value={editForm.loan_purpose || ''}
+                          onValueChange={(v) => setEditForm((p) => ({ ...p, loan_purpose: v }))}
+                        >
+                          <SelectTrigger className="h-9 w-full">
+                            <SelectValue placeholder={isVi ? 'Chọn mục đích vay' : 'Select loan purpose'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {LOAN_PURPOSE_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {isVi ? opt.labelVi : opt.labelEn}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : fieldId === 'loan_amount' ? (
                           <VndAmountInput
                             className="h-9"
                             valueDigits={editForm.requested_loan_amount}
@@ -630,8 +688,7 @@ export default function CustomerDetailPage() {
                             }
                             onChange={(e) => {
                               const v = e.target.value;
-                              if (fieldId === 'loan_purpose') setEditForm((p) => ({ ...p, loan_purpose: v }));
-                              else if (fieldId === 'loan_term') setEditForm((p) => ({ ...p, requested_term_months: v.replace(/[^\d]/g, '') }));
+                              if (fieldId === 'loan_term') setEditForm((p) => ({ ...p, requested_term_months: v.replace(/[^\d]/g, '') }));
                               else if (fieldId === 'interest_rate') setEditForm((p) => ({ ...p, annual_interest_rate: v.replace(/[^\d.]/g, '') }));
                               else setEditForm((p) => ({ ...p, collateral_id: v }));
                             }}

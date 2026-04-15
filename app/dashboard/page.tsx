@@ -135,7 +135,7 @@ export default function DashboardPage() {
   }, [kpi?.avg_pd, kpi?.npl_ratio, locale, customerCount, openAlertsCount, pendingApprovalsCount, activeUsersCount, role]);
 
   return (
-    <div className="flex flex-col gap-8 p-8">
+    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('dashboard.title')}</h1>
         <p className="text-muted-foreground mt-2">

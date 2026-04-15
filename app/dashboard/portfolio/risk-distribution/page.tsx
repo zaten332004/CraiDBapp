@@ -83,7 +83,7 @@ export default function RiskDistributionPage() {
   }, [riskData]);
 
   return (
-    <div className="flex flex-col gap-8 p-8">
+    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('portfolio.risk_dist.title')}</h1>
         <p className="text-muted-foreground mt-2">
@@ -91,7 +91,7 @@ export default function RiskDistributionPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
         <Card>
           <CardHeader>
             <CardTitle>{t('portfolio.risk_dist.level_title')}</CardTitle>

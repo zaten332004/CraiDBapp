@@ -384,7 +384,7 @@ export default function UploadPage() {
   const duplicateCounts = getCountsByDuplicateType();
 
   return (
-    <div className="flex flex-col gap-8 p-8">
+    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div>
         <div className="flex flex-wrap items-center gap-3">
@@ -399,7 +399,7 @@ export default function UploadPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         {/* Upload Area */}
         <div className="lg:col-span-2 space-y-6">
           {isViewer && (

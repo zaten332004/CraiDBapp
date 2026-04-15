@@ -14,14 +14,22 @@ import { browserApiFetchAuth } from '@/lib/api/browser';
 import { type UserFacingLocale } from '@/lib/api/format-api-error';
 import { notifyApiError, notifyError, notifySuccess } from '@/lib/notify';
 import { sanitizeDashboardReturnTo } from '@/lib/dashboard-return-to';
-import { parseVndDigitsToNumber } from '@/lib/money';
+import { formatVnd, parseVndDigitsToNumber } from '@/lib/money';
+import {
+  interestRateRangeByPurpose,
+  minimumLoanAmountByType,
+  normalizeLoanPurposePolicy,
+} from '@/lib/loans/policy';
 import { VndAmountInput } from '@/components/vnd-amount-input';
 
 const LOAN_TYPE_OPTIONS = [
-  { value: 'secured', labelVi: 'Có tài sản bảo đảm', labelEn: 'Secured' },
   { value: 'unsecured', labelVi: 'Tín chấp', labelEn: 'Unsecured' },
   { value: 'mortgage', labelVi: 'Thế chấp', labelEn: 'Mortgage' },
-  { value: 'business', labelVi: 'Kinh doanh', labelEn: 'Business' },
+] as const;
+const LOAN_PURPOSE_OPTIONS = [
+  { value: 'installment', labelVi: 'Vay trả góp', labelEn: 'Installment loan' },
+  { value: 'overdraft', labelVi: 'Vay thấu chi', labelEn: 'Overdraft' },
+  { value: 'credit_card', labelVi: 'Thẻ tín dụng', labelEn: 'Credit card' },
 ] as const;
 
 function RequiredMark() {
@@ -68,7 +76,10 @@ export default function NewLoanApplicationPage() {
     collateral_value: '',
   });
 
-  const collateralFieldsRequired = form.loan_type === 'secured' || form.loan_type === 'mortgage';
+  const minimumLoanAmount = minimumLoanAmountByType(form.loan_type);
+  const normalizedLoanPurpose = normalizeLoanPurposePolicy(form.loan_purpose);
+  const interestRateRange = interestRateRangeByPurpose(normalizedLoanPurpose);
+  const collateralFieldsRequired = form.loan_type === 'mortgage';
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,8 +88,25 @@ export default function NewLoanApplicationPage() {
       const amt = parseVndDigitsToNumber(form.requested_loan_amount);
       const term = Number(form.requested_term_months);
       if (!Number.isFinite(amt) || amt <= 0) throw new Error(t('customers.new_loan.err_invalid_amount'));
+      if (minimumLoanAmount != null && amt < minimumLoanAmount) {
+        const minLabel = formatVnd(minimumLoanAmount, locale === 'vi' ? 'vi' : 'en');
+        const msg =
+          locale === 'vi'
+            ? `Khoản vay tối thiểu cho loại vay đã chọn là ${minLabel}.`
+            : `Minimum loan amount for the selected loan type is ${minLabel}.`;
+        throw new Error(msg);
+      }
       if (!Number.isInteger(term) || term <= 0) throw new Error(t('customers.new_loan.err_invalid_term'));
-      if (!form.loan_purpose.trim()) throw new Error(t('customers.new_loan.err_purpose_required'));
+      if (!normalizedLoanPurpose) throw new Error(t('customers.new_loan.err_purpose_required'));
+      const annualRate = form.annual_interest_rate ? Number(form.annual_interest_rate) : NaN;
+      if (!Number.isFinite(annualRate) || annualRate <= 0) throw new Error(t('customers.new.err.annual_interest_rate'));
+      if (interestRateRange && (annualRate < interestRateRange.minAnnualRate || annualRate > interestRateRange.maxAnnualRate)) {
+        const msg =
+          locale === 'vi'
+            ? `Lãi suất năm cho mục đích vay đã chọn phải trong khoảng ${interestRateRange.minAnnualRate}% - ${interestRateRange.maxAnnualRate}%.`
+            : `Annual interest rate for selected loan purpose must be within ${interestRateRange.minAnnualRate}% - ${interestRateRange.maxAnnualRate}%.`;
+        throw new Error(msg);
+      }
       if (collateralFieldsRequired) {
         const cv = parseVndDigitsToNumber(form.collateral_value);
         if (!form.collateral_id.trim() || !Number.isFinite(cv) || cv <= 0) {
@@ -89,11 +117,11 @@ export default function NewLoanApplicationPage() {
       await browserApiFetchAuth(`/customers/${customerId}/loan-applications`, {
         method: 'POST',
         body: {
-          loan_purpose: form.loan_purpose.trim(),
+          loan_purpose: normalizedLoanPurpose,
           loan_type: form.loan_type || undefined,
           requested_loan_amount: amt,
           requested_term_months: term,
-          annual_interest_rate: form.annual_interest_rate ? Number(form.annual_interest_rate) : undefined,
+          annual_interest_rate: annualRate,
           collateral_id: form.collateral_id.trim() || undefined,
           collateral_value: form.collateral_value ? parseVndDigitsToNumber(form.collateral_value) : undefined,
         },
@@ -108,7 +136,7 @@ export default function NewLoanApplicationPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8 p-8 max-w-2xl">
+    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8 max-w-2xl">
       <div className="flex items-center gap-4">
         <Link href={backToCustomerHref}>
           <Button variant="ghost" size="sm">
@@ -134,7 +162,18 @@ export default function NewLoanApplicationPage() {
                 {t('customers.field.loan_purpose')}
                 <RequiredMark />
               </Label>
-              <Input value={form.loan_purpose} onChange={(e) => setForm((p) => ({ ...p, loan_purpose: e.target.value }))} required />
+              <Select value={form.loan_purpose} onValueChange={(v) => setForm((p) => ({ ...p, loan_purpose: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder={locale === 'vi' ? 'Chọn mục đích vay' : 'Select loan purpose'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {LOAN_PURPOSE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {locale === 'vi' ? opt.labelVi : opt.labelEn}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>{t('customers.field.loan_type')}</Label>
@@ -163,6 +202,13 @@ export default function NewLoanApplicationPage() {
                   onDigitsChange={(digits) => setForm((p) => ({ ...p, requested_loan_amount: digits }))}
                   required
                 />
+                {minimumLoanAmount != null ? (
+                  <p className="text-xs text-muted-foreground">
+                    {locale === 'vi'
+                      ? `Mức tối thiểu: ${formatVnd(minimumLoanAmount, 'vi')}`
+                      : `Minimum: ${formatVnd(minimumLoanAmount, 'en')}`}
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label className="inline-flex items-center gap-1">
@@ -178,12 +224,23 @@ export default function NewLoanApplicationPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>{t('customers.field.interest_rate_display')}</Label>
+              <Label className="inline-flex items-center gap-1">
+                {t('customers.field.interest_rate_display')}
+                <RequiredMark />
+              </Label>
               <Input
                 inputMode="decimal"
                 value={form.annual_interest_rate}
                 onChange={(e) => setForm((p) => ({ ...p, annual_interest_rate: e.target.value.replace(/[^\d.]/g, '') }))}
+                required
               />
+              {interestRateRange ? (
+                <p className="text-xs text-muted-foreground">
+                  {locale === 'vi'
+                    ? `Khoảng lãi suất phù hợp: ${interestRateRange.minAnnualRate}% - ${interestRateRange.maxAnnualRate}%/năm`
+                    : `Recommended annual rate: ${interestRateRange.minAnnualRate}% - ${interestRateRange.maxAnnualRate}%`}
+                </p>
+              ) : null}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

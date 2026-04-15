@@ -8,7 +8,7 @@ import { useI18n } from '@/components/i18n-provider';
 export default function ForbiddenPage() {
   const { t } = useI18n();
   return (
-    <div className="flex flex-col gap-8 p-8">
+    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t("common.access_denied")}</h1>
         <p className="text-muted-foreground mt-2">

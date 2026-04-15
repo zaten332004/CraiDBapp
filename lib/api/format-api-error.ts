@@ -115,6 +115,54 @@ const KNOWN_MESSAGE_ROWS: Array<{ en: string; vi: string }> = [
     en: "This asset is already registered as collateral for another loan application.",
     vi: "Tài sản này đã được đăng ký đảm bảo cho hồ sơ khác.",
   },
+  {
+    en: "Power BI workspace/dataset not configured for this user.",
+    vi: "Tài khoản chưa cấu hình Workspace/Dataset Power BI.",
+  },
+  {
+    en: "Power BI workspace/dataset not configured for this user",
+    vi: "Tài khoản chưa cấu hình Workspace/Dataset Power BI.",
+  },
+  {
+    en: "Power BI account not configured for this user.",
+    vi: "Tài khoản chưa cấu hình Power BI.",
+  },
+  {
+    en: "Power BI account not configured for this user",
+    vi: "Tài khoản chưa cấu hình Power BI.",
+  },
+  {
+    en: "Power BI table hints are required before using table data.",
+    vi: "Cần cấu hình danh sách bảng Power BI trước khi sử dụng dữ liệu bảng.",
+  },
+  {
+    en: "Power BI table hints are required before using table data",
+    vi: "Cần cấu hình danh sách bảng Power BI trước khi sử dụng dữ liệu bảng.",
+  },
+  {
+    en: "Upload not found (expired job, API restarted, or set UPLOAD_JOBS_STORAGE_DIR).",
+    vi: "Không tìm thấy dữ liệu upload (job đã hết hạn, API khởi động lại, hoặc chưa cấu hình UPLOAD_JOBS_STORAGE_DIR).",
+  },
+  {
+    en: "Upload not found (expired job, API restarted, or set UPLOAD_JOBS_STORAGE_DIR)",
+    vi: "Không tìm thấy dữ liệu upload (job đã hết hạn, API khởi động lại, hoặc chưa cấu hình UPLOAD_JOBS_STORAGE_DIR).",
+  },
+  {
+    en: "Upload content not found for job.",
+    vi: "Không tìm thấy nội dung upload cho job.",
+  },
+  {
+    en: "Upload content not found for job",
+    vi: "Không tìm thấy nội dung upload cho job.",
+  },
+  {
+    en: "Upload not found.",
+    vi: "Không tìm thấy dữ liệu upload.",
+  },
+  {
+    en: "Upload not found",
+    vi: "Không tìm thấy dữ liệu upload.",
+  },
 ];
 
 function translateSingleDetailLine(d: string, locale: UserFacingLocale): string {

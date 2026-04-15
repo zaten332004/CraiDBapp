@@ -11,6 +11,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -430,6 +431,7 @@ function slimUploadedFilesForSend(files: UploadedFileCtx[]): Record<string, unkn
 }
 
 export default function AIChatPage() {
+  const searchParams = useSearchParams();
   const { t, locale } = useI18n();
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
@@ -510,6 +512,7 @@ export default function AIChatPage() {
   const [selectedModel, setSelectedModel] = useState<string>('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sourceInitDoneRef = useRef(false);
   /** Avoid re-applying stored model preferences on every render while the same session stays open. */
   const lastSessionIdModelPrefsAppliedRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -529,6 +532,18 @@ export default function AIChatPage() {
     if (aiDataSource === 'customer') return selectedCustomerIds.length > 0;
     return true;
   }, [input, pendingFiles.length, aiDataSource, selectedCustomerIds.length]);
+
+  useEffect(() => {
+    if (sourceInitDoneRef.current) return;
+    sourceInitDoneRef.current = true;
+    const source = String(searchParams.get('source') || '').trim().toLowerCase();
+    if (source !== 'powerbi') return;
+    setAiDataSource('powerbi');
+    setSelectedCustomerIds([]);
+    setPendingFiles([]);
+    if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
+    void activatePowerBiDataSource();
+  }, [searchParams, activatePowerBiDataSource]);
 
   const selectedModelOption = useMemo(
     () => (selectedModel ? modelOptions.find((o) => o.model === selectedModel) ?? null : null),
@@ -1310,19 +1325,19 @@ export default function AIChatPage() {
     return (
       <div className="flex items-start gap-2 px-1 text-xs text-muted-foreground">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="shrink-0 font-medium text-foreground/80">{t('ai_chat.data_source_active')}:</span>
           <Button
             type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-xs font-normal"
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 shrink-0 rounded-md -ml-0.5 text-muted-foreground hover:text-foreground"
             disabled={isSending || isUploadingFile}
             aria-label={t('ai_chat.data_source_none')}
             title={t('ai_chat.data_source_none')}
             onClick={() => clearComposerToChatOnly()}
           >
-            {t('ai_chat.chat_only_short')}
+            <MessageSquarePlus className="h-3.5 w-3.5" />
           </Button>
+          <span className="shrink-0 font-medium text-foreground/80">{t('ai_chat.data_source_active')}:</span>
           {aiDataSource === 'customer' && selectedCustomerIds.length > 0 ? (
             <>
               <span className="min-w-0 max-w-full truncate font-medium text-foreground/90">

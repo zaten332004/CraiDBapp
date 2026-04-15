@@ -20,6 +20,7 @@ import { VndAmountInput } from '@/components/vnd-amount-input';
 import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 import { badgeTone } from '@/lib/dashboard-badge-tones';
 import { cn } from '@/lib/utils';
+import { normalizeLoanPurposePolicy } from '@/lib/loans/policy';
 
 type WorkbenchRow = {
   application_id: number;
@@ -59,12 +60,58 @@ function annualRatePct(row: WorkbenchRow): number {
   return Number(r);
 }
 
-/** Tổng gốc + lãi (lãi = gốc × lãi suất năm / 100). */
+function loanPurposeOf(row: WorkbenchRow): 'installment' | 'overdraft' | 'credit_card' {
+  return normalizeLoanPurposePolicy(row.loan_purpose) || 'installment';
+}
+
+function monthlyRate(row: WorkbenchRow): number {
+  return annualRatePct(row) / 1200;
+}
+
+function totalInterestInstallmentReducingVnd(row: WorkbenchRow): number | null {
+  const p = principalVnd(row);
+  const months = termMonths(row);
+  if (p == null || months == null) return null;
+  const r = monthlyRate(row);
+  if (!Number.isFinite(r) || r <= 0) return 0;
+  // Equal principal, reducing-balance interest:
+  // total interest = P * r * (n + 1) / 2
+  return Math.round((p * r * (months + 1)) / 2);
+}
+
+function totalInterestOverdraftVnd(row: WorkbenchRow): number | null {
+  const p = principalVnd(row);
+  const months = termMonths(row);
+  if (p == null || months == null) return null;
+  const annual = annualRatePct(row);
+  const days = months * 30;
+  return Math.round((p * annual * days) / 36500);
+}
+
+function totalInterestCreditCardVnd(row: WorkbenchRow): number | null {
+  const p = principalVnd(row);
+  const months = termMonths(row);
+  if (p == null || months == null) return null;
+  const r = monthlyRate(row);
+  if (!Number.isFinite(r) || r <= 0) return 0;
+  // Approximation for revolving unpaid balance: compound monthly.
+  const total = p * Math.pow(1 + r, months);
+  return Math.max(0, Math.round(total - p));
+}
+
+/** Tổng gốc + lãi theo mục đích vay. */
 function totalContractRepaymentVnd(row: WorkbenchRow): number | null {
   const p = principalVnd(row);
   if (p == null) return null;
-  const rate = annualRatePct(row);
-  return Math.round(p * (1 + rate / 100));
+  const purpose = loanPurposeOf(row);
+  const interest =
+    purpose === 'installment'
+      ? totalInterestInstallmentReducingVnd(row)
+      : purpose === 'overdraft'
+        ? totalInterestOverdraftVnd(row)
+        : totalInterestCreditCardVnd(row);
+  if (interest == null) return null;
+  return Math.round(p + Math.max(0, interest));
 }
 
 function termMonths(row: WorkbenchRow): number | null {
@@ -73,12 +120,29 @@ function termMonths(row: WorkbenchRow): number | null {
   return Math.max(1, Math.round(Number(n)));
 }
 
-/** Số tiền mỗi kỳ = tổng phải trả / số tháng. */
-function flatPeriodPaymentVnd(row: WorkbenchRow): number | null {
-  const total = totalContractRepaymentVnd(row);
+/** Tiền mỗi kỳ theo công thức mục đích vay. Ưu tiên next_total_due từ API khi có. */
+function periodPaymentEstimateVnd(row: WorkbenchRow): number | null {
+  if (row.next_total_due != null && Number.isFinite(Number(row.next_total_due))) {
+    return Math.max(0, Math.round(Number(row.next_total_due)));
+  }
+  const p = principalVnd(row);
+  if (p == null) return null;
   const months = termMonths(row);
-  if (total == null || months == null) return null;
-  return Math.round(total / months);
+  if (months == null) return null;
+  const purpose = loanPurposeOf(row);
+  const r = monthlyRate(row);
+  if (purpose === 'installment') {
+    const k = currentInstallmentIndex1(row);
+    const principalPart = p / months;
+    const outstandingAtK = Math.max(0, p - (k - 1) * principalPart);
+    const interestK = outstandingAtK * Math.max(0, r);
+    return Math.round(principalPart + interestK);
+  }
+  if (purpose === 'overdraft') {
+    const days = 30;
+    return Math.round((p * annualRatePct(row) * days) / 36500);
+  }
+  return Math.round(p * Math.max(0, r));
 }
 
 function currentInstallmentIndex1(row: WorkbenchRow): number {
@@ -93,8 +157,7 @@ function currentInstallmentIndex1(row: WorkbenchRow): number {
  */
 function cumulativePaidTowardLoanVnd(row: WorkbenchRow): number | null {
   const total = totalContractRepaymentVnd(row);
-  const per = flatPeriodPaymentVnd(row);
-  if (total == null || per == null) return null;
+  if (total == null) return null;
 
   const explicit = row.total_paid ?? row.total_amount_paid;
   if (explicit != null && Number.isFinite(Number(explicit))) {
@@ -102,6 +165,8 @@ function cumulativePaidTowardLoanVnd(row: WorkbenchRow): number | null {
     return Math.min(total, Math.max(0, v));
   }
 
+  const per = periodPaymentEstimateVnd(row);
+  if (per == null) return null;
   const inst = currentInstallmentIndex1(row);
   const prior = (inst - 1) * per;
   const cur = row.next_paid != null && Number.isFinite(Number(row.next_paid)) ? Math.round(Number(row.next_paid)) : 0;
@@ -153,11 +218,8 @@ function canRecordInstallmentPayment(row: WorkbenchRow): boolean {
 /** Số còn phải trả trong kỳ hiện tại (kỳ cố định hoặc next_total_due từ API − đã ghi nhận next_paid). */
 function currentPeriodRemainingVnd(row: WorkbenchRow): number | null {
   const paid = row.next_paid != null && Number.isFinite(Number(row.next_paid)) ? Math.round(Number(row.next_paid)) : 0;
-  const per = flatPeriodPaymentVnd(row);
+  const per = periodPaymentEstimateVnd(row);
   if (per != null) return Math.max(0, per - Math.max(0, paid));
-  if (row.next_total_due != null && Number.isFinite(Number(row.next_total_due))) {
-    return Math.max(0, Math.round(Number(row.next_total_due)) - Math.max(0, paid));
-  }
   return null;
 }
 
@@ -186,6 +248,30 @@ function rowMatchesPeriodState(row: WorkbenchRow, filter: PeriodStateFilter): bo
     .trim()
     .toLowerCase();
   return s === filter;
+}
+
+function loanPurposeLabel(row: WorkbenchRow, locale: string): string {
+  const purpose = loanPurposeOf(row);
+  if (purpose === 'overdraft') return locale === 'vi' ? 'Vay thấu chi' : 'Overdraft';
+  if (purpose === 'credit_card') return locale === 'vi' ? 'Thẻ tín dụng' : 'Credit card';
+  return locale === 'vi' ? 'Vay trả góp' : 'Installment';
+}
+
+function interestFormulaLabel(row: WorkbenchRow, locale: string): string {
+  const purpose = loanPurposeOf(row);
+  if (purpose === 'overdraft') {
+    return locale === 'vi'
+      ? 'Lãi ngày: Dư nợ × lãi suất năm / 365'
+      : 'Daily accrual: Balance × annual rate / 365';
+  }
+  if (purpose === 'credit_card') {
+    return locale === 'vi'
+      ? 'ADB giả định theo tháng: Dư nợ × lãi suất tháng'
+      : 'Monthly ADB approximation: Balance × monthly rate';
+  }
+  return locale === 'vi'
+    ? 'Dư nợ giảm dần: gốc đều + lãi trên dư nợ còn lại'
+    : 'Reducing balance: equal principal + interest on outstanding';
 }
 
 export default function ApprovedLoanWorkbenchPage() {
@@ -310,7 +396,7 @@ export default function ApprovedLoanWorkbenchPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-8">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <div className="flex items-center gap-4">
         <Link href="/dashboard/customers">
           <Button variant="ghost" size="sm">
@@ -380,6 +466,7 @@ export default function ApprovedLoanWorkbenchPage() {
                         <TableRow className={scrollableTableHeaderRowClass}>
                           <TableHead>{t('loans.workbench.col.customer')}</TableHead>
                           <TableHead>{t('loans.workbench.col.ref')}</TableHead>
+                          <TableHead>{t('customers.field.loan_purpose')}</TableHead>
                           <TableHead title={t('loans.workbench.col.amount_hint')}>{t('loans.workbench.col.amount')}</TableHead>
                           <TableHead>{t('loans.workbench.col.period_payment')}</TableHead>
                           <TableHead>{t('loans.workbench.col.installment_progress')}</TableHead>
@@ -396,6 +483,10 @@ export default function ApprovedLoanWorkbenchPage() {
                             <TableCell className="font-mono text-xs">
                               {r.application_ref_no || r.application_id}
                             </TableCell>
+                            <TableCell className="text-xs">
+                              <div className="font-medium">{loanPurposeLabel(r, locale)}</div>
+                              <div className="text-muted-foreground">{interestFormulaLabel(r, locale)}</div>
+                            </TableCell>
                             <TableCell className="text-sm tabular-nums font-medium">
                               {(() => {
                                 const rem = remainingTotalRepaymentVnd(r);
@@ -406,7 +497,7 @@ export default function ApprovedLoanWorkbenchPage() {
                             </TableCell>
                             <TableCell className="text-sm tabular-nums font-medium">
                               {(() => {
-                                const per = flatPeriodPaymentVnd(r);
+                                const per = periodPaymentEstimateVnd(r);
                                 return per != null
                                   ? formatVnd(per, locale === 'vi' ? 'vi' : 'en')
                                   : r.next_total_due != null && Number.isFinite(Number(r.next_total_due))
@@ -416,7 +507,7 @@ export default function ApprovedLoanWorkbenchPage() {
                             </TableCell>
                             <TableCell className="text-sm tabular-nums">
                               {(() => {
-                                const per = flatPeriodPaymentVnd(r);
+                                const per = periodPaymentEstimateVnd(r);
                                 const due = per ?? (r.next_total_due != null && Number.isFinite(Number(r.next_total_due))
                                   ? Math.round(Number(r.next_total_due))
                                   : null);

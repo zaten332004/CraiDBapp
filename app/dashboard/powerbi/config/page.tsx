@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,12 +10,14 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ExternalLink, Loader2, ListChecks, RefreshCw, Trash2, Unplug, PlugZap } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { useI18n } from '@/components/i18n-provider';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
 import { formatDateTimeVietnam } from '@/lib/datetime';
 import { notifyError, notifyInfo, notifySuccess } from '@/lib/notify';
+import { ApiError } from '@/lib/api/shared';
 import { POWER_BI_REFERENCE_EXTENDED_TABLES } from '@/lib/powerbi/reference-tables';
 import {
   getDefaultPowerBiTableSuggestions,
@@ -77,12 +80,19 @@ type PowerBiReadinessResponse = {
   warnings?: string[];
 };
 
+const TABLE_DATA_PREVIEW_ROW_LIMIT = 100;
+
 /** Lỗi probe global từ server (thiếu .env) — không hiển thị toast/banner cho người dùng cuối. */
 function isGlobalPowerBiEnvMissingMessage(text: string): boolean {
   return /missing\s+power_bi_/i.test(text);
 }
 
+function isUnauthorizedError(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 401;
+}
+
 export default function PowerBIConfigPage() {
+  const router = useRouter();
   const { t, locale } = useI18n();
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
@@ -107,6 +117,7 @@ export default function PowerBIConfigPage() {
   const [powerBiSchemaPreview, setPowerBiSchemaPreview] = useState<PowerBiSchemaResponse | null>(null);
   const [powerBiSchemaLoading, setPowerBiSchemaLoading] = useState(false);
   const [tableHintsReadiness, setTableHintsReadiness] = useState<PowerBiReadinessResponse | null>(null);
+  const [selectedSchemaName, setSelectedSchemaName] = useState<string | null>(null);
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((w) => w.id === selectedWorkspaceId) ?? null,
@@ -183,7 +194,10 @@ export default function PowerBIConfigPage() {
     try {
       const s = await browserApiFetchAuth<PowerBiStatus>('/powerbi/status', { method: 'GET' });
       applySavedPowerBiFromStatus(s);
-    } catch {
+    } catch (err) {
+      // Keep current connection snapshot for transient/backend errors.
+      // Only clear when the session is unauthorized (logout / expired auth).
+      if (!isUnauthorizedError(err)) return;
       setAccountStatus({ connected: false, lastSync: null });
       setConfig({ workspaceId: '', datasetId: '', tenantId: '' });
       setSelectedWorkspaceId('');
@@ -211,7 +225,7 @@ export default function PowerBIConfigPage() {
       return { ok: true, detail: msg || undefined };
     } catch (err) {
       const text = formatUserFacingApiError(err, msgLocale);
-      setIsConnected(false);
+      if (isUnauthorizedError(err)) setIsConnected(false);
       setLastCheckedAt(new Date());
       const suppress = isGlobalPowerBiEnvMissingMessage(text);
       return { ok: false, detail: suppress ? undefined : text, suppressUserNotification: suppress };
@@ -299,7 +313,7 @@ export default function PowerBIConfigPage() {
       await loadAccountPowerBiStatus();
       await refreshWorkspaceAndDatasetLists();
     } catch (err) {
-      setIsConnected(false);
+      if (isUnauthorizedError(err)) setIsConnected(false);
       const detail = formatUserFacingApiError(err, msgLocale);
       notifyError(t('powerbi.toast.connect_fail_title'), { description: detail, duration: 6500 });
     } finally {
@@ -349,7 +363,10 @@ export default function PowerBIConfigPage() {
         }
 
         try {
-          const schema = await browserApiFetchAuth<PowerBiSchemaResponse>('/powerbi/schema', { method: 'GET' });
+          const schema = await browserApiFetchAuth<PowerBiSchemaResponse>(
+            `/powerbi/schema?limit=${TABLE_DATA_PREVIEW_ROW_LIMIT}`,
+            { method: 'GET' },
+          );
           if (Array.isArray(schema?.tables) && schema.tables.length > 0) {
             tables = schema.tables.map((x) => String(x).trim()).filter(Boolean);
             sourceKey =
@@ -376,14 +393,13 @@ export default function PowerBIConfigPage() {
           const sourceLine = sourceKey ? t(`powerbi.toast.test_tables_source_${sourceKey}`) : '';
           const body = [
             sourceLine,
-            ...tables.map((name) => `• ${name}`),
-            accountLine,
+            `${tables.length} ${t('powerbi.use_table_data_ok_suffix')}`,
           ]
             .filter((x) => String(x).trim().length > 0)
             .join('\n');
           notifySuccess(t('powerbi.toast.test_tables_title'), {
             description: body,
-            duration: Math.min(12000, 4200 + tables.length * 180),
+            duration: 6200,
           });
         } else {
           notifyInfo(t('powerbi.toast.test_tables_empty_title'), {
@@ -534,7 +550,10 @@ export default function PowerBIConfigPage() {
         });
         return;
       }
-      const data = await browserApiFetchAuth<PowerBiSchemaResponse>('/powerbi/schema', { method: 'GET' });
+      const data = await browserApiFetchAuth<PowerBiSchemaResponse>(
+        `/powerbi/schema?limit=${TABLE_DATA_PREVIEW_ROW_LIMIT}`,
+        { method: 'GET' },
+      );
       if (data.ok === false && data.requires_table_hints) {
         notifyError(t('powerbi.use_table_data_fail_title'), {
           description:
@@ -586,21 +605,23 @@ export default function PowerBIConfigPage() {
               {schemas.map((sch) => {
                 const err = p.errors?.[sch.name];
                 const cols = Array.isArray(sch.columns) ? sch.columns : [];
-                const samples = Array.isArray(sch.sample_rows) ? sch.sample_rows.length : 0;
+                const rawSampleRows = Array.isArray(sch.sample_rows) ? sch.sample_rows : [];
+                // "Tổng dòng" ở khu vực preview chỉ phản ánh phần đã nạp (bị chặn bởi limit).
+                const rowTotal = Math.min(rawSampleRows.length, TABLE_DATA_PREVIEW_ROW_LIMIT);
                 const colNum =
                   typeof sch.column_count === 'number' && sch.column_count >= 0
                     ? sch.column_count
                     : cols.length;
-                const rowTotal = typeof sch.row_count === 'number' && sch.row_count >= 0 ? sch.row_count : null;
-                const sampleCap =
-                  typeof p.schema_row_sample_max === 'number' && p.schema_row_sample_max > 0
-                    ? p.schema_row_sample_max
-                    : null;
                 const namesJoined = cols.join(', ');
                 const namesPreview =
                   namesJoined.length > 200 ? `${namesJoined.slice(0, 200).trimEnd()}…` : namesJoined;
                 return (
-                  <div key={sch.name} className="rounded-md border border-border bg-background/80 p-2.5 text-sm">
+                  <button
+                    key={sch.name}
+                    type="button"
+                    className="w-full rounded-md border border-border bg-background/80 p-2.5 text-left text-sm transition-colors hover:bg-muted/30"
+                    onClick={() => setSelectedSchemaName(sch.name)}
+                  >
                     <p className="font-mono font-semibold text-foreground">{sch.name}</p>
                     <p className="mt-1 break-words text-xs text-muted-foreground">
                       <span className="font-medium text-foreground">{t('powerbi.table_data_column_count_label')}:</span>{' '}
@@ -611,11 +632,7 @@ export default function PowerBIConfigPage() {
                     ) : null}
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       <span className="font-medium text-foreground">{t('powerbi.table_data_total_rows')}:</span>{' '}
-                      {rowTotal != null ? rowTotal.toLocaleString() : '—'}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">{t('powerbi.table_data_sample_count')}:</span>{' '}
-                      {samples.toLocaleString()}
+                      {rowTotal.toLocaleString()}
                     </p>
                     {err ? (
                       <p className="mt-1 text-xs text-destructive">
@@ -625,8 +642,12 @@ export default function PowerBIConfigPage() {
                               err.length > 240 ? `${err.slice(0, 240)}…` : err
                             }`}
                       </p>
-                    ) : null}
-                  </div>
+                    ) : (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {locale === 'vi' ? 'Nhấn để xem bảng chi tiết' : 'Click to open detailed table'}
+                      </p>
+                    )}
+                  </button>
                 );
               })}
             </div>
@@ -640,6 +661,17 @@ export default function PowerBIConfigPage() {
         </div>
       );
     })();
+
+  const selectedSchemaDetail = useMemo(() => {
+    const schemas = Array.isArray(powerBiSchemaPreview?.schemas) ? powerBiSchemaPreview.schemas : [];
+    const picked = schemas.find((sch) => sch.name === selectedSchemaName);
+    if (!picked) return null;
+    const columns = Array.isArray(picked.columns) ? picked.columns.map((c) => String(c)) : [];
+    const rows = (Array.isArray(picked.sample_rows) ? picked.sample_rows : [])
+      .map((item) => (item && typeof item === 'object' ? (item as Record<string, unknown>) : { value: item }))
+      .slice(0, TABLE_DATA_PREVIEW_ROW_LIMIT);
+    return { name: picked.name, columns, rows };
+  }, [powerBiSchemaPreview, selectedSchemaName]);
 
   /** Đồng bộ danh sách gợi ý lên server + kiểm tra token/DAX/bảng — để biết AI có đọc được dữ liệu không. */
   const handleVerifyTableHintsForAi = async () => {
@@ -680,7 +712,7 @@ export default function PowerBIConfigPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8 p-8">
+    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('powerbi.title')}</h1>
         <p className="text-muted-foreground mt-2">
@@ -742,7 +774,7 @@ export default function PowerBIConfigPage() {
                     placeholder={t('powerbi.tenant_id_ph')}
                     value={config.tenantId}
                     onChange={(e) => setConfig({ ...config, tenantId: e.target.value })}
-                    disabled={isConnected === true}
+                    disabled={isLoading}
                   />
                 </div>
 
@@ -755,7 +787,7 @@ export default function PowerBIConfigPage() {
                     placeholder={t('powerbi.workspace_id_ph')}
                     value={config.workspaceId}
                     onChange={(e) => setConfig({ ...config, workspaceId: e.target.value })}
-                    disabled={isConnected === true}
+                    disabled={isLoading}
                   />
                 </div>
 
@@ -768,7 +800,7 @@ export default function PowerBIConfigPage() {
                     placeholder={t('powerbi.dataset_id_ph')}
                     value={config.datasetId}
                     onChange={(e) => setConfig({ ...config, datasetId: e.target.value })}
-                    disabled={isConnected === true}
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -1036,8 +1068,6 @@ export default function PowerBIConfigPage() {
                   <ListChecks className="h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden />
                   {t('powerbi.table_suggestions_title')}
                 </CardTitle>
-                <CardDescription>{t('powerbi.table_suggestions_desc')}</CardDescription>
-                <p className="text-sm text-muted-foreground pt-1">{t('powerbi.table_suggestions_verify_intro')}</p>
               </div>
               <div className="flex flex-wrap gap-2 sm:justify-end">
                 <Button
@@ -1089,10 +1119,6 @@ export default function PowerBIConfigPage() {
                   {t('powerbi.table_suggestions_add')}
                 </Button>
               </div>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p>{t('powerbi.table_suggestions_persist_note')}</p>
-                <p>{t('powerbi.table_suggestions_server_sync_note')}</p>
-              </div>
             </div>
 
             <div>
@@ -1119,35 +1145,6 @@ export default function PowerBIConfigPage() {
               </ul>
             </div>
 
-            {tableHintsReadiness ? (
-              <div
-                className={
-                  tableHintsReadiness.ready_for_ai_context
-                    ? 'rounded-lg border border-emerald-300/90 bg-emerald-50/70 p-3 text-sm text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-50/95'
-                    : 'rounded-lg border border-amber-300/90 bg-amber-50/70 p-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-50/95'
-                }
-              >
-                <p className="font-semibold">
-                  {tableHintsReadiness.ready_for_ai_context
-                    ? t('powerbi.verify_banner_ready')
-                    : t('powerbi.verify_banner_not_ready')}
-                </p>
-                <p className="mt-1.5 tabular-nums">
-                  {t('powerbi.verify_line_api_tables')}: {Number(tableHintsReadiness.discovered_table_count ?? 0)}
-                </p>
-                <p className="tabular-nums">
-                  {t('powerbi.verify_line_server_hints')}: {Number(tableHintsReadiness.hint_table_count ?? 0)}
-                </p>
-                {Array.isArray(tableHintsReadiness.warnings) && tableHintsReadiness.warnings.length > 0 ? (
-                  <ul className="mt-2 list-inside list-disc space-y-1 text-[13px] opacity-95">
-                    {tableHintsReadiness.warnings.map((w, i) => (
-                      <li key={`${i}-${w.slice(0, 48)}`}>{w}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            ) : null}
-
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground">{t('powerbi.rules_ref_extended')}</p>
               <p className="text-xs text-muted-foreground">{t('powerbi.table_suggestions_extended_hint')}</p>
@@ -1169,20 +1166,29 @@ export default function PowerBIConfigPage() {
               </div>
             </div>
 
-            <p className="text-xs leading-relaxed text-muted-foreground">{t('powerbi.rules_ref_note')}</p>
-
             <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <Button
-                  type="button"
-                  onClick={handleUseTableData}
-                  disabled={!accountStatus.connected || powerBiSchemaLoading}
-                >
-                  {powerBiSchemaLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleUseTableData}
+                    disabled={!accountStatus.connected || powerBiSchemaLoading}
+                  >
+                    {powerBiSchemaLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                    ) : null}
+                    {t('powerbi.use_table_data')}
+                  </Button>
+                  {powerBiSchemaPreview ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => router.push('/dashboard/ai-chat?source=powerbi')}
+                    >
+                      {t('powerbi.ask_ai')}
+                    </Button>
                   ) : null}
-                  {t('powerbi.use_table_data')}
-                </Button>
+                </div>
                 {!accountStatus.connected ? (
                   <p className="text-xs text-muted-foreground sm:max-w-md">{t('powerbi.use_table_data_need_account')}</p>
                 ) : null}
@@ -1193,6 +1199,49 @@ export default function PowerBIConfigPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={selectedSchemaDetail != null} onOpenChange={(open) => (!open ? setSelectedSchemaName(null) : null)}>
+        <DialogContent className="!w-[96vw] !max-w-none h-[88vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>{selectedSchemaDetail?.name ?? t('powerbi.table_data_preview_title')}</DialogTitle>
+            <DialogDescription>
+              {selectedSchemaDetail
+                ? `${Math.min(selectedSchemaDetail.rows.length, TABLE_DATA_PREVIEW_ROW_LIMIT)} / ${TABLE_DATA_PREVIEW_ROW_LIMIT} ${t('powerbi.table_data_total_rows').toLowerCase()}, ${selectedSchemaDetail.columns.length} ${t('powerbi.table_data_column_count_label').toLowerCase()}`
+                : t('powerbi.table_data_preview_title')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="h-[calc(88vh-110px)] overflow-hidden rounded-md border border-border">
+            {selectedSchemaDetail ? (
+              <ScrollableTableRegion className="h-full rounded-none border-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className={scrollableTableHeaderRowClass}>
+                      <TableHead className="w-14">#</TableHead>
+                      {selectedSchemaDetail.columns.map((col) => (
+                        <TableHead key={col} className="whitespace-nowrap">
+                          {col}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedSchemaDetail.rows.map((row, idx) => (
+                      <TableRow key={`${selectedSchemaDetail.name}-${idx}`}>
+                        <TableCell className="text-muted-foreground tabular-nums">{idx + 1}</TableCell>
+                        {selectedSchemaDetail.columns.map((col) => (
+                          <TableCell key={`${idx}-${col}`} className="max-w-[280px] truncate" title={String(row?.[col] ?? '-')}>
+                            {String(row?.[col] ?? '-')}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollableTableRegion>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
