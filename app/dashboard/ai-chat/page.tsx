@@ -168,7 +168,57 @@ const LAST_AI_CHAT_MODEL_STORAGE_KEY = 'crs_ai_chat_last_model_v1';
 const SESSION_MODEL_STORAGE_PREFIX = 'crs_ai_chat_session_model_v1:';
 const SESSION_MESSAGES_STORAGE_PREFIX = 'crs_ai_chat_session_messages_v1:';
 const SESSION_SOURCE_STORAGE_PREFIX = 'crs_ai_chat_session_source_v1:';
-const POWERBI_SCHEMA_SYNC_LIMIT = 20;
+const POWERBI_SCHEMA_SYNC_LIMIT = 100;
+const MAX_STORED_SESSION_MESSAGES = 180;
+const SESSION_MESSAGES_PERSIST_DEBOUNCE_MS = 180;
+const POWERBI_HYDRATION_COOLDOWN_MS = 7000;
+
+function extractPowerBiTableHintsFromPrompt(text: string): string[] {
+  const src = String(text || '').trim();
+  if (!src) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (name: string) => {
+    const n = String(name || '').trim();
+    if (!n) return;
+    const key = n.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(n);
+  };
+
+  const explicit = src.match(/\b(?:dim|fact)[a-z0-9_]+\b/gi) ?? [];
+  explicit.forEach((x) => add(x));
+
+  // Also capture backticked identifiers: `DimCurrency`
+  const backticked = src.match(/`([A-Za-z_][A-Za-z0-9_]*)`/g) ?? [];
+  backticked.forEach((token) => add(token.slice(1, -1)));
+
+  return out.slice(0, 12);
+}
+
+function extractPowerBiTableHintsFromConversation(messages: ChatMessage[]): string[] {
+  if (!Array.isArray(messages) || messages.length === 0) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  // Walk backwards so we prioritize the most recent explicit table reference.
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    const text = String(m?.text ?? '').trim();
+    if (!text) continue;
+    const hints = extractPowerBiTableHintsFromPrompt(text);
+    for (const h of hints) {
+      const key = h.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(h);
+      if (out.length >= 12) return out;
+    }
+    // Keep inference cheap on large sessions.
+    if (messages.length - i > 12 && out.length > 0) break;
+  }
+  return out;
+}
 
 function readStoredLastAiChatModel(): string {
   if (typeof window === 'undefined') return '';
@@ -573,6 +623,8 @@ export default function AIChatPage() {
   const { t, locale } = useI18n();
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
+  const powerBiHydrationInFlightRef = useRef(false);
+  const lastPowerBiHydrationAtRef = useRef(0);
 
   const activatePowerBiDataSource = useCallback(async (opts?: { strict?: boolean }): Promise<boolean> => {
     const strict = Boolean(opts?.strict);
@@ -721,6 +773,7 @@ export default function AIChatPage() {
   const lastSessionIdSourcePrefsAppliedRef = useRef<string | null>(null);
   /** Track the latest session whose Power BI context has been rehydrated. */
   const lastPowerBiHydratedSessionRef = useRef<string | null>(null);
+  const sessionMessagesPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   /** Sync lock to prevent duplicate submits before state updates flush. */
@@ -728,6 +781,17 @@ export default function AIChatPage() {
   const [dropChatHighlight, setDropChatHighlight] = useState(false);
   const dragChatDepthRef = useRef(0);
   const [sendingStepIndex, setSendingStepIndex] = useState(0);
+
+  const triggerPowerBiHydration = useCallback(() => {
+    const now = Date.now();
+    if (powerBiHydrationInFlightRef.current) return;
+    if (now - lastPowerBiHydrationAtRef.current < POWERBI_HYDRATION_COOLDOWN_MS) return;
+    powerBiHydrationInFlightRef.current = true;
+    void activatePowerBiDataSource().finally(() => {
+      lastPowerBiHydrationAtRef.current = Date.now();
+      powerBiHydrationInFlightRef.current = false;
+    });
+  }, [activatePowerBiDataSource]);
 
   const hasConversation = useMemo(() => {
     if (messages.some((m) => m.sender === 'user')) return true;
@@ -879,7 +943,21 @@ export default function AIChatPage() {
 
   useEffect(() => {
     if (!sessionId?.trim()) return;
-    writeStoredSessionMessages(sessionId, messages);
+    const sid = sessionId.trim();
+    if (sessionMessagesPersistTimerRef.current) {
+      clearTimeout(sessionMessagesPersistTimerRef.current);
+    }
+    sessionMessagesPersistTimerRef.current = setTimeout(() => {
+      const capped = messages.length > MAX_STORED_SESSION_MESSAGES ? messages.slice(-MAX_STORED_SESSION_MESSAGES) : messages;
+      writeStoredSessionMessages(sid, capped);
+      sessionMessagesPersistTimerRef.current = null;
+    }, SESSION_MESSAGES_PERSIST_DEBOUNCE_MS);
+    return () => {
+      if (sessionMessagesPersistTimerRef.current) {
+        clearTimeout(sessionMessagesPersistTimerRef.current);
+        sessionMessagesPersistTimerRef.current = null;
+      }
+    };
   }, [sessionId, messages]);
 
   useEffect(() => {
@@ -890,8 +968,8 @@ export default function AIChatPage() {
     const key = sessionId?.trim() || '__draft__';
     if (lastPowerBiHydratedSessionRef.current === key) return;
     lastPowerBiHydratedSessionRef.current = key;
-    void activatePowerBiDataSource();
-  }, [sessionId, aiDataSource, activatePowerBiDataSource]);
+    triggerPowerBiHydration();
+  }, [sessionId, aiDataSource, triggerPowerBiHydration]);
 
   useEffect(() => {
     if (!previewAttachment?.id) {
@@ -1295,15 +1373,6 @@ export default function AIChatPage() {
       setMessages((prev) => [...prev, userMessage]);
       setInput('');
 
-      if (aiDataSource === 'powerbi') {
-        const ready = await activatePowerBiDataSource({ strict: true });
-        if (!ready) {
-          setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
-          setInput(text);
-          return;
-        }
-      }
-
       const customerContext: Record<string, unknown> = {
         ai_data_source: aiDataSource,
       };
@@ -1312,6 +1381,24 @@ export default function AIChatPage() {
       }
       if (pendingFiles.length > 0) {
         customerContext.uploaded_files = slimUploadedFilesForSend(pendingFiles);
+      }
+      if (aiDataSource === 'powerbi') {
+        const promptHints = extractPowerBiTableHintsFromPrompt(text);
+        const convoHints = promptHints.length > 0 ? [] : extractPowerBiTableHintsFromConversation(messages);
+        const activeHints = promptHints.length > 0 ? promptHints : convoHints;
+        if (activeHints.length > 0) {
+          customerContext.powerbi_table_hints = activeHints;
+          customerContext.table_names = activeHints;
+          try {
+            const mergedHints = [...new Set([...loadPowerBiTableSuggestions(), ...activeHints])];
+            await browserApiFetchAuth('/powerbi/table-hints', {
+              method: 'POST',
+              body: { table_names: mergedHints },
+            });
+          } catch {
+            // best-effort hint sync; do not block message send on this
+          }
+        }
       }
 
       const body: Record<string, unknown> = {
@@ -1335,6 +1422,10 @@ export default function AIChatPage() {
       setPendingFiles([]);
       if (newSid && newSid !== sessionId) {
         setSessionId(newSid);
+      }
+      if (aiDataSource === 'powerbi') {
+        // Prioritize visible send + session creation, then refresh Power BI context in background.
+        triggerPowerBiHydration();
       }
 
       if (created && newSid) {
