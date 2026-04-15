@@ -167,6 +167,7 @@ const PENDING_FILES_STORAGE_KEY = 'crs_ai_chat_pending_uploads_v1';
 const LAST_AI_CHAT_MODEL_STORAGE_KEY = 'crs_ai_chat_last_model_v1';
 const SESSION_MODEL_STORAGE_PREFIX = 'crs_ai_chat_session_model_v1:';
 const SESSION_MESSAGES_STORAGE_PREFIX = 'crs_ai_chat_session_messages_v1:';
+const SESSION_SOURCE_STORAGE_PREFIX = 'crs_ai_chat_session_source_v1:';
 
 function readStoredLastAiChatModel(): string {
   if (typeof window === 'undefined') return '';
@@ -206,6 +207,39 @@ function writeStoredSessionModel(sessionId: string, model: string) {
   if (!sid || !s) return;
   try {
     window.localStorage.setItem(`${SESSION_MODEL_STORAGE_PREFIX}${sid}`, s);
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function normalizeStoredAiDataSource(value: unknown): AiDataSource | null {
+  const v = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  if (v === 'none' || v === 'customer' || v === 'upload' || v === 'powerbi' || v === 'alerts') return v;
+  return null;
+}
+
+function readStoredSessionAiDataSource(sessionId: string): AiDataSource | null {
+  if (typeof window === 'undefined') return null;
+  const sid = String(sessionId || '').trim();
+  if (!sid) return null;
+  try {
+    const raw = window.localStorage.getItem(`${SESSION_SOURCE_STORAGE_PREFIX}${sid}`);
+    return normalizeStoredAiDataSource(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSessionAiDataSource(sessionId: string, source: AiDataSource) {
+  if (typeof window === 'undefined') return;
+  const sid = String(sessionId || '').trim();
+  if (!sid) return;
+  const normalized = normalizeStoredAiDataSource(source);
+  if (!normalized) return;
+  try {
+    window.localStorage.setItem(`${SESSION_SOURCE_STORAGE_PREFIX}${sid}`, normalized);
   } catch {
     // ignore quota / private mode
   }
@@ -606,6 +640,17 @@ export default function AIChatPage() {
     if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
   }, []);
 
+  const clearPowerBiSourceQuery = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const source = String(url.searchParams.get('source') || '').trim().toLowerCase();
+    if (source !== 'powerbi') return;
+    url.searchParams.delete('source');
+    const nextQuery = url.searchParams.toString();
+    const nextUrl = `${url.pathname}${nextQuery ? `?${nextQuery}` : ''}${url.hash}`;
+    window.history.replaceState(window.history.state, '', nextUrl);
+  }, []);
+
   const skipPendingPersistOnceRef = useRef(true);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
@@ -629,6 +674,8 @@ export default function AIChatPage() {
   const sourceInitDoneRef = useRef(false);
   /** Avoid re-applying stored model preferences on every render while the same session stays open. */
   const lastSessionIdModelPrefsAppliedRef = useRef<string | null>(null);
+  /** Avoid re-applying stored source preferences on every render while the same session stays open. */
+  const lastSessionIdSourcePrefsAppliedRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const [dropChatHighlight, setDropChatHighlight] = useState(false);
@@ -665,12 +712,13 @@ export default function AIChatPage() {
     sourceInitDoneRef.current = true;
     const source = String(searchParams.get('source') || '').trim().toLowerCase();
     if (source !== 'powerbi') return;
+    clearPowerBiSourceQuery();
     setAiDataSource('powerbi');
     setSelectedCustomerIds([]);
     setPendingFiles([]);
     if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
     void activatePowerBiDataSource();
-  }, [searchParams, activatePowerBiDataSource]);
+  }, [searchParams, activatePowerBiDataSource, clearPowerBiSourceQuery]);
 
   const selectedModelOption = useMemo(
     () => (selectedModel ? modelOptions.find((o) => o.model === selectedModel) ?? null : null),
@@ -758,6 +806,29 @@ export default function AIChatPage() {
     if (tryPick(readStoredSessionModel(sid))) return;
     if (tryPick(readStoredLastAiChatModel())) return;
   }, [sessionId, modelOptions, userRole]);
+
+  useEffect(() => {
+    if (!sessionId?.trim()) {
+      lastSessionIdSourcePrefsAppliedRef.current = null;
+      return;
+    }
+    const sid = sessionId.trim();
+    if (lastSessionIdSourcePrefsAppliedRef.current === sid) return;
+    lastSessionIdSourcePrefsAppliedRef.current = sid;
+    const stored = readStoredSessionAiDataSource(sid);
+    if (!stored) return;
+    if (stored === 'alerts' && !canUseAlertsAiDataSource(userRole)) {
+      setAiDataSource('none');
+      return;
+    }
+    setAiDataSource(stored);
+    if (stored === 'powerbi') void activatePowerBiDataSource();
+  }, [sessionId, userRole, activatePowerBiDataSource]);
+
+  useEffect(() => {
+    if (!sessionId?.trim()) return;
+    writeStoredSessionAiDataSource(sessionId, aiDataSource);
+  }, [sessionId, aiDataSource]);
 
   useEffect(() => {
     if (!sessionId?.trim()) return;
@@ -1017,6 +1088,7 @@ export default function AIChatPage() {
     dragChatDepthRef.current = 0;
     setDropChatHighlight(false);
     if (typeof window !== 'undefined') sessionStorage.removeItem(PENDING_FILES_STORAGE_KEY);
+    clearPowerBiSourceQuery();
   };
 
   const fetchHistoryMessages = async (id: string): Promise<ChatMessage[]> => {
