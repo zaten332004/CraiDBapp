@@ -719,6 +719,8 @@ export default function AIChatPage() {
   const lastSessionIdModelPrefsAppliedRef = useRef<string | null>(null);
   /** Avoid re-applying stored source preferences on every render while the same session stays open. */
   const lastSessionIdSourcePrefsAppliedRef = useRef<string | null>(null);
+  /** Track the latest session whose Power BI context has been rehydrated. */
+  const lastPowerBiHydratedSessionRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   /** Sync lock to prevent duplicate submits before state updates flush. */
@@ -879,6 +881,17 @@ export default function AIChatPage() {
     if (!sessionId?.trim()) return;
     writeStoredSessionMessages(sessionId, messages);
   }, [sessionId, messages]);
+
+  useEffect(() => {
+    if (aiDataSource !== 'powerbi') {
+      lastPowerBiHydratedSessionRef.current = null;
+      return;
+    }
+    const key = sessionId?.trim() || '__draft__';
+    if (lastPowerBiHydratedSessionRef.current === key) return;
+    lastPowerBiHydratedSessionRef.current = key;
+    void activatePowerBiDataSource();
+  }, [sessionId, aiDataSource, activatePowerBiDataSource]);
 
   useEffect(() => {
     if (!previewAttachment?.id) {
@@ -1279,9 +1292,16 @@ export default function AIChatPage() {
     };
 
     try {
+      setMessages((prev) => [...prev, userMessage]);
+      setInput('');
+
       if (aiDataSource === 'powerbi') {
         const ready = await activatePowerBiDataSource({ strict: true });
-        if (!ready) return;
+        if (!ready) {
+          setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
+          setInput(text);
+          return;
+        }
       }
 
       const customerContext: Record<string, unknown> = {
@@ -1293,9 +1313,6 @@ export default function AIChatPage() {
       if (pendingFiles.length > 0) {
         customerContext.uploaded_files = slimUploadedFilesForSend(pendingFiles);
       }
-
-      setMessages((prev) => [...prev, userMessage]);
-      setInput('');
 
       const body: Record<string, unknown> = {
         message: text,
