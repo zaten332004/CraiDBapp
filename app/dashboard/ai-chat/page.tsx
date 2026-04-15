@@ -625,6 +625,8 @@ export default function AIChatPage() {
   const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
   const powerBiHydrationInFlightRef = useRef(false);
   const lastPowerBiHydrationAtRef = useRef(0);
+  const lastPowerBiSessionKeyRef = useRef<string>('');
+  const powerBiHydrationRequiredRef = useRef(true);
 
   const activatePowerBiDataSource = useCallback(async (opts?: { strict?: boolean }): Promise<boolean> => {
     const strict = Boolean(opts?.strict);
@@ -783,15 +785,21 @@ export default function AIChatPage() {
   const [sendingStepIndex, setSendingStepIndex] = useState(0);
 
   const triggerPowerBiHydration = useCallback(() => {
+    if (!powerBiHydrationRequiredRef.current) return;
     const now = Date.now();
     if (powerBiHydrationInFlightRef.current) return;
     if (now - lastPowerBiHydrationAtRef.current < POWERBI_HYDRATION_COOLDOWN_MS) return;
+    const sessionKey = sessionId?.trim() || '__draft__';
     powerBiHydrationInFlightRef.current = true;
-    void activatePowerBiDataSource().finally(() => {
+    void activatePowerBiDataSource().then((ok) => {
+      if (!ok) return;
+      lastPowerBiHydratedSessionRef.current = sessionKey;
+      powerBiHydrationRequiredRef.current = false;
+    }).finally(() => {
       lastPowerBiHydrationAtRef.current = Date.now();
       powerBiHydrationInFlightRef.current = false;
     });
-  }, [activatePowerBiDataSource]);
+  }, [activatePowerBiDataSource, sessionId]);
 
   const hasConversation = useMemo(() => {
     if (messages.some((m) => m.sender === 'user')) return true;
@@ -919,6 +927,14 @@ export default function AIChatPage() {
   }, [sessionId, modelOptions, userRole]);
 
   useEffect(() => {
+    const key = sessionId?.trim() || '__draft__';
+    if (lastPowerBiSessionKeyRef.current === key) return;
+    lastPowerBiSessionKeyRef.current = key;
+    // New session created or old session reopened: require a fresh one-time hydration.
+    powerBiHydrationRequiredRef.current = true;
+  }, [sessionId]);
+
+  useEffect(() => {
     if (!sessionId?.trim()) {
       lastSessionIdSourcePrefsAppliedRef.current = null;
       return;
@@ -962,12 +978,10 @@ export default function AIChatPage() {
 
   useEffect(() => {
     if (aiDataSource !== 'powerbi') {
-      lastPowerBiHydratedSessionRef.current = null;
       return;
     }
     const key = sessionId?.trim() || '__draft__';
-    if (lastPowerBiHydratedSessionRef.current === key) return;
-    lastPowerBiHydratedSessionRef.current = key;
+    if (!powerBiHydrationRequiredRef.current && lastPowerBiHydratedSessionRef.current === key) return;
     triggerPowerBiHydration();
   }, [sessionId, aiDataSource, triggerPowerBiHydration]);
 
