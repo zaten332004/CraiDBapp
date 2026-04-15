@@ -146,9 +146,15 @@
   }
   html {
     scroll-behavior: smooth;
+    /*
+     * Global fluid scale: makes rem-based spacing/text auto adapt across screens
+     * without hard-coding per-page sizes.
+     */
+    font-size: clamp(14px, 0.25vw + 13px, 16px);
   }
   body {
     @apply bg-background text-foreground transition-colors duration-300;
+    min-width: 320px;
     background-image: var(--app-bg);
     background-attachment: fixed;
     background-repeat: no-repeat;

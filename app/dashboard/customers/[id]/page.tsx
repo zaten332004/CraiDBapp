@@ -38,6 +38,47 @@ import {
   normalizeLoanPurposePolicy,
 } from '@/lib/loans/policy';
 
+type RepaymentWorkbenchRow = {
+  application_id: number;
+  customer_id?: number | null;
+  application_ref_no?: string | null;
+  installment_state?: string | null;
+  installment_dpd?: number | null;
+  next_due_date?: string | null;
+  next_total_due?: number | null;
+  next_paid?: number | null;
+  total_paid?: number | null;
+  total_amount_paid?: number | null;
+};
+
+function formatDueDate(iso: string | null | undefined, locale: string): string {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US');
+}
+
+function installmentStateLabel(
+  t: (key: string) => string,
+  state: string | null | undefined,
+): string {
+  if (!state) return '-';
+  const key = `loans.workbench.installment_state.${state}`;
+  const label = t(key);
+  return label === key ? state : label;
+}
+
+function installmentStateBadgeClass(state: string | null | undefined): string {
+  const s = String(state || '')
+    .trim()
+    .toLowerCase();
+  if (s === 'paid') return badgeTone.emerald;
+  if (s === 'overdue') return badgeTone.red;
+  if (s === 'partial') return badgeTone.amber;
+  if (s === 'upcoming') return badgeTone.sky;
+  return badgeTone.slate;
+}
+
 export default function CustomerDetailPage() {
   const { locale, t } = useI18n();
   const isVi = locale === 'vi';
@@ -49,6 +90,7 @@ export default function CustomerDetailPage() {
   const applicationIdFromUrl = searchParams.get('application_id');
   const applicationIdQuery =
     applicationIdFromUrl && /^\d+$/.test(applicationIdFromUrl.trim()) ? Number(applicationIdFromUrl.trim()) : undefined;
+  const isRepaymentView = searchParams.get('view') === 'repayment';
   const returnToParam = searchParams.get('returnTo');
   const backHref = useMemo(() => {
     return sanitizeDashboardReturnTo(returnToParam) ?? '/dashboard/customers';
@@ -60,9 +102,10 @@ export default function CustomerDetailPage() {
       p.set('application_id', String(applicationId));
       const safeReturn = sanitizeDashboardReturnTo(returnToParam);
       if (safeReturn) p.set('returnTo', safeReturn);
+      if (isRepaymentView) p.set('view', 'repayment');
       return `/dashboard/customers/${customerId}?${p.toString()}`;
     };
-  }, [customerId, returnToParam]);
+  }, [customerId, isRepaymentView, returnToParam]);
 
   const newLoanHref = useMemo(() => {
     const p = new URLSearchParams();
@@ -77,6 +120,7 @@ export default function CustomerDetailPage() {
   /** Duyệt / từ chối hồ sơ: manager & admin; analyst chỉ sửa & xóa. */
   const canReviewCustomer = canManageProfile && role !== 'analyst';
   const [customer, setCustomer] = useState<any | null>(null);
+  const [repaymentRow, setRepaymentRow] = useState<RepaymentWorkbenchRow | null>(null);
   const [loanApplications, setLoanApplications] = useState<any[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -191,6 +235,37 @@ export default function CustomerDetailPage() {
     };
   }, [customerId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadRepaymentRow = async () => {
+      if (!isRepaymentView || !Number.isFinite(customerId) || customerId <= 0) {
+        if (!cancelled) setRepaymentRow(null);
+        return;
+      }
+      try {
+        const rows = await browserApiFetchAuth<RepaymentWorkbenchRow[]>('/customers/approved-loan-workbench', {
+          method: 'GET',
+        });
+        if (cancelled) return;
+        const list = Array.isArray(rows) ? rows : [];
+        const matched =
+          list.find((row) => applicationIdQuery != null && Number(row.application_id) === applicationIdQuery) ??
+          list.find((row) => Number(row.customer_id ?? 0) === customerId) ??
+          null;
+        setRepaymentRow(matched);
+      } catch (err) {
+        if (!cancelled) {
+          setRepaymentRow(null);
+          notifyError(t('toast.load_failed'), { description: formatUserFacingApiError(err, msgLocale) });
+        }
+      }
+    };
+    void loadRepaymentRow();
+    return () => {
+      cancelled = true;
+    };
+  }, [applicationIdQuery, customerId, isRepaymentView, msgLocale, t]);
+
   const riskBadgeClass = useMemo(() => {
     const level = String(customer?.risk_level || '').toLowerCase();
     if (level === 'high') return badgeTone.rose;
@@ -228,6 +303,16 @@ export default function CustomerDetailPage() {
   }, [customer?.application_status, t]);
 
   const isPending = String(customer?.application_status || '').toLowerCase() === 'pending';
+  const totalPaidAmount = repaymentRow?.total_paid ?? repaymentRow?.total_amount_paid ?? null;
+  const currentPeriodDue =
+    repaymentRow?.next_total_due != null && Number.isFinite(Number(repaymentRow.next_total_due))
+      ? Math.max(0, Math.round(Number(repaymentRow.next_total_due)))
+      : null;
+  const currentPeriodPaid =
+    repaymentRow?.next_paid != null && Number.isFinite(Number(repaymentRow.next_paid))
+      ? Math.max(0, Math.round(Number(repaymentRow.next_paid)))
+      : 0;
+  const currentPeriodRemaining = currentPeriodDue != null ? Math.max(0, currentPeriodDue - currentPeriodPaid) : null;
 
   const sanitizePhoneInput = (value: string) => value.replace(/[^\d+]/g, '').slice(0, 15);
 
@@ -429,47 +514,60 @@ export default function CustomerDetailPage() {
           </Link>
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">{customer.full_name || '-'}</h1>
-            <p className="text-muted-foreground mt-1">{customer.occupation || '-'}</p>
+            <p className="text-muted-foreground mt-1">
+              {isRepaymentView
+                ? isVi
+                  ? `Theo dõi khoản vay ${String(
+                      repaymentRow?.application_ref_no || customer.application_ref_no || customer.application_id || '',
+                    ).trim() || '#'}`
+                  : `Repayment tracking ${String(
+                      repaymentRow?.application_ref_no || customer.application_ref_no || customer.application_id || '',
+                    ).trim() || '#'}`
+                : customer.occupation || '-'}
+            </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={newLoanHref}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              {t('customers.detail.new_application')}
-            </Link>
-          </Button>
-          {isPending && canReviewCustomer ? (
-            <>
-              <Button variant="outline" onClick={handleOpenRejectDialog} disabled={isSaving}>
-                {t('customers.detail.reject')}
-              </Button>
-              <Button onClick={() => void handleReview('approved')} disabled={isSaving}>
-                {t('customers.detail.approve')}
-              </Button>
-            </>
-          ) : null}
-          <Button variant="secondary" onClick={() => setIsEditing((prev) => !prev)} disabled={!isPending || isSaving || !canManageProfile}>
-            <Edit className="mr-2 h-4 w-4" />
-            {isEditing ? t('customers.detail.cancel_edit') : t('customers.detail.edit')}
-          </Button>
-          {isEditing && isPending && canManageProfile ? (
-            <Button onClick={() => void handleUpdateProfile()} disabled={isSaving || isDeleting}>
-              {t('customers.detail.update_profile')}
+        {!isRepaymentView ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={newLoanHref}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                {t('customers.detail.new_application')}
+              </Link>
             </Button>
-          ) : null}
-          <Button
-            variant="destructive"
-            onClick={() => setConfirmDeleteOpen(true)}
-            disabled={!canManageProfile || isSaving || isDeleting}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            {t('customers.detail.delete_profile')}
-          </Button>
-        </div>
+            {isPending && canReviewCustomer ? (
+              <>
+                <Button variant="outline" onClick={handleOpenRejectDialog} disabled={isSaving}>
+                  {t('customers.detail.reject')}
+                </Button>
+                <Button onClick={() => void handleReview('approved')} disabled={isSaving}>
+                  {t('customers.detail.approve')}
+                </Button>
+              </>
+            ) : null}
+            <Button variant="secondary" onClick={() => setIsEditing((prev) => !prev)} disabled={!isPending || isSaving || !canManageProfile}>
+              <Edit className="mr-2 h-4 w-4" />
+              {isEditing ? t('customers.detail.cancel_edit') : t('customers.detail.edit')}
+            </Button>
+            {isEditing && isPending && canManageProfile ? (
+              <Button onClick={() => void handleUpdateProfile()} disabled={isSaving || isDeleting}>
+                {t('customers.detail.update_profile')}
+              </Button>
+            ) : null}
+            <Button
+              variant="destructive"
+              onClick={() => setConfirmDeleteOpen(true)}
+              disabled={!canManageProfile || isSaving || isDeleting}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {t('customers.detail.delete_profile')}
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {!isRepaymentView ? (
         <Card>
           <CardHeader>
             <CardTitle>{t('customers.detail.info_title')}</CardTitle>
@@ -560,6 +658,7 @@ export default function CustomerDetailPage() {
             </div>
           </CardContent>
         </Card>
+        ) : null}
 
         <Card>
           <CardHeader>
@@ -730,6 +829,69 @@ export default function CustomerDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {isRepaymentView ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>{isVi ? 'Tiến độ thanh toán' : 'Repayment progress'}</CardTitle>
+              <CardDescription>
+                {isVi
+                  ? 'Theo dõi số tiền đã trả và trạng thái kỳ thanh toán hiện tại'
+                  : 'Track paid amount and current installment status'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">{isVi ? 'Đã trả toàn khoản' : 'Total paid'}</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {totalPaidAmount != null && Number.isFinite(Number(totalPaidAmount))
+                      ? formatVnd(Number(totalPaidAmount), locale === 'vi' ? 'vi' : 'en')
+                      : '-'}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">{isVi ? 'Kỳ hiện tại (đã trả / phải trả)' : 'Current installment (paid / due)'}</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {currentPeriodDue != null
+                      ? `${formatVnd(currentPeriodPaid, locale === 'vi' ? 'vi' : 'en')} / ${formatVnd(currentPeriodDue, locale === 'vi' ? 'vi' : 'en')}`
+                      : '-'}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">{isVi ? 'Còn lại kỳ hiện tại' : 'Remaining in current installment'}</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {currentPeriodRemaining != null
+                      ? formatVnd(currentPeriodRemaining, locale === 'vi' ? 'vi' : 'en')
+                      : '-'}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">{isVi ? 'Kỳ đến hạn' : 'Due date'}</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {formatDueDate(repaymentRow?.next_due_date, locale)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">{isVi ? 'Trạng thái kỳ' : 'Installment state'}</p>
+                  <div className="mt-1">
+                    {repaymentRow?.installment_state ? (
+                      <Badge variant="outline" className={installmentStateBadgeClass(repaymentRow.installment_state)}>
+                        {installmentStateLabel(t, repaymentRow.installment_state)}
+                      </Badge>
+                    ) : (
+                      <p className="text-sm font-medium">-</p>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">{isVi ? 'Quá hạn (DPD)' : 'Days past due (DPD)'}</p>
+                  <p className="mt-1 text-sm font-medium">{repaymentRow?.installment_dpd ?? 0}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
 
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>

@@ -148,14 +148,6 @@ export default function PortfolioOverviewPage() {
     { titleKey: 'portfolio.kpi.avg_score', value: `${Math.round((1 - (kpi?.avg_pd || 0)) * 100)}` },
     { titleKey: 'portfolio.kpi.customer_count', value: `${portfolioCustomerCount}` },
     { titleKey: 'portfolio.kpi.health', value: (kpi?.npl_ratio || 0) < 0.1 ? 'Good' : 'Watch' },
-    {
-      titleKey: locale === 'vi' ? 'Tổn thất kỳ vọng' : 'Expected loss',
-      value: formatCompactVnd(Number(kpi?.expected_loss || 0), moneyLocale),
-    },
-    {
-      titleKey: 'VaR 99%',
-      value: formatCompactVnd(Number(kpi?.var_99 || 0), moneyLocale),
-    },
   ], [kpi, portfolioCustomerCount, moneyLocale]);
 
   return (

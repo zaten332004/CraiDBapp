@@ -397,7 +397,7 @@ export default function ApprovedLoanWorkbenchPage() {
 
   return (
     <div className="motion-enter flex flex-col gap-5 p-4 sm:p-5 lg:p-6">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
         <Link href="/dashboard/customers">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -405,7 +405,7 @@ export default function ApprovedLoanWorkbenchPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('loans.workbench.title')}</h1>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t('loans.workbench.title')}</h1>
         </div>
       </div>
 
@@ -421,7 +421,7 @@ export default function ApprovedLoanWorkbenchPage() {
           ) : (
             <>
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="relative min-w-[200px] max-w-md flex-1">
+                <div className="relative w-full sm:max-w-md sm:flex-1">
                   <Search
                     className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                     aria-hidden
@@ -439,7 +439,7 @@ export default function ApprovedLoanWorkbenchPage() {
                   value={periodStateFilter}
                   onValueChange={(v) => setPeriodStateFilter(v as PeriodStateFilter)}
                 >
-                  <SelectTrigger className="w-full sm:w-[220px]" aria-label={t('loans.workbench.filter_period_state')}>
+                  <SelectTrigger className="w-full sm:w-auto sm:min-w-[220px]" aria-label={t('loans.workbench.filter_period_state')}>
                     <SelectValue placeholder={t('loans.workbench.filter_period_state')} />
                   </SelectTrigger>
                   <SelectContent>
@@ -459,33 +459,21 @@ export default function ApprovedLoanWorkbenchPage() {
               {filteredRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t('loans.workbench.no_match')}</p>
               ) : (
-                <div className="rounded-lg border border-border bg-muted/30 shadow-sm overflow-hidden">
-                  <ScrollableTableRegion className="rounded-lg border-0 bg-transparent overflow-x-hidden">
-                    <Table className="table-fixed text-xs">
-                      <colgroup>
-                        <col className="w-[11%]" />
-                        <col className="w-[10%]" />
-                        <col className="w-[16%]" />
-                        <col className="w-[11%]" />
-                        <col className="w-[11%]" />
-                        <col className="w-[12%]" />
-                        <col className="w-[7%]" />
-                        <col className="w-[8%]" />
-                        <col className="w-[6%]" />
-                        <col className="w-[8%]" />
-                      </colgroup>
+                <div className="rounded-lg border border-border bg-muted/30 shadow-sm">
+                  <ScrollableTableRegion className="rounded-lg border-0 bg-transparent">
+                    <Table className="w-full min-w-[980px] table-auto text-xs sm:text-sm">
                       <TableHeader>
                         <TableRow className={scrollableTableHeaderRowClass}>
-                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.customer')}</TableHead>
-                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.ref')}</TableHead>
-                          <TableHead className="truncate text-[12px]">{t('customers.field.loan_purpose')}</TableHead>
-                          <TableHead className="truncate text-[12px]" title={t('loans.workbench.col.amount_hint')}>{t('loans.workbench.col.amount')}</TableHead>
-                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.period_payment')}</TableHead>
-                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.installment_progress')}</TableHead>
-                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.due')}</TableHead>
-                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.state')}</TableHead>
-                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.dpd')}</TableHead>
-                          <TableHead className="truncate text-right text-[12px]">{t('loans.workbench.record_payment')}</TableHead>
+                          <TableHead className="min-w-[150px] text-[12px]">{t('loans.workbench.col.customer')}</TableHead>
+                          <TableHead className="min-w-[130px] text-[12px]">{t('loans.workbench.col.ref')}</TableHead>
+                          <TableHead className="min-w-[200px] text-[12px]">{t('customers.field.loan_purpose')}</TableHead>
+                          <TableHead className="min-w-[140px] text-[12px]" title={t('loans.workbench.col.amount_hint')}>{t('loans.workbench.col.amount')}</TableHead>
+                          <TableHead className="min-w-[140px] text-[12px]">{t('loans.workbench.col.period_payment')}</TableHead>
+                          <TableHead className="min-w-[170px] text-[12px]">{t('loans.workbench.col.installment_progress')}</TableHead>
+                          <TableHead className="min-w-[120px] text-[12px]">{t('loans.workbench.col.due')}</TableHead>
+                          <TableHead className="min-w-[120px] text-[12px]">{t('loans.workbench.col.state')}</TableHead>
+                          <TableHead className="min-w-[90px] text-[12px]">{t('loans.workbench.col.dpd')}</TableHead>
+                          <TableHead className="min-w-[150px] text-right text-[12px]">{t('loans.workbench.record_payment')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -561,7 +549,7 @@ export default function ApprovedLoanWorkbenchPage() {
                               <div className="flex justify-end gap-1">
                                 <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" asChild>
                                   <Link
-                                    href={`/dashboard/customers/${r.customer_id}?application_id=${r.application_id}&returnTo=${encodeURIComponent('/dashboard/loans/approved-workbench')}`}
+                                    href={`/dashboard/customers/${r.customer_id}?application_id=${r.application_id}&returnTo=${encodeURIComponent('/dashboard/loans/approved-workbench')}&view=repayment`}
                                   >
                                     {locale === 'vi' ? 'Mở KH' : 'Open'}
                                   </Link>
