@@ -504,7 +504,8 @@ export default function AIChatPage() {
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const apiErr = (err: unknown) => formatUserFacingApiError(err, msgLocale);
 
-  const activatePowerBiDataSource = useCallback(async () => {
+  const activatePowerBiDataSource = useCallback(async (opts?: { strict?: boolean }): Promise<boolean> => {
+    const strict = Boolean(opts?.strict);
     try {
       const names = loadPowerBiTableSuggestions();
       await browserApiFetchAuth('/powerbi/table-hints', {
@@ -520,16 +521,26 @@ export default function AIChatPage() {
         warnings?: string[];
       }>('/ai-chat/powerbi-readiness', { method: 'GET' });
       if (!r?.ready_for_ai_context && Array.isArray(r?.warnings) && r.warnings.length) {
-        notifyInfo(t('ai_chat.powerbi_readiness_title'), {
-          description: r.warnings.join('\n'),
-          duration: 10000,
-        });
+        if (strict) {
+          notifyError(t('ai_chat.powerbi_readiness_title'), {
+            description: r.warnings.join('\n'),
+            duration: 10000,
+          });
+        } else {
+          notifyInfo(t('ai_chat.powerbi_readiness_title'), {
+            description: r.warnings.join('\n'),
+            duration: 10000,
+          });
+        }
+        return false;
       }
+      return true;
     } catch (err) {
       notifyError(t('ai_chat.powerbi_readiness_error_title'), {
         description: apiErr(err),
         duration: 6500,
       });
+      return false;
     }
   }, [t, apiErr]);
 
@@ -1079,6 +1090,10 @@ export default function AIChatPage() {
     if (aiDataSource === 'customer' && selectedCustomerIds.length === 0) {
       notifyError(t('ai_chat.error_customer_mode_no_customer'));
       return;
+    }
+    if (aiDataSource === 'powerbi') {
+      const ready = await activatePowerBiDataSource({ strict: true });
+      if (!ready) return;
     }
 
     const pickLowestAllowedModel = (): string => {
