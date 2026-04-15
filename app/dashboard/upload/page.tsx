@@ -542,9 +542,9 @@ export default function UploadPage() {
                     <Table>
                       <TableHeader>
                         <TableRow className={scrollableTableHeaderRowClass}>
-                          <TableHead className="w-16">{t('upload.col_row')}</TableHead>
-                          <TableHead>{t('upload.col_name_email')}</TableHead>
-                          <TableHead>{t('upload.col_reason')}</TableHead>
+                          <TableHead className="w-16 text-[12px]">{t('upload.col_row')}</TableHead>
+                          <TableHead className="text-[12px]">{t('upload.col_name_email')}</TableHead>
+                          <TableHead className="text-[12px]">{t('upload.col_reason')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

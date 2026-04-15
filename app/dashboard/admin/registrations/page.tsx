@@ -320,7 +320,7 @@ export default function AdminRegistrationsPage() {
   const selected = registrations.find((r) => r.id === selectedId) ?? null;
 
   return (
-    <div className="flex flex-col gap-4 bg-background p-6">
+    <div className="motion-enter flex flex-col gap-4 bg-background p-4 sm:p-5 lg:p-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('admin.reg.title')}</h1>
         <p className="text-muted-foreground mt-2">{t('admin.reg.desc')}</p>
@@ -398,15 +398,22 @@ export default function AdminRegistrationsPage() {
               <p className="text-muted-foreground mt-1">{t('admin.reg.none_desc')}</p>
             </div>
           ) : (
-            <ScrollableTableRegion>
-              <Table className="min-w-[760px] w-full">
+            <ScrollableTableRegion className="overflow-x-hidden">
+              <Table className="w-full table-fixed text-xs">
+                <colgroup>
+                  <col className="w-[22%]" />
+                  <col className="w-[26%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[18%]" />
+                </colgroup>
                 <TableHeader>
                   <TableRow className={scrollableTableHeaderRowClass}>
-                    <TableHead className="py-1.5">{t('common.name')}</TableHead>
-                    <TableHead className="py-1.5">{t('common.email')}</TableHead>
-                    <TableHead className="py-1.5">{t('admin.reg.type')}</TableHead>
-                    <TableHead className="py-1.5">{t('admin.reg.requested')}</TableHead>
-                    <TableHead className="py-1.5 text-right">{t('common.actions')}</TableHead>
+                    <TableHead className="py-2 text-[12px] truncate">{t('common.name')}</TableHead>
+                    <TableHead className="py-2 text-[12px] truncate">{t('common.email')}</TableHead>
+                    <TableHead className="py-2 text-[12px] truncate">{t('admin.reg.type')}</TableHead>
+                    <TableHead className="py-2 text-[12px] truncate">{t('admin.reg.requested')}</TableHead>
+                    <TableHead className="py-2 text-[12px] truncate text-right">{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -418,20 +425,26 @@ export default function AdminRegistrationsPage() {
                         void openRegistrationDetails(reg.id);
                       })}
                     >
-                      <TableCell className="py-1.5 text-[12px] font-medium">{reg.name}</TableCell>
-                      <TableCell className="py-1.5 text-[12px]">{reg.email}</TableCell>
-                      <TableCell className="py-1.5">
-                        <Badge variant="outline" className={registrationRoleBadgeClass(reg.type)}>
+                      <TableCell className="py-2 text-[12px] font-medium">
+                        <span className="block truncate" title={reg.name}>{reg.name}</span>
+                      </TableCell>
+                      <TableCell className="py-2 text-[12px]">
+                        <span className="block truncate" title={reg.email}>{reg.email}</span>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <Badge variant="outline" className={`text-[11px] ${registrationRoleBadgeClass(reg.type)}`}>
                           {t(`role.${reg.type}`)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="py-1.5 text-[12px] text-muted-foreground whitespace-nowrap">{reg.requestedAt || '—'}</TableCell>
-                      <TableCell className="py-1.5 text-right">
+                      <TableCell className="py-2 text-[12px] text-muted-foreground whitespace-nowrap">
+                        <span className="block truncate" title={reg.requestedAt || '—'}>{reg.requestedAt || '—'}</span>
+                      </TableCell>
+                      <TableCell className="py-2 text-right">
                         {(() => {
                           const rowStatus = String((reg.raw as any)?.status ?? statusFilter).trim().toLowerCase();
                           return (
                             <div className="flex items-center justify-end gap-2 min-h-8">
-                              <Badge variant="outline" className={statusBadgeClass(rowStatus)}>
+                              <Badge variant="outline" className={`text-[11px] ${statusBadgeClass(rowStatus)}`}>
                                 {formatStatusLabel(rowStatus, locale)}
                               </Badge>
                               <DropdownMenu>
@@ -520,31 +533,40 @@ export default function AdminRegistrationsPage() {
               {locale === 'vi' ? 'Không có yêu cầu quên PIN đang chờ.' : 'No pending forgot-PIN requests.'}
             </div>
           ) : (
-            <ScrollableTableRegion>
-              <Table className="min-w-[760px] w-full">
+            <ScrollableTableRegion className="overflow-x-hidden">
+              <Table className="w-full table-fixed text-xs">
+                <colgroup>
+                  <col className="w-[28%]" />
+                  <col className="w-[28%]" />
+                  <col className="w-[24%]" />
+                  <col className="w-[20%]" />
+                </colgroup>
                 <TableHeader>
                   <TableRow className={scrollableTableHeaderRowClass}>
-                    <TableHead className="py-1.5">{locale === 'vi' ? 'Người dùng' : 'User'}</TableHead>
-                    <TableHead className="py-1.5">{t('common.email')}</TableHead>
-                    <TableHead className="py-1.5">{locale === 'vi' ? 'Thời gian yêu cầu' : 'Requested at'}</TableHead>
-                    <TableHead className="py-1.5 text-right">{t('common.actions')}</TableHead>
+                    <TableHead className="py-2 text-[12px] truncate">{locale === 'vi' ? 'Người dùng' : 'User'}</TableHead>
+                    <TableHead className="py-2 text-[12px] truncate">{t('common.email')}</TableHead>
+                    <TableHead className="py-2 text-[12px] truncate">{locale === 'vi' ? 'Thời gian yêu cầu' : 'Requested at'}</TableHead>
+                    <TableHead className="py-2 text-[12px] truncate text-right">{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {pinResetRequests.map((row) => (
                     <TableRow key={row.userId} className="border-b border-border/70">
-                      <TableCell className="py-1.5 text-[12px] font-medium">
-                        {row.fullName}
-                        <span className="ml-2 text-xs text-muted-foreground font-mono">#{row.userId}</span>
+                      <TableCell className="py-2 text-[12px] font-medium">
+                        <span className="block truncate" title={row.fullName}>{row.fullName}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground font-mono" title={`#${row.userId}`}>#{row.userId}</span>
                       </TableCell>
-                      <TableCell className="py-1.5 text-[12px]">{row.email}</TableCell>
-                      <TableCell className="py-1.5 text-[12px] text-muted-foreground whitespace-nowrap">
-                        {formatDateTime(row.requestedAt, locale)}
+                      <TableCell className="py-2 text-[12px]">
+                        <span className="block truncate" title={row.email}>{row.email}</span>
                       </TableCell>
-                      <TableCell className="py-1.5 text-right">
+                      <TableCell className="py-2 text-[12px] text-muted-foreground whitespace-nowrap">
+                        <span className="block truncate" title={formatDateTime(row.requestedAt, locale)}>{formatDateTime(row.requestedAt, locale)}</span>
+                      </TableCell>
+                      <TableCell className="py-2 text-right">
                         <div className="inline-flex items-center gap-2">
                           <Button
                             size="sm"
+                            className="h-7 px-2 text-[11px]"
                             onClick={() => openPinResetAction(row, 'approve')}
                             disabled={pinResetLoading}
                           >
@@ -553,6 +575,7 @@ export default function AdminRegistrationsPage() {
                           <Button
                             size="sm"
                             variant="outline"
+                            className="h-7 px-2 text-[11px]"
                             onClick={() => openPinResetAction(row, 'reject')}
                             disabled={pinResetLoading}
                           >

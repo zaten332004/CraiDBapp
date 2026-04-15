@@ -18,9 +18,7 @@ import { formatAlertMessageForDisplay } from '@/lib/alerts/alert-message-display
 type PortfolioKPI = {
   total_exposure: number;
   avg_pd: number;
-  expected_loss: number;
   npl_ratio: number;
-  var_99: number;
 };
 
 type PortfolioTrend = { points: Array<{ timestamp: string; value: number }> };
@@ -94,13 +92,11 @@ export default function DashboardPage() {
   const msgLocale: UserFacingLocale = locale === 'en' ? 'en' : 'vi';
   const [kpi, setKpi] = useState<PortfolioKPI | null>(null);
   const [trendData, setTrendData] = useState<Array<{ month: string; value: number; avgPd: number; npl: number }>>([]);
-  const [lossTrendData, setLossTrendData] = useState<Array<{ month: string; expectedLoss: number; var99: number }>>([]);
   const [riskMixData, setRiskMixData] = useState<Array<{ level: string; count: number }>>([]);
   const [alertSeverityData, setAlertSeverityData] = useState<Array<{ level: string; count: number }>>([]);
   const [recentAlerts, setRecentAlerts] = useState<AlertItem[]>([]);
   const [openAlertsCount, setOpenAlertsCount] = useState(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
-  const [activeUsersCount, setActiveUsersCount] = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
 
   useEffect(() => {
@@ -111,13 +107,11 @@ export default function DashboardPage() {
     let cancelled = false;
     const load = async () => {
       try {
-        const [kpiData, exposureTrendResult, avgPdTrendResult, nplTrendResult, expectedLossTrendResult, var99TrendResult, dist, alerts] = await Promise.all([
+        const [kpiData, exposureTrendResult, avgPdTrendResult, nplTrendResult, dist, alerts] = await Promise.all([
           browserApiFetchAuth<PortfolioKPI>('/portfolio/kpi', { method: 'GET' }),
           browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=total_exposure&interval=month', { method: 'GET' }),
           browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=avg_pd&interval=month', { method: 'GET' }).catch(() => null),
           browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=npl_ratio&interval=month', { method: 'GET' }).catch(() => null),
-          browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=expected_loss&interval=month', { method: 'GET' }).catch(() => null),
-          browserApiFetchAuth<PortfolioTrend>('/portfolio/trend?metric=var_99&interval=month', { method: 'GET' }).catch(() => null),
           browserApiFetchAuth<RiskDistribution>('/portfolio/risk-distribution', { method: 'GET' }),
           browserApiFetchAuth<AlertItem[]>('/alerts?status=open', { method: 'GET' }),
         ]);
@@ -127,7 +121,6 @@ export default function DashboardPage() {
         const distCountMap = Object.fromEntries(
           (dist.chart_data || []).map((x) => [String(x.bucket || '').toLowerCase(), Number(x.count ?? x.value ?? 0)]),
         );
-        const total = Math.max(1, Number(distCountMap.low || 0) + Number(distCountMap.medium || 0) + Number(distCountMap.high || 0));
         setRiskMixData([
           { level: 'low', count: Number(distCountMap.low || 0) },
           { level: 'medium', count: Number(distCountMap.medium || 0) },
@@ -137,13 +130,8 @@ export default function DashboardPage() {
         const exposureRows = toTrendRows(exposureTrendResult, locale);
         const avgPdRows = toTrendRows(avgPdTrendResult, locale);
         const nplRows = toTrendRows(nplTrendResult, locale);
-        const expectedLossRows = toTrendRows(expectedLossTrendResult, locale);
-        const var99Rows = toTrendRows(var99TrendResult, locale);
-
         const avgPdMap = seriesValueByTimestamp(avgPdRows);
         const nplMap = seriesValueByTimestamp(nplRows);
-        const expectedLossMap = seriesValueByTimestamp(expectedLossRows);
-        const var99Map = seriesValueByTimestamp(var99Rows);
 
         setTrendData(
           exposureRows.map((item) => ({
@@ -151,13 +139,6 @@ export default function DashboardPage() {
             value: item.value,
             avgPd: Number(((avgPdMap.get(item.timestamp) ?? Number(kpiData?.avg_pd || 0)) * 100).toFixed(2)),
             npl: Number(((nplMap.get(item.timestamp) ?? Number(kpiData?.npl_ratio || 0)) * 100).toFixed(2)),
-          })),
-        );
-        setLossTrendData(
-          exposureRows.map((item) => ({
-            month: item.month,
-            expectedLoss: Number(expectedLossMap.get(item.timestamp) ?? Number(kpiData?.expected_loss || 0)),
-            var99: Number(var99Map.get(item.timestamp) ?? Number(kpiData?.var_99 || 0)),
           })),
         );
         setRecentAlerts((alerts || []).slice(0, 4));
@@ -174,16 +155,15 @@ export default function DashboardPage() {
         ]);
 
         if (r === 'admin') {
-          const [pendingPayload, activeUsers] = await Promise.all([
-            browserApiFetchAuth<unknown>('/auth/register/list?status_filter=pending', { method: 'GET' }),
-            browserApiFetchAuth<any[]>('/admin/users?status_filter=active', { method: 'GET' }),
-          ]);
+          const pendingPayload = await browserApiFetchAuth<unknown>(
+            '/auth/register/list?status_filter=pending',
+            { method: 'GET' },
+          );
           if (!cancelled) {
             const pendingCount = extractRegistrationList(pendingPayload)
               .map((x) => normalizeRegistrationRow(x))
               .filter(Boolean).length;
             setPendingApprovalsCount(pendingCount);
-            setActiveUsersCount(extractTotalCount(activeUsers));
           }
         }
 
@@ -211,20 +191,9 @@ export default function DashboardPage() {
       },
       { title: locale === 'vi' ? 'Khách hàng' : 'Customers', value: String(customerCount), icon: Users },
       { title: locale === 'vi' ? 'Cảnh báo mở' : 'Open alerts', value: String(openAlertsCount), icon: AlertCircle },
-      {
-        title: locale === 'vi' ? 'Tổn thất kỳ vọng' : 'Expected loss',
-        value: formatCompactVnd(Number(kpi?.expected_loss || 0), locale === 'vi' ? 'vi' : 'en'),
-        icon: AlertCircle,
-      },
-      {
-        title: locale === 'vi' ? 'VaR 99%' : 'VaR 99%',
-        value: formatCompactVnd(Number(kpi?.var_99 || 0), locale === 'vi' ? 'vi' : 'en'),
-        icon: TrendingUp,
-      },
       { title: role === 'admin' ? (locale === 'vi' ? 'Chờ phê duyệt' : 'Pending approvals') : (locale === 'vi' ? 'Sức khỏe hệ thống' : 'System health'), value: role === 'admin' ? String(pendingApprovalsCount) : health, icon: PieChart },
-      ...(role === 'admin' ? [{ title: locale === 'vi' ? 'Người dùng hoạt động' : 'Active users', value: String(activeUsersCount), icon: Users }] : []),
     ];
-  }, [kpi?.avg_pd, kpi?.npl_ratio, kpi?.total_exposure, kpi?.expected_loss, kpi?.var_99, locale, customerCount, openAlertsCount, pendingApprovalsCount, activeUsersCount, role]);
+  }, [kpi?.avg_pd, kpi?.npl_ratio, kpi?.total_exposure, locale, customerCount, openAlertsCount, pendingApprovalsCount, role]);
 
   return (
     <div className="motion-enter flex flex-col gap-5 lg:gap-6 p-4 sm:p-5 lg:p-6">
@@ -247,20 +216,20 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          <div className="motion-stagger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
+          <div className="motion-stagger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4">
             {cards.map((metric, idx) => (
               <KPICard key={idx} title={metric.title} value={metric.value} icon={metric.icon} />
             ))}
           </div>
 
-          <div className="motion-stagger grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="motion-stagger grid grid-cols-1 xl:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
                 <CardTitle>{t('dashboard.chart_portfolio_trend_title')}</CardTitle>
                 <CardDescription>{t('dashboard.chart_portfolio_trend_desc')}</CardDescription>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+              <CardContent className="pb-4">
+                <ResponsiveContainer width="100%" height={248}>
                   <LineChart data={trendData} margin={RECHART_MARGIN.lineDualY}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" tickMargin={8} />
@@ -320,49 +289,11 @@ export default function DashboardPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>{locale === 'vi' ? 'Xu hướng tổn thất & VaR' : 'Loss & VaR trend'}</CardTitle>
-                <CardDescription>
-                  {locale === 'vi'
-                    ? 'Theo dõi tổn thất kỳ vọng và VaR 99% theo chu kỳ.'
-                    : 'Track expected loss and VaR 99% over periods.'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={lossTrendData} margin={RECHART_MARGIN.lineDualY}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" tickMargin={8} />
-                    <YAxis
-                      tickFormatter={(v) => formatCompactVnd(Number(v), locale === 'vi' ? 'vi' : 'en')}
-                      width={RECHART_Y_WIDTH.money}
-                      tickMargin={8}
-                      tick={{ fontSize: 11 }}
-                    />
-                    <Tooltip
-                      formatter={(value: number, name: string) => [
-                        formatCompactVnd(Number(value), locale === 'vi' ? 'vi' : 'en'),
-                        name === 'expectedLoss'
-                          ? locale === 'vi'
-                            ? 'Tổn thất kỳ vọng'
-                            : 'Expected loss'
-                          : 'VaR 99%',
-                      ]}
-                    />
-                    <Legend />
-                    <Line type="monotone" dataKey="expectedLoss" stroke="#14b8a6" strokeWidth={2} name={locale === 'vi' ? 'Tổn thất kỳ vọng' : 'Expected loss'} />
-                    <Line type="monotone" dataKey="var99" stroke="#f59e0b" strokeWidth={2} name="VaR 99%" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
                 <CardTitle>{t('dashboard.recent_alerts_title')}</CardTitle>
                 <CardDescription>{t('dashboard.recent_alerts_desc')}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="h-44">
+              <CardContent className="space-y-3 pb-4">
+                <div className="h-34">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={riskMixData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -380,7 +311,7 @@ export default function DashboardPage() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="h-36">
+                <div className="h-28">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={alertSeverityData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -396,25 +327,27 @@ export default function DashboardPage() {
                     {t('dashboard.no_open_alerts')}
                   </p>
                 ) : (
-                  recentAlerts.map((item) => (
-                    <div
-                      key={item.alert_id}
-                      className="flex items-center justify-between pb-3 border-b last:border-0 last:pb-0"
-                    >
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {item.customer_name ||
-                            `${t('dashboard.customer_fallback')} #${item.alert_id}`}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatAlertMessageForDisplay(item.message, locale)}
+                  <div className="max-h-40 overflow-y-auto pr-1">
+                    {recentAlerts.map((item) => (
+                      <div
+                        key={item.alert_id}
+                        className="flex items-center justify-between pb-2 border-b last:border-0 last:pb-0"
+                      >
+                        <div>
+                          <p className="font-medium text-foreground">
+                            {item.customer_name ||
+                              `${t('dashboard.customer_fallback')} #${item.alert_id}`}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatAlertMessageForDisplay(item.message, locale)}
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDateTimeVietnam(item.created_at, locale)}
                         </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateTimeVietnam(item.created_at, locale)}
-                      </p>
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>

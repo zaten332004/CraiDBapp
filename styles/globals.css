@@ -514,38 +514,58 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.28);
 }
 
-/* Đuôi trái (AI): chồng ~2px lên thân để khớp nền; viền = box-shadow ring */
+/* Đuôi trái (AI) - hai lớp (viền + nền) để nối mạch với thân bubble */
 .ai-chat-bubble--in::after {
   content: '';
   position: absolute;
-  z-index: 0;
-  left: calc(1.1rem - 1px);
-  bottom: -4px;
-  width: 12px;
-  height: 12px;
-  box-sizing: border-box;
-  background: var(--ai-chat-bubble-fill);
-  box-shadow: 0 0 0 1px var(--ai-chat-bubble-edge);
-  transform: rotate(45deg);
-  clip-path: inset(50% 0 0 0);
+  left: 1rem;
+  bottom: -9px;
+  width: 16px;
+  height: 11px;
+  background: var(--ai-chat-bubble-edge);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
   pointer-events: none;
+  z-index: 0;
 }
 
-/* Đuôi phải (user) */
+.ai-chat-bubble--in::before {
+  content: '';
+  position: absolute;
+  left: calc(1rem + 1px);
+  bottom: -8px;
+  width: 14px;
+  height: 10px;
+  background: var(--ai-chat-bubble-fill);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Đuôi phải (user) - hai lớp (viền + nền) để nối mạch với thân bubble */
 .ai-chat-bubble--out::after {
   content: '';
   position: absolute;
-  z-index: 0;
-  right: calc(1.1rem - 1px);
-  bottom: -4px;
-  width: 12px;
-  height: 12px;
-  box-sizing: border-box;
-  background: var(--ai-chat-bubble-fill);
-  box-shadow: 0 0 0 1px var(--ai-chat-bubble-edge);
-  transform: rotate(-45deg);
-  clip-path: inset(50% 0 0 0);
+  right: 1rem;
+  bottom: -9px;
+  width: 16px;
+  height: 11px;
+  background: var(--ai-chat-bubble-edge);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
   pointer-events: none;
+  z-index: 0;
+}
+
+.ai-chat-bubble--out::before {
+  content: '';
+  position: absolute;
+  right: calc(1rem + 1px);
+  bottom: -8px;
+  width: 14px;
+  height: 10px;
+  background: var(--ai-chat-bubble-fill);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* Nội dung bong bóng luôn trên đuôi */

@@ -316,13 +316,13 @@ export default function AlertsPage() {
                   </colgroup>
                   <TableHeader>
                     <TableRow className={scrollableTableHeaderRowClass}>
-                      <TableHead></TableHead>
-                      <TableHead className="py-2.5 text-[13px] font-semibold">{t('alerts.type')}</TableHead>
-                      <TableHead className="py-2.5 text-[13px] font-semibold">{t('alerts.customer')}</TableHead>
-                      <TableHead className="py-2.5 text-[13px] font-semibold">{t('alerts.severity')}</TableHead>
-                      <TableHead className="py-2.5 text-[13px] font-semibold">{t('common.status')}</TableHead>
-                      <TableHead className="py-2.5 text-[13px] font-semibold">{t('common.date')}</TableHead>
-                      <TableHead className="py-2.5 text-right text-[13px] font-semibold">{t('common.actions')}</TableHead>
+                      <TableHead className="text-[12px]"></TableHead>
+                      <TableHead className="py-2.5 text-[12px] font-semibold">{t('alerts.type')}</TableHead>
+                      <TableHead className="py-2.5 text-[12px] font-semibold">{t('alerts.customer')}</TableHead>
+                      <TableHead className="py-2.5 text-[12px] font-semibold">{t('alerts.severity')}</TableHead>
+                      <TableHead className="py-2.5 text-[12px] font-semibold">{t('common.status')}</TableHead>
+                      <TableHead className="py-2.5 text-[12px] font-semibold">{t('common.date')}</TableHead>
+                      <TableHead className="py-2.5 text-right text-[12px] font-semibold">{t('common.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

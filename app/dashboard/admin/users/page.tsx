@@ -364,7 +364,7 @@ export default function AdminUsersPage() {
   }, [selectedUser, selectedRole, pinNew, pinConfirm]);
 
   return (
-    <div className="flex flex-col gap-6 bg-background p-6">
+    <div className="motion-enter flex flex-col gap-5 bg-background p-4 sm:p-5 lg:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('admin.users.title')}</h1>
@@ -439,15 +439,22 @@ export default function AdminUsersPage() {
         </CardHeader>
 
         <CardContent className="pt-0">
-          <ScrollableTableRegion>
-            <Table className="min-w-[820px] w-full">
+          <ScrollableTableRegion className="overflow-x-hidden">
+            <Table className="w-full table-fixed text-xs">
+              <colgroup>
+                <col className="w-[30%]" />
+                <col className="w-[30%]" />
+                <col className="w-[14%]" />
+                <col className="w-[14%]" />
+                <col className="w-[12%]" />
+              </colgroup>
               <TableHeader>
                 <TableRow className={scrollableTableHeaderRowClass}>
-                  <TableHead className="py-1.5">{t('common.name')}</TableHead>
-                  <TableHead className="py-1.5">{t('common.email')}</TableHead>
-                  <TableHead className="py-1.5">{t('common.role')}</TableHead>
-                  <TableHead className="py-1.5">{t('common.status')}</TableHead>
-                  <TableHead className="py-1.5 text-right">{t('common.actions')}</TableHead>
+                  <TableHead className="py-2 text-[12px] truncate">{t('common.name')}</TableHead>
+                  <TableHead className="py-2 text-[12px] truncate">{t('common.email')}</TableHead>
+                  <TableHead className="py-2 text-[12px] truncate">{t('common.role')}</TableHead>
+                  <TableHead className="py-2 text-[12px] truncate">{t('common.status')}</TableHead>
+                  <TableHead className="py-2 text-[12px] truncate text-right">{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -459,30 +466,32 @@ export default function AdminUsersPage() {
                       setSelectedUser(user);
                     })}
                   >
-                    <TableCell className="py-1.5 font-medium">
+                    <TableCell className="py-2 font-medium">
                       <div className="flex flex-col">
-                        <span>{user.name}</span>
-                        <span className="text-xs text-muted-foreground font-mono">{user.id}</span>
+                        <span className="truncate" title={user.name}>{user.name}</span>
+                        <span className="truncate text-[11px] text-muted-foreground font-mono" title={user.id}>{user.id}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="py-1.5">{user.email}</TableCell>
-                    <TableCell className="py-1.5">
-                      <Badge variant="outline" className={getRoleBadgeClass(user.role)}>
+                    <TableCell className="py-2">
+                      <span className="block truncate" title={user.email}>{user.email}</span>
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <Badge variant="outline" className={`text-[11px] ${getRoleBadgeClass(user.role)}`}>
                         {roleLabel(user.role)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="py-1.5">
-                      <Badge variant="outline" className={getStatusBadgeClass(user.isActive)}>
+                    <TableCell className="py-2">
+                      <Badge variant="outline" className={`text-[11px] ${getStatusBadgeClass(user.isActive)}`}>
                         {t(user.isActive ? 'status.active' : 'status.inactive')}
                       </Badge>
                     </TableCell>
-                    <TableCell className="py-1.5 text-right">
+                    <TableCell className="py-2 text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-6 px-1.5"
+                            className="h-7 px-1.5"
                             disabled={isLoading}
                             onClick={(e) => e.stopPropagation()}
                           >

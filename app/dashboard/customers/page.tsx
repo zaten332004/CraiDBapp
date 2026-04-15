@@ -247,7 +247,7 @@ export default function CustomersPage() {
   return (
     <div className="motion-enter flex flex-col gap-5 bg-background p-4 sm:p-5 lg:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('customers.title')}</h1>
           <p className="text-muted-foreground mt-2">
@@ -255,7 +255,7 @@ export default function CustomersPage() {
           </p>
         </div>
         {!isViewer && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button asChild variant="outline">
               <Link href="/dashboard/upload">
                 {t('sidebar.upload')}
@@ -280,8 +280,8 @@ export default function CustomersPage() {
       {/* Filters */}
       <Card className="border-border/80 bg-card shadow-sm">
         <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end">
-            <div className="flex-1 min-w-[200px] relative">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_220px_180px] xl:items-end">
+            <div className="relative min-w-0">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder={t('customers.search_ph')}
@@ -300,7 +300,7 @@ export default function CustomersPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-full md:w-[200px]">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder={t('customers.app_status_filter_all')} />
               </SelectTrigger>
               <SelectContent>
@@ -317,7 +317,7 @@ export default function CustomersPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-full md:w-40">
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -337,21 +337,16 @@ export default function CustomersPage() {
           <CardTitle>{t('customers.list_title')}</CardTitle>
         </CardHeader>
         <CardContent className="pb-5">
-          <ScrollableTableRegion className="max-h-[min(48vh,32rem,calc(100dvh-17rem))] shadow-sm">
-            <Table className="w-full table-fixed text-sm">
-              <colgroup>
-                {Array.from({ length: 6 }, (_, i) => (
-                  <col key={i} style={{ width: `${100 / 6}%` }} />
-                ))}
-              </colgroup>
+          <ScrollableTableRegion className="max-h-[min(58vh,42rem,calc(100dvh-14rem))] shadow-sm">
+            <Table className="w-full text-sm">
               <TableHeader>
                 <TableRow className={scrollableTableHeaderRowClass}>
-                  <TableHead className="py-1.5 pr-2">{t('customers.col_name_mail')}</TableHead>
-                  <TableHead className="py-1.5 whitespace-nowrap px-2">{t('customers.col_app_count')}</TableHead>
-                  <TableHead className="py-1.5 whitespace-nowrap px-2">{t('customers.col_total_loan')}</TableHead>
-                  <TableHead className="py-1.5 whitespace-nowrap px-2">{t('customers.risk_level')}</TableHead>
-                  <TableHead className="py-1.5 px-2">{t('customers.col_status_portfolio')}</TableHead>
-                  <TableHead className="py-1.5 whitespace-nowrap pl-2 text-left">{t('customers.col_actions')}</TableHead>
+                  <TableHead className="min-w-[180px] py-1.5 pr-2 text-[12px]">{t('customers.col_name_mail')}</TableHead>
+                  <TableHead className="min-w-[90px] py-1.5 whitespace-nowrap px-2 text-[12px]">{t('customers.col_app_count')}</TableHead>
+                  <TableHead className="min-w-[140px] py-1.5 whitespace-nowrap px-2 text-[12px]">{t('customers.col_total_loan')}</TableHead>
+                  <TableHead className="min-w-[110px] py-1.5 whitespace-nowrap px-2 text-[12px]">{t('customers.risk_level')}</TableHead>
+                  <TableHead className="min-w-[170px] py-1.5 px-2 text-[12px]">{t('customers.col_status_portfolio')}</TableHead>
+                  <TableHead className="min-w-[120px] py-1.5 whitespace-nowrap pl-2 text-left text-[12px]">{t('customers.col_actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

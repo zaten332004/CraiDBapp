@@ -460,34 +460,56 @@ export default function ApprovedLoanWorkbenchPage() {
                 <p className="text-sm text-muted-foreground">{t('loans.workbench.no_match')}</p>
               ) : (
                 <div className="rounded-lg border border-border bg-muted/30 shadow-sm overflow-hidden">
-                  <ScrollableTableRegion className="rounded-lg border-0 bg-transparent">
-                    <Table>
+                  <ScrollableTableRegion className="rounded-lg border-0 bg-transparent overflow-x-hidden">
+                    <Table className="table-fixed text-xs">
+                      <colgroup>
+                        <col className="w-[11%]" />
+                        <col className="w-[10%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[11%]" />
+                        <col className="w-[11%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[7%]" />
+                        <col className="w-[8%]" />
+                        <col className="w-[6%]" />
+                        <col className="w-[8%]" />
+                      </colgroup>
                       <TableHeader>
                         <TableRow className={scrollableTableHeaderRowClass}>
-                          <TableHead>{t('loans.workbench.col.customer')}</TableHead>
-                          <TableHead>{t('loans.workbench.col.ref')}</TableHead>
-                          <TableHead>{t('customers.field.loan_purpose')}</TableHead>
-                          <TableHead title={t('loans.workbench.col.amount_hint')}>{t('loans.workbench.col.amount')}</TableHead>
-                          <TableHead>{t('loans.workbench.col.period_payment')}</TableHead>
-                          <TableHead>{t('loans.workbench.col.installment_progress')}</TableHead>
-                          <TableHead>{t('loans.workbench.col.due')}</TableHead>
-                          <TableHead>{t('loans.workbench.col.state')}</TableHead>
-                          <TableHead>{t('loans.workbench.col.dpd')}</TableHead>
-                          <TableHead className="text-right">{t('loans.workbench.record_payment')}</TableHead>
+                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.customer')}</TableHead>
+                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.ref')}</TableHead>
+                          <TableHead className="truncate text-[12px]">{t('customers.field.loan_purpose')}</TableHead>
+                          <TableHead className="truncate text-[12px]" title={t('loans.workbench.col.amount_hint')}>{t('loans.workbench.col.amount')}</TableHead>
+                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.period_payment')}</TableHead>
+                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.installment_progress')}</TableHead>
+                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.due')}</TableHead>
+                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.state')}</TableHead>
+                          <TableHead className="truncate text-[12px]">{t('loans.workbench.col.dpd')}</TableHead>
+                          <TableHead className="truncate text-right text-[12px]">{t('loans.workbench.record_payment')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredRows.map((r) => (
                           <TableRow key={r.application_id}>
-                            <TableCell className="font-medium">{r.customer_name || '-'}</TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {r.application_ref_no || r.application_id}
+                            <TableCell className="font-medium leading-tight">
+                              <span className="block truncate" title={r.customer_name || '-'}>
+                                {r.customer_name || '-'}
+                              </span>
                             </TableCell>
-                            <TableCell className="text-xs">
-                              <div className="font-medium">{loanPurposeLabel(r, locale)}</div>
-                              <div className="text-muted-foreground">{interestFormulaLabel(r, locale)}</div>
+                            <TableCell className="font-mono text-[11px]">
+                              <span className="block truncate" title={String(r.application_ref_no || r.application_id)}>
+                                {r.application_ref_no || r.application_id}
+                              </span>
                             </TableCell>
-                            <TableCell className="text-sm tabular-nums font-medium">
+                            <TableCell className="text-[11px] leading-tight">
+                              <div className="font-medium truncate" title={loanPurposeLabel(r, locale)}>
+                                {loanPurposeLabel(r, locale)}
+                              </div>
+                              <div className="text-muted-foreground truncate" title={interestFormulaLabel(r, locale)}>
+                                {interestFormulaLabel(r, locale)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="tabular-nums font-medium">
                               {(() => {
                                 const rem = remainingTotalRepaymentVnd(r);
                                 return rem != null
@@ -495,7 +517,7 @@ export default function ApprovedLoanWorkbenchPage() {
                                   : '-';
                               })()}
                             </TableCell>
-                            <TableCell className="text-sm tabular-nums font-medium">
+                            <TableCell className="tabular-nums font-medium">
                               {(() => {
                                 const per = periodPaymentEstimateVnd(r);
                                 return per != null
@@ -505,7 +527,7 @@ export default function ApprovedLoanWorkbenchPage() {
                                     : '-';
                               })()}
                             </TableCell>
-                            <TableCell className="text-sm tabular-nums">
+                            <TableCell className="tabular-nums">
                               {(() => {
                                 const per = periodPaymentEstimateVnd(r);
                                 const due = per ?? (r.next_total_due != null && Number.isFinite(Number(r.next_total_due))
@@ -521,12 +543,12 @@ export default function ApprovedLoanWorkbenchPage() {
                                 );
                               })()}
                             </TableCell>
-                            <TableCell>{formatDueDate(r.next_due_date, locale)}</TableCell>
+                            <TableCell className="truncate">{formatDueDate(r.next_due_date, locale)}</TableCell>
                             <TableCell>
                               {r.installment_state ? (
                                 <Badge
                                   variant="outline"
-                                  className={cn('font-medium border', installmentStateBadgeClass(r.installment_state))}
+                                  className={cn('font-medium border px-1.5 py-0 text-[11px]', installmentStateBadgeClass(r.installment_state))}
                                 >
                                   {installmentStateLabel(t, r.installment_state)}
                                 </Badge>
@@ -534,18 +556,19 @@ export default function ApprovedLoanWorkbenchPage() {
                                 '-'
                               )}
                             </TableCell>
-                            <TableCell>{r.installment_dpd ?? 0}</TableCell>
+                            <TableCell className="tabular-nums">{r.installment_dpd ?? 0}</TableCell>
                             <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button variant="outline" size="sm" asChild>
+                              <div className="flex justify-end gap-1">
+                                <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" asChild>
                                   <Link
                                     href={`/dashboard/customers/${r.customer_id}?application_id=${r.application_id}&returnTo=${encodeURIComponent('/dashboard/loans/approved-workbench')}`}
                                   >
-                                    {t('loans.workbench.open_customer')}
+                                    {locale === 'vi' ? 'Mở KH' : 'Open'}
                                   </Link>
                                 </Button>
                                 <Button
                                   size="sm"
+                                  className="h-7 px-2 text-[11px]"
                                   onClick={() => void openPay(r)}
                                   disabled={
                                     ensuringApplicationId === r.application_id || !canRecordInstallmentPayment(r)
@@ -556,7 +579,7 @@ export default function ApprovedLoanWorkbenchPage() {
                                       : undefined
                                   }
                                 >
-                                  {t('loans.workbench.record_payment')}
+                                  {locale === 'vi' ? 'Ghi nhận' : 'Record'}
                                 </Button>
                               </div>
                             </TableCell>

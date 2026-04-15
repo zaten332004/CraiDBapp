@@ -888,12 +888,16 @@ export default function PowerBIConfigPage() {
                     </Button>
                   </div>
                   {workspaces.length > 0 ? (
-                    <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm">
-                      <Table className="table-fixed">
+                    <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm overflow-x-hidden">
+                      <Table className="table-fixed text-xs">
+                        <colgroup>
+                          <col className="w-[68%]" />
+                          <col className="w-[32%]" />
+                        </colgroup>
                         <TableHeader>
                           <TableRow className={scrollableTableHeaderRowClass}>
-                            <TableHead className="w-[68%]">ID</TableHead>
-                            <TableHead className="w-[32%]">{t('common.name')}</TableHead>
+                            <TableHead className="truncate text-[12px]">ID</TableHead>
+                            <TableHead className="truncate text-[12px]">{t('common.name')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -902,8 +906,12 @@ export default function PowerBIConfigPage() {
                               key={w.id}
                               className={w.id === selectedWorkspaceId ? 'bg-secondary/60' : undefined}
                             >
-                              <TableCell className="w-[68%] font-mono text-xs">{w.id}</TableCell>
-                              <TableCell>{w.name}</TableCell>
+                              <TableCell className="font-mono text-[11px]">
+                                <span className="block truncate" title={w.id}>{w.id}</span>
+                              </TableCell>
+                              <TableCell>
+                                <span className="block truncate" title={w.name}>{w.name}</span>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -959,12 +967,16 @@ export default function PowerBIConfigPage() {
                     </Button>
                   </div>
                   {datasets.length > 0 ? (
-                    <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm">
-                      <Table className="table-fixed">
+                    <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm overflow-x-hidden">
+                      <Table className="table-fixed text-xs">
+                        <colgroup>
+                          <col className="w-[68%]" />
+                          <col className="w-[32%]" />
+                        </colgroup>
                         <TableHeader>
                           <TableRow className={scrollableTableHeaderRowClass}>
-                            <TableHead className="w-[68%]">ID</TableHead>
-                            <TableHead className="w-[32%]">{t('common.name')}</TableHead>
+                            <TableHead className="truncate text-[12px]">ID</TableHead>
+                            <TableHead className="truncate text-[12px]">{t('common.name')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -973,8 +985,12 @@ export default function PowerBIConfigPage() {
                               key={d.id}
                               className={d.id === selectedDatasetId ? 'bg-secondary/60' : undefined}
                             >
-                              <TableCell className="w-[68%] font-mono text-xs">{d.id}</TableCell>
-                              <TableCell>{d.name}</TableCell>
+                              <TableCell className="font-mono text-[11px]">
+                                <span className="block truncate" title={d.id}>{d.id}</span>
+                              </TableCell>
+                              <TableCell>
+                                <span className="block truncate" title={d.name}>{d.name}</span>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -1216,9 +1232,9 @@ export default function PowerBIConfigPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className={scrollableTableHeaderRowClass}>
-                      <TableHead className="w-14">#</TableHead>
+                      <TableHead className="w-14 text-[12px]">#</TableHead>
                       {selectedSchemaDetail.columns.map((col) => (
-                        <TableHead key={col} className="whitespace-nowrap">
+                        <TableHead key={col} className="whitespace-nowrap text-[12px]">
                           {col}
                         </TableHead>
                       ))}

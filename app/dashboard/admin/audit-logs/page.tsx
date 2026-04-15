@@ -708,50 +708,54 @@ export default function AdminAuditLogsPage() {
           </div>
         </CardHeader>
         <CardContent className="pt-0 pb-3">
-          <ScrollableTableRegion className="min-h-[200px]">
-            <Table className="w-full min-w-[1280px] table-fixed">
+          <ScrollableTableRegion className="min-h-[200px] overflow-x-hidden">
+            <Table className="w-full table-fixed text-xs">
               <colgroup>
-                <col className="w-[11%]" />
+                <col className="w-[12%]" />
                 <col className="w-[9%]" />
-                <col className="w-[16%]" />
-                <col className="w-[20%]" />
-                <col className="w-[22%]" />
+                <col className="w-[15%]" />
+                <col className="w-[24%]" />
+                <col className="w-[30%]" />
                 <col className="w-[10%]" />
               </colgroup>
               <TableHeader>
                 <TableRow className={scrollableTableHeaderRowClass}>
-                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('common.date')}</TableHead>
-                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{locale === 'vi' ? 'Giờ' : 'Time'}</TableHead>
-                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('admin.audit.actor')}</TableHead>
-                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('admin.audit.action')}</TableHead>
-                  <TableHead className="px-6 py-3.5 text-[13px] font-semibold">{t('admin.audit.short_desc')}</TableHead>
-                  <TableHead className="px-4 py-3.5 text-[13px] font-semibold text-center">{t('admin.audit.details')}</TableHead>
+                  <TableHead className="px-3 py-3 text-[12px] font-semibold">{t('common.date')}</TableHead>
+                  <TableHead className="px-3 py-3 text-[12px] font-semibold">{locale === 'vi' ? 'Giờ' : 'Time'}</TableHead>
+                  <TableHead className="px-3 py-3 text-[12px] font-semibold">{t('admin.audit.actor')}</TableHead>
+                  <TableHead className="px-3 py-3 text-[12px] font-semibold">{t('admin.audit.action')}</TableHead>
+                  <TableHead className="px-3 py-3 text-[12px] font-semibold">{t('admin.audit.short_desc')}</TableHead>
+                  <TableHead className="px-2 py-3 text-[12px] font-semibold text-center">{t('admin.audit.details')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paged.map((r) => (
                   <TableRow key={r.id} className="border-b border-border/70 hover:bg-muted/35">
-                    <TableCell className="px-6 py-3 whitespace-nowrap text-[13px]">{formatAuditDateOnly(r.ts, locale)}</TableCell>
-                    <TableCell className="px-6 py-3 whitespace-nowrap text-[13px]">{formatAuditTimeOnly(r.ts, locale)}</TableCell>
-                    <TableCell className="px-6 py-3 text-[13px] font-medium">
-                      {resolveActorDisplay(r)}
+                    <TableCell className="px-3 py-2.5 whitespace-nowrap tabular-nums">{formatAuditDateOnly(r.ts, locale)}</TableCell>
+                    <TableCell className="px-3 py-2.5 whitespace-nowrap tabular-nums">{formatAuditTimeOnly(r.ts, locale)}</TableCell>
+                    <TableCell className="px-3 py-2.5 font-medium">
+                      <span className="block truncate" title={resolveActorDisplay(r)}>
+                        {resolveActorDisplay(r)}
+                      </span>
                     </TableCell>
-                    <TableCell className="px-6 py-3 align-top">
+                    <TableCell className="px-3 py-2.5 align-top">
                       <Badge
                         variant="outline"
                         className={cn(
                           getActionBadgeClass(r),
-                          'max-w-full whitespace-normal text-left font-normal leading-snug py-1.5 px-2.5',
+                          'max-w-full whitespace-normal text-left font-normal leading-snug py-1 px-2 text-[11px]',
                         )}
                       >
                         {getActionLabel(r, locale)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="px-6 py-3 align-top text-[13px] text-muted-foreground whitespace-normal leading-snug">
-                      {getActionShortDescription(r, locale)}
+                    <TableCell className="px-3 py-2.5 align-top text-muted-foreground leading-snug">
+                      <span className="block truncate" title={getActionShortDescription(r, locale)}>
+                        {getActionShortDescription(r, locale)}
+                      </span>
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-center">
-                      <Button type="button" variant="outline" size="sm" className="text-[12px]" onClick={() => setSelected(r)}>
+                    <TableCell className="px-2 py-2.5 text-center">
+                      <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setSelected(r)}>
                         {t('admin.audit.view_details')}
                       </Button>
                     </TableCell>

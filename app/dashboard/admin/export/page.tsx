@@ -64,14 +64,14 @@ export default function AdminExportPage() {
   const downloadUrl = String(result?.url ?? result?.download_url ?? result?.downloadUrl ?? '').trim() || null;
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
+    <div className="motion-enter flex flex-col gap-5 p-4 sm:p-5 lg:p-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('admin.export.title')}</h1>
         <p className="text-muted-foreground mt-2">{t('admin.export.desc')}</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+        <Card>
           <CardHeader>
             <CardTitle>{t('admin.export.config_title')}</CardTitle>
             <CardDescription>{t('admin.export.config_desc')}</CardDescription>
@@ -133,7 +133,7 @@ export default function AdminExportPage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2 flex flex-col min-h-0">
+        <Card className="flex flex-col min-h-0">
           <CardHeader>
             <CardTitle>{t('common.result')}</CardTitle>
             <CardDescription>{t('admin.export.result_desc')}</CardDescription>
