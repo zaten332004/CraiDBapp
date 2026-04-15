@@ -16,6 +16,25 @@ import { ScrollableListRegion } from '@/components/scrollable-table-region';
 type DistResp = { chart_data: Array<{ bucket: string; count?: number }> };
 type ConcResp = { items: Array<{ name: string; exposure: number }> };
 type CustomerItem = { customer_id: number; full_name?: string | null; monthly_income?: number | null; requested_loan_amount?: number | null; risk_level?: string | null };
+
+function ScatterFadeDot(props: any) {
+  const cx = Number(props?.cx);
+  const cy = Number(props?.cy);
+  if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+  const fill = String(props?.fill || '#06b6d4');
+  const index = Number(props?.index ?? 0);
+  const delayMs = Math.min(Math.max(index, 0), 36) * 26;
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={4}
+      fill={fill}
+      className="scatter-point-fade-in"
+      style={{ animationDelay: `${delayMs}ms` }}
+    />
+  );
+}
 type CustomerListResp = { items: CustomerItem[]; total: number; page: number; limit: number };
 type RiskFactorImpactResp = { items: Array<{ factor_key: string; impact: number }>; sample_size: number };
 
@@ -505,6 +524,8 @@ export default function RiskAnalyzePage() {
                     name={t('customers.title')}
                     data={customerScatter}
                     fill="#06b6d4"
+                    isAnimationActive={false}
+                    shape={<ScatterFadeDot />}
                   />
                 </ScatterChart>
               </ResponsiveContainer>

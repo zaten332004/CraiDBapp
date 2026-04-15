@@ -396,7 +396,7 @@ export default function ApprovedLoanWorkbenchPage() {
   };
 
   return (
-    <div className="motion-enter mx-auto flex w-full max-w-[1380px] flex-col gap-4 p-4 sm:p-5 lg:p-6">
+    <div className="motion-enter mx-auto flex w-full flex-col gap-4 p-4 sm:p-5 lg:p-6">
       <div className="flex flex-wrap items-center gap-3 sm:gap-4">
         <Link href="/dashboard/customers">
           <Button variant="ghost" size="sm">
@@ -461,11 +461,10 @@ export default function ApprovedLoanWorkbenchPage() {
               ) : (
                 <div className="rounded-lg border border-border bg-muted/30 shadow-sm">
                   <ScrollableTableRegion className="rounded-lg border-0 bg-transparent">
-                    <Table className="w-full min-w-[760px] table-auto text-xs sm:min-w-[860px] sm:text-sm">
+                    <Table className="w-full table-auto text-xs sm:text-sm">
                       <TableHeader>
                         <TableRow className={scrollableTableHeaderRowClass}>
-                          <TableHead className="min-w-[120px] text-[12px]">{t('loans.workbench.col.customer')}</TableHead>
-                          <TableHead className="min-w-[100px] text-[12px]">{t('loans.workbench.col.ref')}</TableHead>
+                          <TableHead className="min-w-[170px] text-[12px]">{t('loans.workbench.col.customer')}</TableHead>
                           <TableHead className="min-w-[120px] text-[12px]">{t('customers.field.loan_purpose')}</TableHead>
                           <TableHead className="min-w-[110px] text-[12px]" title={t('loans.workbench.col.amount_hint')}>{t('loans.workbench.col.amount')}</TableHead>
                           <TableHead className="min-w-[110px] text-[12px]">{t('loans.workbench.col.period_payment')}</TableHead>
@@ -483,9 +482,10 @@ export default function ApprovedLoanWorkbenchPage() {
                               <span className="block truncate" title={r.customer_name || '-'}>
                                 {r.customer_name || '-'}
                               </span>
-                            </TableCell>
-                            <TableCell className="font-mono text-[11px]">
-                              <span className="block truncate" title={String(r.application_ref_no || r.application_id)}>
+                              <span
+                                className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground"
+                                title={String(r.application_ref_no || r.application_id)}
+                              >
                                 {r.application_ref_no || r.application_id}
                               </span>
                             </TableCell>

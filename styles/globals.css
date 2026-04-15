@@ -725,3 +725,24 @@ textarea,
     animation: none !important;
   }
 }
+
+@keyframes scatter-point-fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.scatter-point-fade-in {
+  opacity: 0;
+  animation: scatter-point-fade-in 420ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scatter-point-fade-in {
+    opacity: 1;
+    animation: none;
+  }
+}

@@ -566,7 +566,7 @@ export default function CustomerDetailPage() {
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 items-start gap-6">
         {!isRepaymentView ? (
         <Card>
           <CardHeader>
