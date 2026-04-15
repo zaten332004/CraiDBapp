@@ -168,6 +168,7 @@ const LAST_AI_CHAT_MODEL_STORAGE_KEY = 'crs_ai_chat_last_model_v1';
 const SESSION_MODEL_STORAGE_PREFIX = 'crs_ai_chat_session_model_v1:';
 const SESSION_MESSAGES_STORAGE_PREFIX = 'crs_ai_chat_session_messages_v1:';
 const SESSION_SOURCE_STORAGE_PREFIX = 'crs_ai_chat_session_source_v1:';
+const POWERBI_SCHEMA_SYNC_LIMIT = 20;
 
 function readStoredLastAiChatModel(): string {
   if (typeof window === 'undefined') return '';
@@ -584,6 +585,48 @@ export default function AIChatPage() {
     } catch {
       /* Chưa lưu workspace/dataset hoặc lỗi mạng — vẫn chạy readiness bên dưới. */
     }
+
+    // Mirror "Sử dụng dữ liệu bảng": refresh schema context so AI has table data attached.
+    try {
+      const schema = await browserApiFetchAuth<{
+        ok?: boolean;
+        requires_table_hints?: boolean;
+        message?: string;
+        tables?: unknown[];
+        schemas?: unknown[];
+      }>(`/powerbi/schema?limit=${POWERBI_SCHEMA_SYNC_LIMIT}`, { method: 'GET' });
+      if (schema?.ok === false && schema?.requires_table_hints) {
+        if (strict) {
+          notifyError(t('powerbi.use_table_data_fail_title'), {
+            description:
+              (typeof schema?.message === 'string' && schema.message.trim()) || t('powerbi.use_table_data_hints_required'),
+            duration: 7000,
+          });
+        }
+        return false;
+      }
+      const tableCount = Array.isArray(schema?.tables) ? schema.tables.length : 0;
+      const schemaCount = Array.isArray(schema?.schemas) ? schema.schemas.length : 0;
+      if (tableCount <= 0 && schemaCount <= 0) {
+        if (strict) {
+          notifyError(t('powerbi.use_table_data_fail_title'), {
+            description:
+              (typeof schema?.message === 'string' && schema.message.trim()) || t('powerbi.use_table_data_hints_required'),
+            duration: 7000,
+          });
+        }
+        return false;
+      }
+    } catch (err) {
+      if (strict) {
+        notifyError(t('powerbi.use_table_data_fail_title'), {
+          description: apiErr(err),
+          duration: 7000,
+        });
+      }
+      return false;
+    }
+
     try {
       const r = await browserApiFetchAuth<{
         ready_for_ai_context?: boolean;
@@ -678,6 +721,8 @@ export default function AIChatPage() {
   const lastSessionIdSourcePrefsAppliedRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  /** Sync lock to prevent duplicate submits before state updates flush. */
+  const sendInFlightRef = useRef(false);
   const [dropChatHighlight, setDropChatHighlight] = useState(false);
   const dragChatDepthRef = useRef(0);
   const [sendingStepIndex, setSendingStepIndex] = useState(0);
@@ -1199,6 +1244,7 @@ export default function AIChatPage() {
 
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
+    if (sendInFlightRef.current) return;
     if (!input.trim() && pendingFiles.length === 0) return;
     if (aiDataSource === 'upload' && pendingFiles.length === 0) {
       notifyError(t('ai_chat.error_upload_mode_no_files'));
@@ -1208,10 +1254,9 @@ export default function AIChatPage() {
       notifyError(t('ai_chat.error_customer_mode_no_customer'));
       return;
     }
-    if (aiDataSource === 'powerbi') {
-      const ready = await activatePowerBiDataSource({ strict: true });
-      if (!ready) return;
-    }
+
+    sendInFlightRef.current = true;
+    setIsSending(true);
 
     const pickLowestAllowedModel = (): string => {
       const allowed = modelOptions.filter((o) => isModelAllowed(o));
@@ -1223,7 +1268,6 @@ export default function AIChatPage() {
       Boolean(selectedModel) &&
       modelOptions.some((o) => o.model === selectedModel && isModelAllowed(o));
     const resolvedModel = hadValidModelSelection ? selectedModel : pickLowestAllowedModel();
-
     const text = input.trim();
     const attachForMsg = pendingFiles.length ? uploadedCtxToMessageAttachments(pendingFiles) : undefined;
     const userMessage: ChatMessage = {
@@ -1234,21 +1278,25 @@ export default function AIChatPage() {
       ...(attachForMsg?.length ? { attachments: attachForMsg } : {}),
     };
 
-    const customerContext: Record<string, unknown> = {
-      ai_data_source: aiDataSource,
-    };
-    if (aiDataSource === 'customer' && selectedCustomerIds.length > 0) {
-      customerContext.customer_ids = [...selectedCustomerIds];
-    }
-    if (pendingFiles.length > 0) {
-      customerContext.uploaded_files = slimUploadedFilesForSend(pendingFiles);
-    }
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput('');
-    setIsSending(true);
-
     try {
+      if (aiDataSource === 'powerbi') {
+        const ready = await activatePowerBiDataSource({ strict: true });
+        if (!ready) return;
+      }
+
+      const customerContext: Record<string, unknown> = {
+        ai_data_source: aiDataSource,
+      };
+      if (aiDataSource === 'customer' && selectedCustomerIds.length > 0) {
+        customerContext.customer_ids = [...selectedCustomerIds];
+      }
+      if (pendingFiles.length > 0) {
+        customerContext.uploaded_files = slimUploadedFilesForSend(pendingFiles);
+      }
+
+      setMessages((prev) => [...prev, userMessage]);
+      setInput('');
+
       const body: Record<string, unknown> = {
         message: text,
         ...(sessionId ? { session_id: sessionId, sessionId } : {}),
@@ -1268,9 +1316,11 @@ export default function AIChatPage() {
       const newSid = String(data?.session_id ?? data?.sessionId ?? '').trim();
       const created = Boolean(data?.created_session ?? data?.createdSession);
       setPendingFiles([]);
+      if (newSid && newSid !== sessionId) {
+        setSessionId(newSid);
+      }
 
       if (created && newSid) {
-        setSessionId(newSid);
         const reply =
           String(data?.response ?? data?.reply ?? data?.message ?? '').trim() || t('ai_chat.default_reply');
         setMessages((prev) => [
@@ -1310,6 +1360,7 @@ export default function AIChatPage() {
       ]);
       notifyError(t('ai_chat.send_failed'), { description: apiErr(err) });
     } finally {
+      sendInFlightRef.current = false;
       setIsSending(false);
     }
   };
@@ -1317,7 +1368,7 @@ export default function AIChatPage() {
   const onComposerKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== 'Enter' || e.shiftKey) return;
     e.preventDefault();
-    if (isSending) return;
+    if (isSending || sendInFlightRef.current) return;
     if (!canSubmitComposer) return;
     e.currentTarget.form?.requestSubmit();
   };
