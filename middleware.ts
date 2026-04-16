@@ -5,12 +5,29 @@ function isSafeNextPath(path: string) {
   return path.startsWith("/") && !path.startsWith("//");
 }
 
+function isInactiveFlag(value: string | undefined) {
+  if (!value) return false;
+  const v = String(value).trim().toLowerCase();
+  return v === "0" || v === "false" || v === "inactive" || v === "disabled";
+}
+
+function redirectToDisabledLogin(request: NextRequest) {
+  const response = NextResponse.redirect(new URL("/auth/login?reason=account_disabled", request.url));
+  response.cookies.set("access_token", "", { path: "/", maxAge: 0 });
+  response.cookies.set("user_role", "", { path: "/", maxAge: 0 });
+  response.cookies.set("user_status", "", { path: "/", maxAge: 0 });
+  response.cookies.set("user_has_pin", "", { path: "/", maxAge: 0 });
+  response.cookies.set("user_is_active", "", { path: "/", maxAge: 0 });
+  return response;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const token = request.cookies.get("access_token")?.value;
   const role = request.cookies.get("user_role")?.value?.toLowerCase();
   const status = request.cookies.get("user_status")?.value?.toLowerCase();
   const hasPin = request.cookies.get("user_has_pin")?.value === "1";
+  const isInactive = isInactiveFlag(request.cookies.get("user_is_active")?.value);
 
   const isApproved = status === "approved";
 
@@ -20,6 +37,9 @@ export function middleware(request: NextRequest) {
       const next = `${pathname}${search}`;
       if (isSafeNextPath(next)) loginUrl.searchParams.set("next", next);
       return NextResponse.redirect(loginUrl);
+    }
+    if (isInactive) {
+      return redirectToDisabledLogin(request);
     }
 
     if (!isApproved) {
@@ -54,6 +74,12 @@ export function middleware(request: NextRequest) {
 
   if (pathname.startsWith("/auth")) {
     if (token) {
+      if (isInactive) {
+        if (pathname.startsWith("/auth/login")) {
+          return NextResponse.next();
+        }
+        return redirectToDisabledLogin(request);
+      }
       if (!isApproved) {
         if (pathname.startsWith("/auth/verify-email")) {
           return NextResponse.next();

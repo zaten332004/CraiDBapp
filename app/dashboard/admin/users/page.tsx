@@ -76,6 +76,11 @@ type AdminUser = {
   raw: unknown;
 };
 
+type ProfileMeIdentity = {
+  user_id?: number | string;
+  email?: string | null;
+};
+
 function normalizeUser(item: any): AdminUser | null {
   if (!item || typeof item !== 'object') return null;
   const id = String(item.user_id ?? item.userId ?? item.id ?? '').trim();
@@ -122,6 +127,35 @@ export default function AdminUsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [pinNew, setPinNew] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+
+  const isSelfUser = (user: AdminUser | null | undefined) => {
+    if (!user) return false;
+    const sameId = currentUserId != null && String(user.id).trim() === String(currentUserId).trim();
+    const sameEmail =
+      currentUserEmail != null &&
+      String(user.email || '')
+        .trim()
+        .toLowerCase() === currentUserEmail;
+    return sameId || sameEmail;
+  };
+
+  const loadCurrentUserId = async () => {
+    try {
+      const me = await browserApiFetchAuth<ProfileMeIdentity>('/profile/me', { method: 'GET' });
+      const rawId = me?.user_id;
+      if (rawId !== undefined && rawId !== null) {
+        setCurrentUserId(String(rawId).trim());
+      }
+      const rawEmail = String(me?.email ?? '')
+        .trim()
+        .toLowerCase();
+      if (rawEmail) setCurrentUserEmail(rawEmail);
+    } catch {
+      /* non-blocking: dangerous actions still guarded when id is known */
+    }
+  };
 
   const loadUsers = async () => {
     setIsLoading(true);
@@ -160,6 +194,13 @@ export default function AdminUsersPage() {
   };
 
   const setUserActive = async (userId: string, isActive: boolean) => {
+    const target = users.find((u) => u.id === userId) ?? selectedUser;
+    if (!isActive && isSelfUser(target)) {
+      notifyError(
+        locale === 'vi' ? 'Không thể vô hiệu hóa tài khoản của chính bạn.' : 'You cannot deactivate your own account.',
+      );
+      return;
+    }
     setIsLoading(true);
     try {
       await browserApiFetchAuth(`/admin/users/${encodeURIComponent(userId)}/status?is_active=${isActive ? 'true' : 'false'}`, {
@@ -183,6 +224,11 @@ export default function AdminUsersPage() {
   };
 
   const deleteUser = async (user: AdminUser) => {
+    if (isSelfUser(user)) {
+      notifyError(locale === 'vi' ? 'Không thể xóa tài khoản của chính bạn.' : 'You cannot delete your own account.');
+      setDeleteTarget(null);
+      return;
+    }
     setIsLoading(true);
     try {
       const response = await browserApiFetchAuth<{ message?: string }>(`/admin/users/${encodeURIComponent(user.id)}`, {
@@ -263,6 +309,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     void loadUsers();
+    void loadCurrentUserId();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -500,6 +547,7 @@ export default function AdminUsersPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
+                            disabled={user.isActive && isSelfUser(user)}
                             onClick={(e) => {
                               e.stopPropagation();
                               void setUserActive(user.id, !user.isActive);
@@ -514,6 +562,7 @@ export default function AdminUsersPage() {
                             {user.isActive ? t('admin.users.deactivate') : t('admin.users.activate')}
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            disabled={isSelfUser(user)}
                             onClick={(e) => {
                               e.stopPropagation();
                               setDeleteTarget(user);
@@ -621,7 +670,7 @@ export default function AdminUsersPage() {
               <Button
                 variant={selectedUser.isActive ? 'destructive' : 'default'}
                 onClick={() => void setUserActive(selectedUser.id, !selectedUser.isActive)}
-                disabled={isLoading}
+                disabled={isLoading || (selectedUser.isActive && isSelfUser(selectedUser))}
               >
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {selectedUser.isActive ? t('admin.users.deactivate') : t('admin.users.activate')}
@@ -631,7 +680,7 @@ export default function AdminUsersPage() {
               <Button
                 variant="destructive"
                 onClick={() => setDeleteTarget(selectedUser)}
-                disabled={isLoading}
+                disabled={isLoading || isSelfUser(selectedUser)}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 {locale === 'vi' ? 'Xóa người dùng' : 'Delete user'}
@@ -661,7 +710,7 @@ export default function AdminUsersPage() {
             <Button
               variant="destructive"
               onClick={() => { if (deleteTarget) void deleteUser(deleteTarget); }}
-              disabled={isLoading || !deleteTarget}
+              disabled={isLoading || !deleteTarget || isSelfUser(deleteTarget)}
             >
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
               {locale === 'vi' ? 'Xóa vĩnh viễn' : 'Delete permanently'}

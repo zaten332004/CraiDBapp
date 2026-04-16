@@ -8,6 +8,8 @@ const USER_STATUS_STORAGE_KEY = "userStatus";
 const USER_STATUS_COOKIE_KEY = "user_status";
 const USER_HAS_PIN_STORAGE_KEY = "userHasPin";
 const USER_HAS_PIN_COOKIE_KEY = "user_has_pin";
+const USER_IS_ACTIVE_STORAGE_KEY = "userIsActive";
+const USER_IS_ACTIVE_COOKIE_KEY = "user_is_active";
 
 export type UserRole = "admin" | "manager" | "analyst" | "viewer";
 export type UserStatus = "pending" | "approved" | "rejected";
@@ -50,6 +52,14 @@ export function getUserStatus(): UserStatus | null {
 export function getUserHasPin(): boolean {
   if (!isBrowser()) return false;
   return window.localStorage.getItem(USER_HAS_PIN_STORAGE_KEY) === "1";
+}
+
+export function getUserIsActive(): boolean | null {
+  if (!isBrowser()) return null;
+  const raw = window.localStorage.getItem(USER_IS_ACTIVE_STORAGE_KEY);
+  if (raw === "1") return true;
+  if (raw === "0") return false;
+  return null;
 }
 
 export function setAccessToken(token: string) {
@@ -109,11 +119,26 @@ export function setUserHasPin(hasPin: boolean) {
   document.cookie = attrs.join("; ");
 }
 
+export function setUserIsActive(isActive: boolean) {
+  if (!isBrowser()) return;
+  window.localStorage.setItem(USER_IS_ACTIVE_STORAGE_KEY, isActive ? "1" : "0");
+
+  const secure = window.location.protocol === "https:";
+  const attrs = [
+    `${USER_IS_ACTIVE_COOKIE_KEY}=${isActive ? "1" : "0"}`,
+    "Path=/",
+    "SameSite=Lax",
+    secure ? "Secure" : null,
+  ].filter(Boolean);
+  document.cookie = attrs.join("; ");
+}
+
 export function setSession(args: {
   accessToken: string;
   role?: string | null;
   status?: string | null;
   hasPin?: boolean | null;
+  isActive?: boolean | null;
 }) {
   setAccessToken(args.accessToken);
   const role = normalizeRole(args.role);
@@ -123,6 +148,9 @@ export function setSession(args: {
   if (args.hasPin !== undefined && args.hasPin !== null) {
     setUserHasPin(Boolean(args.hasPin));
   }
+  if (args.isActive !== undefined && args.isActive !== null) {
+    setUserIsActive(Boolean(args.isActive));
+  }
 }
 
 export function clearAccessToken() {
@@ -131,11 +159,13 @@ export function clearAccessToken() {
   window.localStorage.removeItem(USER_ROLE_STORAGE_KEY);
   window.localStorage.removeItem(USER_STATUS_STORAGE_KEY);
   window.localStorage.removeItem(USER_HAS_PIN_STORAGE_KEY);
+  window.localStorage.removeItem(USER_IS_ACTIVE_STORAGE_KEY);
   clearSessionActivity();
   document.cookie = `${ACCESS_TOKEN_COOKIE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
   document.cookie = `${USER_ROLE_COOKIE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
   document.cookie = `${USER_STATUS_COOKIE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
   document.cookie = `${USER_HAS_PIN_COOKIE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
+  document.cookie = `${USER_IS_ACTIVE_COOKIE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
 }
 
 export function authJsonHeaders(extra?: Record<string, string>) {

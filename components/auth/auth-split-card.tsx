@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
 import { Chrome, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { setSession } from '@/lib/auth/token';
+import { clearAccessToken, setSession } from '@/lib/auth/token';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/components/i18n-provider';
 import { isStrongPassword, isValidEmail, passwordRuleMessage } from '@/lib/validation/account';
@@ -66,8 +66,27 @@ function normalizeAuthPayload(payload: Record<string, unknown>) {
       : typeof payload.user_has_pin === 'boolean'
         ? payload.user_has_pin
         : undefined;
+  const isActiveRaw =
+    payload.is_active ??
+    payload.isActive ??
+    payload.active ??
+    payload.user_is_active ??
+    payload.userActive;
+  const isActive =
+    typeof isActiveRaw === 'boolean'
+      ? isActiveRaw
+      : typeof isActiveRaw === 'number'
+        ? isActiveRaw !== 0
+        : typeof isActiveRaw === 'string'
+          ? (() => {
+              const v = isActiveRaw.trim().toLowerCase();
+              if (v === 'true' || v === '1' || v === 'active' || v === 'enabled') return true;
+              if (v === 'false' || v === '0' || v === 'inactive' || v === 'disabled') return false;
+              return undefined;
+            })()
+          : undefined;
 
-  return { role, status, hasPin };
+  return { role, status, hasPin, isActive };
 }
 
 export function AuthSplitCard() {
@@ -88,6 +107,7 @@ export function AuthSplitCard() {
     sessionReason === 'session_expired' ||
     sessionReason === 'session_idle' ||
     sessionReason === 'session_invalid';
+  const accountDisabledRedirect = sessionReason === 'account_disabled';
 
   const queryMode = useMemo(() => toMode(searchParams.get('mode')) ?? 'login', [searchParams]);
   // Start in `login` so opening `/auth?mode=register` can animate into place after hydration.
@@ -124,6 +144,11 @@ export function AuthSplitCard() {
         : t('session.expired_idle');
     notifyError(isVi ? 'Phiên đăng nhập đã hết hạn.' : 'Session expired.', message);
   }, [isVi, sessionExpiredRedirect, sessionReason, t]);
+
+  useEffect(() => {
+    if (!accountDisabledRedirect) return;
+    notifyError(t('session.disabled_title'), t('session.disabled_contact_admin'));
+  }, [accountDisabledRedirect, t]);
 
   /** Google Identity Services: gửi id_token JWT tới POST /auth/login/google (backend không có GET /auth/oauth). */
   useEffect(() => {
@@ -217,6 +242,10 @@ export function AuthSplitCard() {
         const data = await readJsonOrThrowAuthError(response, msgLocale);
         const accessToken = typeof data.access_token === 'string' ? data.access_token : '';
         const normalized = normalizeAuthPayload(data);
+        if (normalized.isActive === false) {
+          clearAccessToken();
+          throw new Error(t('session.disabled_login'));
+        }
         if (!accessToken) {
           throw new Error(isVi ? 'Phản hồi đăng nhập không hợp lệ.' : 'Invalid login response.');
         }
@@ -225,6 +254,7 @@ export function AuthSplitCard() {
           role: normalized.role,
           status: normalized.status,
           hasPin: normalized.hasPin,
+          isActive: normalized.isActive,
         });
         router.push(safeNext ?? postLoginRoute({ role: normalized.role, status: normalized.status }));
       } catch (err) {
@@ -256,6 +286,10 @@ export function AuthSplitCard() {
       const data = await readJsonOrThrowAuthError(response, msgLocale);
       const accessToken = typeof data.access_token === 'string' ? data.access_token : '';
       const normalized = normalizeAuthPayload(data);
+      if (normalized.isActive === false) {
+        clearAccessToken();
+        throw new Error(t('session.disabled_login'));
+      }
       if (!accessToken) {
         throw new Error(isVi ? 'Phản hồi đăng nhập không hợp lệ.' : 'Invalid login response.');
       }
@@ -264,6 +298,7 @@ export function AuthSplitCard() {
         role: normalized.role,
         status: normalized.status,
         hasPin: normalized.hasPin,
+        isActive: normalized.isActive,
       });
       router.push(safeNext ?? postLoginRoute({ role: normalized.role, status: normalized.status }));
     } catch (err) {
@@ -317,6 +352,7 @@ export function AuthSplitCard() {
           role: normalizedRole,
           status: normalizedStatus,
           hasPin: normalized.hasPin ?? false,
+          isActive: normalized.isActive,
         });
         if (normalizedStatus === 'approved') {
           router.push(defaultDashboardAfterLogin(normalizedRole));
