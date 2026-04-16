@@ -89,6 +89,26 @@ function normalizeAuthPayload(payload: Record<string, unknown>) {
   return { role, status, hasPin, isActive };
 }
 
+function isDisabledLoginMessage(message: string): boolean {
+  const normalized = String(message || "").trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    normalized.includes("bạn cần có quyền để thực hiện đăng nhập") ||
+    normalized.includes("ban can co quyen de thuc hien dang nhap") ||
+    normalized.includes("không có quyền để thực hiện đăng nhập") ||
+    normalized.includes("permission to perform login") ||
+    normalized.includes("permission to sign in")
+  );
+}
+
+function getLoginErrorDescription(err: unknown, disabledCopy: string, fallback: string): string {
+  if (err instanceof Error && isDisabledLoginMessage(err.message)) {
+    return disabledCopy;
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
+
 export function AuthSplitCard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -258,7 +278,10 @@ export function AuthSplitCard() {
         });
         router.push(safeNext ?? postLoginRoute({ role: normalized.role, status: normalized.status }));
       } catch (err) {
-        notifyError(isVi ? 'Đăng nhập thất bại.' : 'Sign in failed.', err instanceof Error ? err.message : t('common.error'));
+        notifyError(
+          isVi ? 'Đăng nhập thất bại.' : 'Sign in failed.',
+          getLoginErrorDescription(err, t('session.disabled_login'), t('common.error')),
+        );
       } finally {
         setLoginLoading(false);
       }
@@ -302,7 +325,10 @@ export function AuthSplitCard() {
       });
       router.push(safeNext ?? postLoginRoute({ role: normalized.role, status: normalized.status }));
     } catch (err) {
-      notifyError(isVi ? 'Đăng nhập thất bại.' : 'Sign in failed.', err instanceof Error ? err.message : t('common.error'));
+      notifyError(
+        isVi ? 'Đăng nhập thất bại.' : 'Sign in failed.',
+        getLoginErrorDescription(err, t('session.disabled_login'), t('common.error')),
+      );
     } finally {
       setLoginLoading(false);
     }

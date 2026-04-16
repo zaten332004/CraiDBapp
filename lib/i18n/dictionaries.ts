@@ -1055,7 +1055,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "session.expired_token": "Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại.",
     "session.disabled_title": "Tài khoản đã bị vô hiệu hóa.",
     "session.disabled_contact_admin": "Vui lòng liên hệ quản trị viên để được hỗ trợ.",
-    "session.disabled_login": "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.",
+    "session.disabled_login": "Tài khoản của bạn đã bị vô hiệu hóa. Nếu có sai sót, hãy liên hệ với admin.",
 
     "alerts.title": "Cảnh báo",
     "alerts.desc": "Theo dõi và quản lý cảnh báo/thông báo danh mục",
@@ -2304,7 +2304,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "session.expired_token": "Your session is no longer valid. Please sign in again.",
     "session.disabled_title": "Your account has been disabled.",
     "session.disabled_contact_admin": "Please contact an administrator for assistance.",
-    "session.disabled_login": "Your account is disabled. Please contact an administrator.",
+    "session.disabled_login": "Your account has been disabled. If this is a mistake, please contact an administrator.",
 
     "alerts.title": "Alerts",
     "alerts.desc": "Monitor and manage portfolio alerts and notifications",
