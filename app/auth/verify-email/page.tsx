@@ -12,7 +12,18 @@ import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
 import { useI18n } from '@/components/i18n-provider';
-import { authHeaders, clearAccessToken, getAccessToken, getUserHasPin, getUserRole, getUserStatus, setUserHasPin, setUserRole, setUserStatus } from '@/lib/auth/token';
+import {
+  authHeaders,
+  clearAccessToken,
+  getAccessToken,
+  getUserHasPin,
+  getUserRole,
+  getUserStatus,
+  setUserHasPin,
+  setUserIsActive,
+  setUserRole,
+  setUserStatus,
+} from '@/lib/auth/token';
 import { isNumericPin } from '@/lib/validation/account';
 import { notifyError, notifySuccess } from '@/lib/notify';
 
@@ -22,8 +33,27 @@ type PendingStatusResponse = {
   role: string;
   status: 'pending' | 'approved' | 'rejected' | string;
   has_pin: boolean;
+  /** Mirrors DB `is_active`; when false, session ends and user leaves this screen. */
+  is_active?: boolean;
   rejection_reason?: string | null;
 };
+
+function pickIsActiveFromPayload(payload: Record<string, unknown>): boolean | undefined {
+  const raw =
+    payload.is_active ??
+    payload.isActive ??
+    payload.active ??
+    payload.user_is_active ??
+    payload.userActive;
+  if (typeof raw === 'boolean') return raw;
+  if (typeof raw === 'number') return raw !== 0;
+  if (typeof raw === 'string') {
+    const v = raw.trim().toLowerCase();
+    if (v === 'true' || v === '1' || v === 'active' || v === 'enabled') return true;
+    if (v === 'false' || v === '0' || v === 'inactive' || v === 'disabled') return false;
+  }
+  return undefined;
+}
 
 function pickTopLevelRejectionFromPayload(payload: Record<string, unknown>): string | null {
   const a = payload.rejection_reason;
@@ -136,6 +166,7 @@ function VerifyEmailContent() {
     if (!pendingInfo) return;
     const st = String(pendingInfo.status || "").trim().toLowerCase();
     if (st === "rejected") return;
+    if (pendingInfo.is_active === false) return;
     if (st === "approved" && pendingInfo.has_pin) {
       const dest =
         String(pendingInfo.role || "")
@@ -162,6 +193,15 @@ function VerifyEmailContent() {
         throw new Error(data?.detail || data?.message || (isVi ? 'Không thể tải trạng thái tài khoản.' : 'Could not load account status.'));
       }
       const payload = data as Record<string, unknown>;
+      const accountActive = pickIsActiveFromPayload(payload);
+      if (accountActive === false) {
+        clearAccessToken();
+        router.replace('/auth/login?reason=account_disabled');
+        return null;
+      }
+      if (accountActive === true) {
+        setUserIsActive(true);
+      }
       const normalizedRole = normalizeRoleFromPayload(payload) || getUserRole() || 'analyst';
       const normalizedEmail =
         (typeof payload.email === 'string' && payload.email.trim()) ||
@@ -184,6 +224,7 @@ function VerifyEmailContent() {
         role: normalizedRole,
         status: normalizedStatus,
         has_pin: Boolean(normalizedHasPin),
+        ...(accountActive !== undefined ? { is_active: accountActive } : {}),
         rejection_reason: pickTopLevelRejectionFromPayload(payload) ?? extractRejectionReason(payload),
       };
       if (
