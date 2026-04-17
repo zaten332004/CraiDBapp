@@ -1,17 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ExternalLink, Loader2, ListChecks, RefreshCw, Trash2, Unplug, PlugZap } from 'lucide-react';
+import { ArrowRight, Copy, Loader2, ListChecks, RefreshCw, Trash2, Unplug, PlugZap } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { useI18n } from '@/components/i18n-provider';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
@@ -31,6 +32,8 @@ type PowerBIDataset = { id: string; name: string; raw: unknown };
 const UUID_V4_LIKE_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const POWER_BI_APP_CLIENT_ID = '53a7db35-5f93-4e5d-beba-34d0437ef94c';
 const POWER_BI_ADMIN_CONSENT_REDIRECT_URI = 'https://craidbapp-production.up.railway.app/dashboard/powerbi/config';
+const WORKSPACE_URL_TEMPLATE = 'https://app.powerbi.com/groups/<workspace-guid>/...';
+const DATASET_URL_TEMPLATE = 'https://app.powerbi.com/.../dataset/<dataset-guid>/...';
 
 function toWorkspace(item: any): PowerBIWorkspace | null {
   if (!item || typeof item !== 'object') return null;
@@ -61,6 +64,62 @@ function extractTenantFromAdminConsentState(state: string): string {
   if (!raw.startsWith('powerbi:')) return '';
   const tenant = raw.slice('powerbi:'.length).trim();
   return isLikelyGuid(tenant) ? tenant : '';
+}
+
+function toUrlOrNull(raw: string): URL | null {
+  const value = String(raw || '').trim();
+  if (!value) return null;
+  try {
+    return new URL(value);
+  } catch {
+    try {
+      return new URL(`https://${value}`);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function parsePowerBiIdsFromLink(raw: string): {
+  tenantId?: string;
+  workspaceId?: string;
+  datasetId?: string;
+} {
+  const url = toUrlOrNull(raw);
+  if (!url) return {};
+  const parts = url.pathname.split('/').filter(Boolean);
+
+  let workspaceId = '';
+  let datasetId = '';
+
+  const groupsIdx = parts.findIndex((p) => p.toLowerCase() === 'groups');
+  if (groupsIdx >= 0 && parts[groupsIdx + 1] && isLikelyGuid(parts[groupsIdx + 1])) {
+    workspaceId = parts[groupsIdx + 1];
+  }
+
+  const oneLakeDetailsIdx = parts.findIndex((p) => p.toLowerCase() === 'details');
+  if (!workspaceId && oneLakeDetailsIdx >= 0 && parts[oneLakeDetailsIdx + 1] && isLikelyGuid(parts[oneLakeDetailsIdx + 1])) {
+    workspaceId = parts[oneLakeDetailsIdx + 1];
+  }
+
+  const datasetIdx = parts.findIndex((p) => p.toLowerCase() === 'dataset');
+  if (datasetIdx >= 0 && parts[datasetIdx + 1] && isLikelyGuid(parts[datasetIdx + 1])) {
+    datasetId = parts[datasetIdx + 1];
+  }
+
+  const tenantCandidate = String(
+    url.searchParams.get('ctid') ||
+      url.searchParams.get('tenant') ||
+      url.searchParams.get('tenantId') ||
+      url.searchParams.get('tid') ||
+      '',
+  ).trim();
+
+  return {
+    ...(isLikelyGuid(tenantCandidate) ? { tenantId: tenantCandidate } : {}),
+    ...(workspaceId ? { workspaceId } : {}),
+    ...(datasetId ? { datasetId } : {}),
+  };
 }
 
 function buildAdminConsentUrl(tenantId: string, redirectUri: string, state?: string): string {
@@ -148,6 +207,8 @@ export default function PowerBIConfigPage() {
   const [powerBiSchemaLoading, setPowerBiSchemaLoading] = useState(false);
   const [tableHintsReadiness, setTableHintsReadiness] = useState<PowerBiReadinessResponse | null>(null);
   const [selectedSchemaName, setSelectedSchemaName] = useState<string | null>(null);
+  const [powerBiUrlInput, setPowerBiUrlInput] = useState('');
+  const powerBiUrlInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -219,6 +280,28 @@ export default function PowerBIConfigPage() {
     () => datasets.find((d) => d.id === selectedDatasetId) ?? null,
     [datasets, selectedDatasetId],
   );
+  const parsedPowerBiLinkIds = useMemo(() => parsePowerBiIdsFromLink(powerBiUrlInput), [powerBiUrlInput]);
+
+  useEffect(() => {
+    const el = powerBiUrlInputRef.current;
+    if (!el) return;
+    el.style.height = '0px';
+    const nextHeight = Math.max(44, Math.min(el.scrollHeight, 160));
+    el.style.height = `${nextHeight}px`;
+  }, [powerBiUrlInput]);
+
+  useEffect(() => {
+    const { tenantId, workspaceId, datasetId } = parsedPowerBiLinkIds;
+    if (!tenantId && !workspaceId && !datasetId) return;
+    setConfig((prev) => ({
+      ...prev,
+      ...(tenantId ? { tenantId } : {}),
+      ...(workspaceId ? { workspaceId } : {}),
+      ...(datasetId ? { datasetId } : {}),
+    }));
+    if (workspaceId) setSelectedWorkspaceId(workspaceId);
+    if (datasetId) setSelectedDatasetId(datasetId);
+  }, [parsedPowerBiLinkIds]);
 
   const loadWorkspaces = async () => {
     const data = await browserApiFetchAuth<any>('/powerbi/workspaces', { method: 'GET' });
@@ -478,6 +561,20 @@ export default function PowerBIConfigPage() {
       '_blank',
       'popup=yes,width=1040,height=780',
     );
+  };
+
+  const handleCopyIdTemplate = async (kind: 'workspace' | 'dataset') => {
+    const text = kind === 'workspace' ? WORKSPACE_URL_TEMPLATE : DATASET_URL_TEMPLATE;
+    const okText =
+      kind === 'workspace' ? t('powerbi.hints_copy_workspace_ok') : t('powerbi.hints_copy_dataset_ok');
+    const failText =
+      kind === 'workspace' ? t('powerbi.hints_copy_workspace_fail') : t('powerbi.hints_copy_dataset_fail');
+    try {
+      await navigator.clipboard.writeText(text);
+      notifySuccess(t('powerbi.hints_copy_ok_title'), { description: okText, duration: 3600 });
+    } catch {
+      notifyError(t('powerbi.hints_copy_fail_title'), { description: failText, duration: 4600 });
+    }
   };
 
   const handleTestConnection = async () => {
@@ -881,7 +978,7 @@ export default function PowerBIConfigPage() {
 
       <div className="space-y-8">
         <div className="motion-stagger grid grid-cols-1 gap-6 xl:grid-cols-2 xl:items-stretch">
-          <Card className="flex flex-col">
+          <Card>
             <CardHeader>
               <CardTitle className="text-xl">{t('powerbi.config_title')}</CardTitle>
             </CardHeader>
@@ -1002,54 +1099,56 @@ export default function PowerBIConfigPage() {
               <div className="space-y-6 rounded-lg border border-border bg-muted/20 p-4">
                 <div className="space-y-3">
                   <Label>{t('powerbi.workspace_select_label')}</Label>
-                  <Select
-                    value={selectedWorkspaceId}
-                    onValueChange={(v) => {
-                      setSelectedWorkspaceId(v);
-                      setConfig((prev) => ({ ...prev, workspaceId: v }));
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t('powerbi.workspace_id_ph')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {workspaces.map((w) => (
-                        <SelectItem key={w.id} value={w.id}>
-                          {w.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={async () => {
-                        setIsLoading(true);
-                        try {
-                          await loadWorkspaces();
-                        } catch (err) {
-                          notifyError(t('powerbi.view_workspaces'), {
-                            description: formatUserFacingApiError(err, msgLocale),
-                            duration: 6500,
-                          });
-                        } finally {
-                          setIsLoading(false);
-                        }
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Select
+                      value={selectedWorkspaceId}
+                      onValueChange={(v) => {
+                        setSelectedWorkspaceId(v);
+                        setConfig((prev) => ({ ...prev, workspaceId: v }));
                       }}
-                      disabled={isLoading}
                     >
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      {t('common.refresh')}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setConfig((prev) => ({ ...prev, workspaceId: selectedWorkspaceId }));
-                      }}
-                      disabled={!selectedWorkspaceId}
-                    >
-                      {t('common.use')}
-                    </Button>
+                      <SelectTrigger className="sm:w-64">
+                        <SelectValue placeholder={t('powerbi.workspace_id_ph')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {workspaces.map((w) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          setIsLoading(true);
+                          try {
+                            await loadWorkspaces();
+                          } catch (err) {
+                            notifyError(t('powerbi.view_workspaces'), {
+                              description: formatUserFacingApiError(err, msgLocale),
+                              duration: 6500,
+                            });
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                        disabled={isLoading}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {t('common.refresh')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setConfig((prev) => ({ ...prev, workspaceId: selectedWorkspaceId }));
+                        }}
+                        disabled={!selectedWorkspaceId}
+                      >
+                        {t('common.use')}
+                      </Button>
+                    </div>
                   </div>
                   {workspaces.length > 0 ? (
                     <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm overflow-x-hidden">
@@ -1086,49 +1185,51 @@ export default function PowerBIConfigPage() {
 
                 <div className="space-y-3 border-t border-border pt-6">
                   <Label>{t('powerbi.view_datasets')}</Label>
-                  <Select
-                    value={selectedDatasetId}
-                    onValueChange={(v) => {
-                      setSelectedDatasetId(v);
-                      setConfig((prev) => ({ ...prev, datasetId: v }));
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t('common.select')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {datasets.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={async () => {
-                        setIsLoading(true);
-                        try {
-                          await loadDatasets();
-                        } catch (err) {
-                          notifyError(t('powerbi.view_datasets'), {
-                            description: formatUserFacingApiError(err, msgLocale),
-                            duration: 6500,
-                          });
-                        } finally {
-                          setIsLoading(false);
-                        }
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Select
+                      value={selectedDatasetId}
+                      onValueChange={(v) => {
+                        setSelectedDatasetId(v);
+                        setConfig((prev) => ({ ...prev, datasetId: v }));
                       }}
-                      disabled={isLoading}
                     >
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      {t('common.refresh')}
-                    </Button>
-                    <Button onClick={handleRefreshDataset} disabled={isLoading || !selectedDatasetId}>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      {t('powerbi.refresh_dataset')}
-                    </Button>
+                      <SelectTrigger className="sm:w-64">
+                        <SelectValue placeholder={t('common.select')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {datasets.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          setIsLoading(true);
+                          try {
+                            await loadDatasets();
+                          } catch (err) {
+                            notifyError(t('powerbi.view_datasets'), {
+                              description: formatUserFacingApiError(err, msgLocale),
+                              duration: 6500,
+                            });
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                        disabled={isLoading}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {t('common.refresh')}
+                      </Button>
+                      <Button onClick={handleRefreshDataset} disabled={isLoading || !selectedDatasetId}>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {t('powerbi.refresh_dataset')}
+                      </Button>
+                    </div>
                   </div>
                   {datasets.length > 0 ? (
                     <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm overflow-x-hidden">
@@ -1180,7 +1281,7 @@ export default function PowerBIConfigPage() {
               <CardTitle className="text-xl">{t('powerbi.hints_title')}</CardTitle>
               <CardDescription>{t('powerbi.hints_card_desc')}</CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 space-y-4 text-sm leading-relaxed text-muted-foreground">
+            <CardContent className="flex flex-1 flex-col gap-4 text-sm leading-relaxed text-muted-foreground">
               <section className="rounded-lg border border-border bg-muted/40 p-3">
                 <p className="font-medium text-foreground">{t('powerbi.hints_sp_label')}</p>
                 <p className="mt-1 text-[13px] font-medium text-amber-900 dark:text-amber-100/90">
@@ -1193,29 +1294,96 @@ export default function PowerBIConfigPage() {
                 </ul>
                 <p className="mt-2 text-[13px]">{t('powerbi.hints_sp_workspace_note')}</p>
               </section>
-              <section>
-                <p className="font-medium text-foreground">{t('powerbi.hints_tenant_label')}</p>
-                <p className="mt-1.5">
-                  {t('powerbi.hints_tenant_before')}
-                  <a
-                    href="https://entra.microsoft.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-medium text-primary underline underline-offset-2"
-                  >
-                    {t('powerbi.hints_tenant_link')}
-                    <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
-                  </a>
-                  {t('powerbi.hints_tenant_after')}
+              <section className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="font-medium text-foreground">
+                  {locale === 'vi' ? 'Dán link Power BI để tự nhận diện ID' : 'Paste a Power BI link to auto-detect IDs'}
                 </p>
+                <p className="mt-1 text-[12px] text-muted-foreground">
+                  {locale === 'vi'
+                    ? 'Ô sẽ tự giãn theo độ dài nội dung. Hệ thống sẽ tự tách Workspace ID và Dataset ID từ URL.'
+                    : 'The field auto-resizes with content. Workspace ID and Dataset ID are extracted automatically from the URL.'}
+                </p>
+                <Textarea
+                  ref={powerBiUrlInputRef}
+                  value={powerBiUrlInput}
+                  onChange={(e) => setPowerBiUrlInput(e.target.value)}
+                  placeholder={
+                    locale === 'vi'
+                      ? 'Ví dụ: https://app.powerbi.com/onelake/details/<workspace-guid>/dataset/<dataset-guid>/overview?experience=power-bi'
+                      : 'Example: https://app.powerbi.com/onelake/details/<workspace-guid>/dataset/<dataset-guid>/overview?experience=power-bi'
+                  }
+                  className="mt-2 min-h-[44px] resize-none overflow-hidden text-[12px] leading-relaxed font-mono"
+                  maxLength={1200}
+                />
+                <div className="mt-2 text-[12px] text-muted-foreground">
+                  <span>
+                    {locale === 'vi' ? 'Workspace ID nhận diện:' : 'Detected Workspace ID:'}{' '}
+                    <span className="font-mono text-foreground">{parsedPowerBiLinkIds.workspaceId || '—'}</span>
+                  </span>
+                  <span className="mx-2">|</span>
+                  <span>
+                    {locale === 'vi' ? 'Dataset ID nhận diện:' : 'Detected Dataset ID:'}{' '}
+                    <span className="font-mono text-foreground">{parsedPowerBiLinkIds.datasetId || '—'}</span>
+                  </span>
+                </div>
               </section>
-              <section>
-                <p className="font-medium text-foreground">{t('powerbi.hints_workspace_label')}</p>
-                <p className="mt-1.5">{t('powerbi.hints_workspace_body')}</p>
-              </section>
-              <section>
-                <p className="font-medium text-foreground">{t('powerbi.hints_dataset_label')}</p>
-                <p className="mt-1.5">{t('powerbi.hints_dataset_body')}</p>
+
+              <section className="mt-auto rounded-lg border border-border bg-muted/25 p-3">
+                <p className="text-sm font-semibold text-foreground">{t('powerbi.hints_steps_title')}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px]">
+                  <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-2 py-1">
+                    1. {t('powerbi.hints_step_1')}
+                  </span>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                  <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-2 py-1">
+                    2. {t('powerbi.hints_step_2')}
+                  </span>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                  <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-2 py-1">
+                    3. {t('powerbi.hints_step_3')}
+                  </span>
+                </div>
+
+                <p className="mt-3 text-sm font-semibold text-foreground">{t('powerbi.hints_copy_title')}</p>
+                <p className="mt-1 text-[12px] text-muted-foreground">{t('powerbi.hints_copy_desc')}</p>
+                <div className="mt-2 space-y-2 text-[12px]">
+                  <div className="rounded-md border border-border/70 bg-background/80 p-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-foreground">{t('powerbi.hints_workspace_label')}</p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-[11px]"
+                        onClick={() => void handleCopyIdTemplate('workspace')}
+                      >
+                        <Copy className="mr-1 h-3.5 w-3.5" />
+                        {t('powerbi.hints_copy_workspace_button')}
+                      </Button>
+                    </div>
+                    <code className="mt-1 block break-all font-mono text-[11px] text-muted-foreground">
+                      {WORKSPACE_URL_TEMPLATE}
+                    </code>
+                  </div>
+                  <div className="rounded-md border border-border/70 bg-background/80 p-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-foreground">{t('powerbi.hints_dataset_label')}</p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-[11px]"
+                        onClick={() => void handleCopyIdTemplate('dataset')}
+                      >
+                        <Copy className="mr-1 h-3.5 w-3.5" />
+                        {t('powerbi.hints_copy_dataset_button')}
+                      </Button>
+                    </div>
+                    <code className="mt-1 block break-all font-mono text-[11px] text-muted-foreground">
+                      {DATASET_URL_TEMPLATE}
+                    </code>
+                  </div>
+                </div>
               </section>
             </CardContent>
           </Card>
