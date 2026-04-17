@@ -481,11 +481,19 @@ function toModelOption(item: any): ModelOption | null {
 
 function normalizeSession(item: any): ChatSession | null {
   if (!item || typeof item !== 'object') return null;
-  const id = String(item.session_id ?? item.sessionId ?? item.id ?? '').trim();
+  const id = String(item.session_id ?? item.sessionId ?? item.id ?? item.chat_id ?? item.chatId ?? '').trim();
   if (!id) return null;
   const title =
     String(item.session_name ?? item.sessionName ?? item.title ?? item.name ?? item.label ?? '').trim() || null;
-  const updatedAt = String(item.updated_at ?? item.updatedAt ?? item.last_active_at ?? item.lastActiveAt ?? '').trim() || null;
+  const updatedAt = String(
+    item.updated_at ??
+      item.updatedAt ??
+      item.last_active_at ??
+      item.lastActiveAt ??
+      item.created_at ??
+      item.createdAt ??
+      '',
+  ).trim() || null;
   const pinned = Boolean(item.is_pinned ?? item.isPinned ?? item.pinned ?? false);
   return { id, title, updatedAt, pinned, raw: item };
 }
@@ -1214,6 +1222,10 @@ export default function AIChatPage() {
         ? data
         : Array.isArray(data?.items)
           ? data.items
+          : Array.isArray(data?.sessions)
+            ? data.sessions
+            : Array.isArray(data?.data)
+              ? data.data
           : Array.isArray(data?.value)
             ? data.value
             : [];
@@ -1431,7 +1443,7 @@ export default function AIChatPage() {
         writeStoredLastAiChatModel(resolvedModel);
       }
 
-      const newSid = String(data?.session_id ?? data?.sessionId ?? '').trim();
+      const newSid = String(data?.session_id ?? data?.sessionId ?? data?.id ?? data?.chat_id ?? data?.chatId ?? '').trim();
       const created = Boolean(data?.created_session ?? data?.createdSession);
       setPendingFiles([]);
       if (newSid && newSid !== sessionId) {

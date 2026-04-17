@@ -13,6 +13,33 @@ function isAuthPublicPath(cleanPath: string) {
   );
 }
 
+function looksLikeTokenSessionUnauthorized(err: ApiError): boolean {
+  const raw = String(err.bodyText ?? "").trim().toLowerCase();
+  if (!raw) return true;
+
+  // Backends sometimes return 401 for permission errors (should be 403).
+  // In that case we should show the API error, not force logout user.
+  if (
+    raw.includes("permission") ||
+    raw.includes("forbidden") ||
+    raw.includes("insufficient") ||
+    raw.includes("not allowed") ||
+    raw.includes("không có quyền") ||
+    raw.includes("khong co quyen")
+  ) {
+    return false;
+  }
+
+  return (
+    raw.includes("unauthorized") ||
+    raw.includes("not authenticated") ||
+    raw.includes("token") ||
+    raw.includes("expired") ||
+    raw.includes("invalid credentials") ||
+    raw.includes("signature")
+  );
+}
+
 /**
  * Browser-safe API helper that calls the Next.js proxy route (/api/v1),
  * so you don't need CORS and you don't expose server env vars to the client.
@@ -23,7 +50,13 @@ export async function browserApiFetch<T>(path: string, options?: ApiFetchOptions
   try {
     return await fetchJson<T>(url, options);
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401 && !isAuthPublicPath(cleanPath) && getAccessToken()) {
+    if (
+      e instanceof ApiError &&
+      e.status === 401 &&
+      !isAuthPublicPath(cleanPath) &&
+      getAccessToken() &&
+      looksLikeTokenSessionUnauthorized(e)
+    ) {
       logoutDueToSessionExpired("token");
     }
     throw e;
