@@ -335,8 +335,11 @@ export default function PowerBIConfigPage() {
   };
 
   const handleConnect = async () => {
-    const workspace_id = config.workspaceId.trim() || selectedWorkspaceId.trim();
-    const dataset_id = selectedDatasetId.trim() || config.datasetId.trim();
+    // Only trust the values currently shown in input fields.
+    // Do not silently fallback to previously selected IDs, otherwise
+    // users can submit stale values and never see validation errors.
+    const workspace_id = config.workspaceId.trim();
+    const dataset_id = config.datasetId.trim();
     const tenant_id = config.tenantId.trim();
 
     if (!workspace_id) {
