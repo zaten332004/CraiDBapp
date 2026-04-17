@@ -28,6 +28,7 @@ import { isPowerBiTableNotInDatasetError } from '@/lib/powerbi/schema-table-erro
 
 type PowerBIWorkspace = { id: string; name: string; raw: unknown };
 type PowerBIDataset = { id: string; name: string; raw: unknown };
+const UUID_V4_LIKE_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function toWorkspace(item: any): PowerBIWorkspace | null {
   if (!item || typeof item !== 'object') return null;
@@ -43,6 +44,10 @@ function toDataset(item: any): PowerBIDataset | null {
   if (!id) return null;
   const name = String(item.name ?? item.displayName ?? item.datasetName ?? id).trim();
   return { id, name, raw: item };
+}
+
+function isLikelyGuid(value: string): boolean {
+  return UUID_V4_LIKE_REGEX.test(String(value || '').trim());
 }
 
 type PowerBiStatus = {
@@ -262,6 +267,41 @@ export default function PowerBIConfigPage() {
       notifyError(t('powerbi.toast.connect_fail_title'), { description: msg, duration: 5000 });
       return;
     }
+    if (!isLikelyGuid(tenant_id)) {
+      notifyError(t('powerbi.toast.connect_fail_title'), {
+        description: t('powerbi.tenant_id_invalid_format'),
+        duration: 6500,
+      });
+      return;
+    }
+    if (!isLikelyGuid(workspace_id)) {
+      notifyError(t('powerbi.toast.connect_fail_title'), {
+        description: t('powerbi.workspace_id_invalid_format'),
+        duration: 6500,
+      });
+      return;
+    }
+    if (!isLikelyGuid(dataset_id)) {
+      notifyError(t('powerbi.toast.connect_fail_title'), {
+        description: t('powerbi.dataset_id_invalid_format'),
+        duration: 6500,
+      });
+      return;
+    }
+    if (workspaces.length > 0 && !workspaces.some((w) => w.id === workspace_id)) {
+      notifyError(t('powerbi.toast.connect_fail_title'), {
+        description: t('powerbi.workspace_id_not_found_in_list'),
+        duration: 7000,
+      });
+      return;
+    }
+    if (datasets.length > 0 && !datasets.some((d) => d.id === dataset_id)) {
+      notifyError(t('powerbi.toast.connect_fail_title'), {
+        description: t('powerbi.dataset_id_not_found_in_list'),
+        duration: 7000,
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -279,7 +319,12 @@ export default function PowerBIConfigPage() {
           ...(dataset_name_prefetch ? { dataset_name: dataset_name_prefetch } : {}),
         },
       });
-      setIsConnected(Boolean(res?.success ?? res?.connected ?? true));
+      const confirmed = res?.success === true || res?.connected === true;
+      if (!confirmed) {
+        const apiMsg = typeof res?.message === 'string' ? res.message.trim() : '';
+        throw new Error(apiMsg || t('powerbi.toast.connect_unconfirmed'));
+      }
+      setIsConnected(true);
       setLastCheckedAt(new Date());
       if (workspace_id) setSelectedWorkspaceId(workspace_id);
       if (dataset_id) setSelectedDatasetId(dataset_id);
