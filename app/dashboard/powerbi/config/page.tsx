@@ -30,6 +30,7 @@ type PowerBIWorkspace = { id: string; name: string; raw: unknown };
 type PowerBIDataset = { id: string; name: string; raw: unknown };
 const UUID_V4_LIKE_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const POWER_BI_APP_CLIENT_ID = '53a7db35-5f93-4e5d-beba-34d0437ef94c';
+const POWER_BI_ADMIN_CONSENT_REDIRECT_URI = 'https://craidbapp-production.up.railway.app/dashboard/powerbi/config';
 
 function toWorkspace(item: any): PowerBIWorkspace | null {
   if (!item || typeof item !== 'object') return null;
@@ -54,6 +55,12 @@ function isLikelyGuid(value: string): boolean {
 function buildAdminConsentUrl(tenantId: string, redirectUri: string): string {
   return `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/adminconsent?client_id=${encodeURIComponent(POWER_BI_APP_CLIENT_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 }
+
+type AdminConsentMessage = {
+  type: 'powerbi_admin_consent_result';
+  ok: boolean;
+  tenantId: string;
+};
 
 type PowerBiStatus = {
   connected?: boolean;
@@ -128,6 +135,63 @@ export default function PowerBIConfigPage() {
   const [powerBiSchemaLoading, setPowerBiSchemaLoading] = useState(false);
   const [tableHintsReadiness, setTableHintsReadiness] = useState<PowerBiReadinessResponse | null>(null);
   const [selectedSchemaName, setSelectedSchemaName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tenantFromQuery = String(params.get('tenant') || '').trim();
+    const hasConsentResult =
+      params.has('admin_consent') ||
+      params.has('error') ||
+      params.has('error_description');
+    if (!hasConsentResult) return;
+
+    // When opened from "Grant access", send consent result back and close popup tab.
+    if (window.opener && window.opener !== window) {
+      const ok = String(params.get('admin_consent') || '').trim().toLowerCase() === 'true';
+      const payload: AdminConsentMessage = {
+        type: 'powerbi_admin_consent_result',
+        ok,
+        tenantId: tenantFromQuery,
+      };
+      try {
+        window.opener.postMessage(payload, window.location.origin);
+        window.opener.focus();
+      } catch {
+        /* noop */
+      }
+      window.close();
+    }
+  }, []);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as Partial<AdminConsentMessage> | null;
+      if (!data || data.type !== 'powerbi_admin_consent_result') return;
+
+      const tenantId = String(data.tenantId || '').trim();
+      if (tenantId) {
+        setConfig((prev) => ({ ...prev, tenantId }));
+      }
+
+      if (data.ok) {
+        notifySuccess(t('powerbi.toast.grant_access_ok_title'), {
+          description: t('powerbi.toast.grant_access_ok_desc'),
+          duration: 5200,
+        });
+      } else {
+        notifyInfo(t('powerbi.toast.grant_access_cancel_title'), {
+          description: t('powerbi.toast.grant_access_cancel_desc'),
+          duration: 5200,
+        });
+      }
+      void runConnectionTest();
+      void loadAccountPowerBiStatus();
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t]);
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((w) => w.id === selectedWorkspaceId) ?? null,
@@ -387,8 +451,11 @@ export default function PowerBIConfigPage() {
       });
       return;
     }
-    const redirectUri = window.location.origin;
-    window.open(buildAdminConsentUrl(tenant_id, redirectUri), '_blank', 'noopener,noreferrer');
+    window.open(
+      buildAdminConsentUrl(tenant_id, POWER_BI_ADMIN_CONSENT_REDIRECT_URI),
+      '_blank',
+      'popup=yes,width=1040,height=780',
+    );
   };
 
   const handleTestConnection = async () => {
