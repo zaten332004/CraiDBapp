@@ -293,36 +293,39 @@ export default function DashboardPage() {
                 <CardDescription>{t('dashboard.recent_alerts_desc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 pb-4">
-                <div className="pt-1">
-                  <p className="text-sm font-semibold text-foreground">
-                    {locale === 'vi' ? 'Cảnh báo gần nhất' : 'Recent alerts'}
-                  </p>
-                </div>
                 {recentAlerts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {t('dashboard.no_open_alerts')}
-                  </p>
+                  <div className="rounded-lg border border-border/60 bg-muted/15 p-3">
+                    <p className="text-sm text-muted-foreground">
+                      {t('dashboard.no_open_alerts')}
+                    </p>
+                  </div>
                 ) : (
-                  <div className="max-h-40 overflow-y-auto pr-1">
+                  <div className="rounded-lg border border-border/60 bg-muted/15 p-2">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/60 px-2 pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <span>{t('dashboard.recent_alerts_col_name')}</span>
+                      <span>{t('dashboard.recent_alerts_col_time')}</span>
+                    </div>
+                    <div className="max-h-40 overflow-y-auto pr-1">
                     {recentAlerts.map((item) => (
                       <div
                         key={item.alert_id}
-                        className="flex items-center justify-between pb-2 border-b last:border-0 last:pb-0"
+                        className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-b border-border/50 px-2 py-2 last:border-0"
                       >
-                        <div>
+                        <div className="min-w-0">
                           <p className="font-medium text-foreground">
                             {item.customer_name ||
                               `${t('dashboard.customer_fallback')} #${item.alert_id}`}
                           </p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-muted-foreground line-clamp-2">
                             {formatAlertMessageForDisplay(item.message, locale)}
                           </p>
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground whitespace-nowrap pt-0.5">
                           {formatDateTimeVietnam(item.created_at, locale)}
                         </p>
                       </div>
                     ))}
+                  </div>
                   </div>
                 )}
               </CardContent>
