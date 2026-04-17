@@ -61,7 +61,7 @@ const KPICard = ({ title, value, icon: Icon }: { title: string; value: string; i
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      <Icon className="h-4 w-4 text-accent" />
+      <Icon className="h-5 w-5 text-accent" />
     </CardHeader>
     <CardContent>
       <div className="text-2xl font-bold">{value}</div>
@@ -305,7 +305,7 @@ export default function DashboardPage() {
                       <span>{t('dashboard.recent_alerts_col_name')}</span>
                       <span>{t('dashboard.recent_alerts_col_time')}</span>
                     </div>
-                    <div className="max-h-40 overflow-y-auto pr-1">
+                    <div className="max-h-52 overflow-y-auto pr-1">
                     {recentAlerts.map((item) => (
                       <div
                         key={item.alert_id}

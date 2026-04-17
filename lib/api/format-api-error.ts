@@ -140,6 +140,18 @@ const KNOWN_MESSAGE_ROWS: Array<{ en: string; vi: string }> = [
     vi: "Cần cấu hình danh sách bảng Power BI trước khi sử dụng dữ liệu bảng.",
   },
   {
+    en: "'User' object has no attribute 'user_id'",
+    vi: "Tài khoản hiện tại thiếu thuộc tính user_id để lưu cấu hình.",
+  },
+  {
+    en: "\"User\" object has no attribute \"user_id\"",
+    vi: "Tài khoản hiện tại thiếu thuộc tính user_id để lưu cấu hình.",
+  },
+  {
+    en: "User object has no attribute user_id",
+    vi: "Tài khoản hiện tại thiếu thuộc tính user_id để lưu cấu hình.",
+  },
+  {
     en: "Upload not found (expired job, API restarted, or set UPLOAD_JOBS_STORAGE_DIR).",
     vi: "Không tìm thấy dữ liệu upload (job đã hết hạn, API khởi động lại, hoặc chưa cấu hình UPLOAD_JOBS_STORAGE_DIR).",
   },
@@ -168,6 +180,14 @@ const KNOWN_MESSAGE_ROWS: Array<{ en: string; vi: string }> = [
 function translateSingleDetailLine(d: string, locale: UserFacingLocale): string {
   const line = d.trim();
   if (!line) return line;
+
+  const configuringPowerBi = line.match(/^Error configuring Power BI:\s*(.+)$/i);
+  if (configuringPowerBi) {
+    const nested = translateSingleDetailLine(String(configuringPowerBi[1] || "").trim(), locale);
+    return locale === "vi"
+      ? `Lỗi khi cấu hình Power BI: ${nested}`
+      : `Error configuring Power BI: ${nested}`;
+  }
 
   const uploadFail = line.match(/^Upload failed \((\d+)\)$/i);
   if (uploadFail) {

@@ -929,10 +929,10 @@ export const dictionaries: Record<Locale, Dictionary> = {
       " → Microsoft Entra ID → Tổng quan (Overview) → mục Tenant information → sao chép Tenant ID (GUID). Cùng giá trị thường xuất hiện trong URL Power BI dưới dạng tham số ctid= trên thanh địa chỉ.",
     "powerbi.hints_workspace_label": "Workspace ID",
     "powerbi.hints_workspace_body":
-      "Dùng workspace nhóm (shared), không dùng My workspace cho tích hợp API. URL kinh điển: app.powerbi.com/groups/{workspace-guid}/… — GUID ngay sau /groups/ là Workspace ID; My workspace thường là /groups/me/ (không thay cho workspace nhóm trong API). Một số màn Fabric/OneLake có dạng …/onelake/details/{me hoặc workspace-guid}/… — nếu không phải me thì segment đó là workspace.",
+      "Hãy dùng workspace nhóm, không dùng My workspace. Cách lấy nhanh: mở workspace trên Power BI Service, nếu URL có dạng /groups/{GUID}/... thì đoạn GUID sau /groups/ chính là Workspace ID. Nếu URL là /groups/me/... thì đó là My workspace (không dùng cho tích hợp API). Trên một số màn hình Fabric/OneLake, /onelake/details/{...} cũng có thể chứa workspace GUID.",
     "powerbi.hints_dataset_label": "Dataset ID",
     "powerbi.hints_dataset_body":
-      "GUID của semantic model / dataset: thường nằm trong URL sau …/dataset/{dataset-guid}/… (ví dụ đường dẫn OneLake details). Trong giao diện cổ điển có thể thấy trong …/groups/{workspace-guid}/datasets/… hoặc trong phần Settings của dataset. Có thể chọn dataset ở khối “Xem Workspaces” bên dưới để tự điền ô Dataset ID.",
+      "Dataset ID là GUID của semantic model. Cách lấy nhanh: mở dataset rồi xem URL, đoạn sau /dataset/{GUID}/ thường là Dataset ID. Bạn cũng có thể xem trong phần Settings của dataset. Nếu không chắc, hãy chọn dataset ở khối danh sách bên dưới để hệ thống tự điền vào ô Dataset ID.",
     "powerbi.rules_title": "Kiểm tra quy tắc bảng",
     "powerbi.rules_intro":
       "Bạn đã lưu cấu hình Power BI. Hệ thống không đọc danh sách bảng trực tiếp từ semantic model — hãy mở dataset trong Power BI Desktop hoặc Power BI Service (tab Tables / Model view) và đối chiếu thủ công với quy ước và danh mục tham chiếu bên dưới.",
@@ -981,7 +981,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "powerbi.table_suggestions_remove": "Xóa gợi ý",
     "powerbi.table_hints_sync_fail_title": "Không đồng bộ được gợi ý bảng",
     "powerbi.workspace": "Workspace",
-    "powerbi.workspace_select_label": "xem workspace",
+    "powerbi.workspace_select_label": "Xem Workspace",
     "powerbi.dataset": "Dataset",
     "powerbi.last_synced": "Đồng bộ gần nhất",
     "powerbi.view_workspaces": "Xem Workspaces",
@@ -2187,10 +2187,10 @@ export const dictionaries: Record<Locale, Dictionary> = {
       " → Microsoft Entra ID → Overview → Tenant information → copy Tenant ID (GUID). The same value often appears in Power BI URLs as the ctid= query parameter.",
     "powerbi.hints_workspace_label": "Workspace ID",
     "powerbi.hints_workspace_body":
-      "Use a team (shared) workspace, not My workspace, for API integration. Classic URL: app.powerbi.com/groups/{workspace-guid}/… — the GUID right after /groups/ is the Workspace ID; My workspace is usually /groups/me/ (not a substitute for a team workspace in APIs). Some Fabric/OneLake pages use …/onelake/details/{me-or-workspace-guid}/… — when it is not me, that segment is the workspace.",
+      "Use a team (shared) workspace, not My workspace. Quick way: open the workspace in Power BI Service; if the URL is /groups/{GUID}/..., the GUID right after /groups/ is your Workspace ID. If the URL is /groups/me/..., that is My workspace (not for API integration). Some Fabric/OneLake pages may also show the workspace GUID in /onelake/details/{...}.",
     "powerbi.hints_dataset_label": "Dataset ID",
     "powerbi.hints_dataset_body":
-      "The semantic model / dataset GUID usually appears in the URL after …/dataset/{dataset-guid}/… (e.g. OneLake details). Classic UI may show …/groups/{workspace-guid}/datasets/… or the ID under dataset Settings. You can also pick a dataset in “View Workspaces” below to fill the Dataset ID field.",
+      "Dataset ID is the semantic model GUID. Quick way: open the dataset and check the URL; the GUID after /dataset/{GUID}/ is usually the Dataset ID. You can also find it in dataset Settings. If unsure, pick a dataset from the list below and let the form fill Dataset ID automatically.",
     "powerbi.rules_title": "Table rule check",
     "powerbi.rules_intro":
       "Your Power BI settings are saved. This app does not read the semantic model table list here — open the dataset in Power BI Desktop or the Power BI Service (Tables / Model view) and manually verify against the conventions and reference lists below.",
@@ -2239,7 +2239,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "powerbi.table_suggestions_remove": "Remove suggestion",
     "powerbi.table_hints_sync_fail_title": "Could not sync table hints",
     "powerbi.workspace": "Workspace",
-    "powerbi.workspace_select_label": "View workspace",
+    "powerbi.workspace_select_label": "View Workspace",
     "powerbi.dataset": "Dataset",
     "powerbi.last_synced": "Last Synced",
     "powerbi.view_workspaces": "View Workspaces",

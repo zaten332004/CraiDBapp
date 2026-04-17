@@ -387,7 +387,7 @@ export default function PowerBIConfigPage() {
       });
       return;
     }
-    const redirectUri = `${window.location.origin}/dashboard/powerbi/config`;
+    const redirectUri = window.location.origin;
     window.open(buildAdminConsentUrl(tenant_id, redirectUri), '_blank', 'noopener,noreferrer');
   };
 
