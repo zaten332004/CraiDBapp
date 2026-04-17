@@ -1134,37 +1134,6 @@ export default function PowerBIConfigPage() {
                       </Button>
                     </div>
                   </div>
-                  {workspaces.length > 0 ? (
-                    <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm overflow-x-hidden">
-                      <Table className="table-fixed text-xs">
-                        <colgroup>
-                          <col className="w-[68%]" />
-                          <col className="w-[32%]" />
-                        </colgroup>
-                        <TableHeader>
-                          <TableRow className={scrollableTableHeaderRowClass}>
-                            <TableHead className="truncate text-[12px]">ID</TableHead>
-                            <TableHead className="truncate text-[12px]">{t('common.name')}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {workspaces.map((w) => (
-                            <TableRow
-                              key={w.id}
-                              className={w.id === selectedWorkspaceId ? 'bg-secondary/60' : undefined}
-                            >
-                              <TableCell className="font-mono text-[11px]">
-                                <span className="block truncate" title={w.id}>{w.id}</span>
-                              </TableCell>
-                              <TableCell>
-                                <span className="block truncate" title={w.name}>{w.name}</span>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollableTableRegion>
-                  ) : null}
                 </div>
 
                 <div className="space-y-3 border-t border-border pt-6">
@@ -1215,37 +1184,6 @@ export default function PowerBIConfigPage() {
                       </Button>
                     </div>
                   </div>
-                  {datasets.length > 0 ? (
-                    <ScrollableTableRegion className="max-h-56 rounded-md bg-background/60 shadow-sm overflow-x-hidden">
-                      <Table className="table-fixed text-xs">
-                        <colgroup>
-                          <col className="w-[68%]" />
-                          <col className="w-[32%]" />
-                        </colgroup>
-                        <TableHeader>
-                          <TableRow className={scrollableTableHeaderRowClass}>
-                            <TableHead className="truncate text-[12px]">ID</TableHead>
-                            <TableHead className="truncate text-[12px]">{t('common.name')}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {datasets.map((d) => (
-                            <TableRow
-                              key={d.id}
-                              className={d.id === selectedDatasetId ? 'bg-secondary/60' : undefined}
-                            >
-                              <TableCell className="font-mono text-[11px]">
-                                <span className="block truncate" title={d.id}>{d.id}</span>
-                              </TableCell>
-                              <TableCell>
-                                <span className="block truncate" title={d.name}>{d.name}</span>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollableTableRegion>
-                  ) : null}
                 </div>
 
                 {refreshResult ? (
