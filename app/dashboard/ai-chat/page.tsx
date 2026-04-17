@@ -108,6 +108,19 @@ type ChatSession = {
   raw: unknown;
 };
 
+const SESSION_ID_CANDIDATE_KEYS = [
+  'session_id',
+  'sessionId',
+  'id',
+  'chat_id',
+  'chatId',
+  'conversation_id',
+  'conversationId',
+  'thread_id',
+  'threadId',
+  'uuid',
+] as const;
+
 type UploadedFileCtx = {
   id: string;
   name: string;
@@ -496,6 +509,87 @@ function normalizeSession(item: any): ChatSession | null {
   ).trim() || null;
   const pinned = Boolean(item.is_pinned ?? item.isPinned ?? item.pinned ?? false);
   return { id, title, updatedAt, pinned, raw: item };
+}
+
+function collectSessionIdCandidates(raw: unknown): string[] {
+  if (!raw || typeof raw !== 'object') return [];
+  const obj = raw as Record<string, unknown>;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const key of SESSION_ID_CANDIDATE_KEYS) {
+    const id = String(obj[key] ?? '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+function readArrayByKeys(payload: unknown, keys: readonly string[]): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+  const obj = payload as Record<string, unknown>;
+
+  for (const key of keys) {
+    const v = obj[key];
+    if (Array.isArray(v)) return v;
+  }
+
+  for (const v of Object.values(obj)) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+    const nested = v as Record<string, unknown>;
+    for (const key of keys) {
+      const n = nested[key];
+      if (Array.isArray(n)) return n;
+    }
+  }
+
+  return [];
+}
+
+function extractSessionIdFromSendPayload(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return '';
+  const obj = payload as Record<string, unknown>;
+  const roots: unknown[] = [obj, obj.data, obj.result, obj.payload, obj.session];
+  for (const root of roots) {
+    if (!root || typeof root !== 'object') continue;
+    const rec = root as Record<string, unknown>;
+    for (const key of SESSION_ID_CANDIDATE_KEYS) {
+      const id = String(rec[key] ?? '').trim();
+      if (id) return id;
+    }
+  }
+  return '';
+}
+
+function extractCreatedSessionFlag(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  const obj = payload as Record<string, unknown>;
+  const roots: unknown[] = [obj, obj.data, obj.result, obj.payload, obj.session];
+  for (const root of roots) {
+    if (!root || typeof root !== 'object') continue;
+    const rec = root as Record<string, unknown>;
+    if (typeof rec.created_session === 'boolean') return rec.created_session;
+    if (typeof rec.createdSession === 'boolean') return rec.createdSession;
+    if (typeof rec.is_new_session === 'boolean') return rec.is_new_session;
+    if (typeof rec.isNewSession === 'boolean') return rec.isNewSession;
+  }
+  return false;
+}
+
+function pickMostRecentSession(list: ChatSession[]): ChatSession | null {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  let best: ChatSession | null = null;
+  let bestTs = Number.NEGATIVE_INFINITY;
+  for (const s of list) {
+    const ts = Date.parse(String(s.updatedAt ?? '').trim());
+    const score = Number.isFinite(ts) ? ts : Number.NEGATIVE_INFINITY;
+    if (!best || score > bestTs) {
+      best = s;
+      bestTs = score;
+    }
+  }
+  return best ?? list[0] ?? null;
 }
 
 function parseBackendChatTimestamp(value: unknown): Date | null {
@@ -1215,24 +1309,16 @@ export default function AIChatPage() {
     }
   };
 
-  const loadSessions = async () => {
+  const loadSessions = async (): Promise<ChatSession[]> => {
     try {
       const data = await browserApiFetchAuth<any>('/ai-chat/sessions', { method: 'GET' });
-      const rawList = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.items)
-          ? data.items
-          : Array.isArray(data?.sessions)
-            ? data.sessions
-            : Array.isArray(data?.data)
-              ? data.data
-          : Array.isArray(data?.value)
-            ? data.value
-            : [];
+      const rawList = readArrayByKeys(data, ['items', 'sessions', 'data', 'value', 'results']);
       const list = rawList.map(normalizeSession).filter(Boolean) as ChatSession[];
       setSessions(list);
+      return list;
     } catch (err) {
       notifyError(t('toast.load_failed'), { description: apiErr(err) });
+      return [];
     }
   };
 
@@ -1257,29 +1343,41 @@ export default function AIChatPage() {
     const data = await browserApiFetchAuth<any>(`/ai-chat/history/${encodeURIComponent(id)}`, {
       method: 'GET',
     });
-    const rawList = Array.isArray(data)
-      ? data
-      : Array.isArray(data?.items)
-        ? data.items
-        : Array.isArray(data?.messages)
-          ? data.messages
-          : Array.isArray(data?.value)
-            ? data.value
-            : [];
+    const rawList = readArrayByKeys(data, ['items', 'messages', 'data', 'value', 'results']);
     return rawList.map(normalizeHistoryMessage).filter(Boolean) as ChatMessage[];
   };
 
-  const loadHistory = async (id: string) => {
+  const loadHistory = async (session: ChatSession) => {
+    const primaryId = String(session.id || '').trim();
+    const candidates = [primaryId, ...collectSessionIdCandidates(session.raw)].filter(
+      (id, idx, arr) => Boolean(id) && arr.indexOf(id) === idx,
+    );
+    if (!primaryId) return;
+
     setMessages([]);
     setIsLoading(true);
     try {
-      const cached = readStoredSessionMessages(id);
+      const cached = readStoredSessionMessages(primaryId);
       if (cached.length > 0) {
         setMessages(cached);
         return;
       }
-      const list = await fetchHistoryMessages(id);
-      setMessages(list);
+
+      let lastErr: unknown = null;
+      for (const sid of candidates) {
+        try {
+          const list = await fetchHistoryMessages(sid);
+          if (list.length > 0) {
+            setMessages(list);
+            return;
+          }
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+
+      if (lastErr) throw lastErr;
+      setMessages([]);
     } catch (err) {
       notifyError(t('toast.load_failed'), { description: apiErr(err) });
       setMessages([]);
@@ -1381,6 +1479,7 @@ export default function AIChatPage() {
       const order = (tier: ModelTier) => (tier === 'fast' ? 0 : tier === 'thinking' ? 1 : tier === 'pro' ? 2 : 9);
       return [...allowed].sort((a, b) => order(a.tier) - order(b.tier))[0]?.model ?? '';
     };
+    const activeSessionId = String(sessionId ?? '').trim();
     const hadValidModelSelection =
       Boolean(selectedModel) &&
       modelOptions.some((o) => o.model === selectedModel && isModelAllowed(o));
@@ -1429,7 +1528,7 @@ export default function AIChatPage() {
 
       const body: Record<string, unknown> = {
         message: text,
-        ...(sessionId ? { session_id: sessionId, sessionId } : {}),
+        ...(activeSessionId ? { session_id: activeSessionId, sessionId: activeSessionId } : {}),
         ...(resolvedModel ? { model: resolvedModel } : {}),
         customer_context: customerContext,
       };
@@ -1443,11 +1542,16 @@ export default function AIChatPage() {
         writeStoredLastAiChatModel(resolvedModel);
       }
 
-      const newSid = String(data?.session_id ?? data?.sessionId ?? data?.id ?? data?.chat_id ?? data?.chatId ?? '').trim();
-      const created = Boolean(data?.created_session ?? data?.createdSession);
+      const newSid = extractSessionIdFromSendPayload(data);
+      const created = extractCreatedSessionFlag(data) || (!activeSessionId && Boolean(newSid));
       setPendingFiles([]);
-      if (newSid && newSid !== sessionId) {
+      if (newSid && newSid !== activeSessionId) {
         setSessionId(newSid);
+      } else if (!activeSessionId && !newSid) {
+        // Fallback for older/newer backend payloads not returning session id in send response.
+        const refreshed = await loadSessions();
+        const newest = pickMostRecentSession(refreshed);
+        if (newest?.id) setSessionId(newest.id);
       }
       if (aiDataSource === 'powerbi') {
         // Prioritize visible send + session creation, then refresh Power BI context in background.
@@ -1580,13 +1684,21 @@ export default function AIChatPage() {
   useEffect(() => {
     (async () => {
       setIsLoading(true);
+      setUserRole(getUserRole());
+
+      // Prioritize session list visibility first, load models in parallel.
+      const sessionsTask = loadSessions();
+      const modelsTask = loadModels();
+
       try {
-        setUserRole(getUserRole());
-        await loadModels();
-        await loadSessions();
+        await sessionsTask;
       } finally {
+        // Unblock UI as soon as session list is ready.
         setIsLoading(false);
       }
+
+      // Keep model loading in background; errors are handled inside loadModels.
+      await modelsTask;
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1862,7 +1974,7 @@ export default function AIChatPage() {
                         type="button"
                         onClick={() => {
                           setSessionId(s.id);
-                          void loadHistory(s.id);
+                          void loadHistory(s);
                         }}
                         className="min-w-0 text-left pl-2.5 pr-1 py-2 rounded-l-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
