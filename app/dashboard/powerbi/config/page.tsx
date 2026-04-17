@@ -52,8 +52,21 @@ function isLikelyGuid(value: string): boolean {
   return UUID_V4_LIKE_REGEX.test(String(value || '').trim());
 }
 
-function buildAdminConsentUrl(tenantId: string, redirectUri: string): string {
-  return `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/adminconsent?client_id=${encodeURIComponent(POWER_BI_APP_CLIENT_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+function buildAdminConsentState(tenantId: string): string {
+  return `powerbi:${tenantId}`;
+}
+
+function extractTenantFromAdminConsentState(state: string): string {
+  const raw = String(state || '').trim();
+  if (!raw.startsWith('powerbi:')) return '';
+  const tenant = raw.slice('powerbi:'.length).trim();
+  return isLikelyGuid(tenant) ? tenant : '';
+}
+
+function buildAdminConsentUrl(tenantId: string, redirectUri: string, state?: string): string {
+  const base = `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/adminconsent?client_id=${encodeURIComponent(POWER_BI_APP_CLIENT_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  if (!state) return base;
+  return `${base}&state=${encodeURIComponent(state)}`;
 }
 
 type AdminConsentMessage = {
@@ -138,7 +151,7 @@ export default function PowerBIConfigPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const tenantFromQuery = String(params.get('tenant') || '').trim();
+    const tenantFromState = extractTenantFromAdminConsentState(String(params.get('state') || ''));
     const hasConsentResult =
       params.has('admin_consent') ||
       params.has('error') ||
@@ -151,7 +164,7 @@ export default function PowerBIConfigPage() {
       const payload: AdminConsentMessage = {
         type: 'powerbi_admin_consent_result',
         ok,
-        tenantId: tenantFromQuery,
+        tenantId: tenantFromState,
       };
       try {
         window.opener.postMessage(payload, window.location.origin);
@@ -456,9 +469,12 @@ export default function PowerBIConfigPage() {
       });
       return;
     }
-    const redirectUrl = new URL(POWER_BI_ADMIN_CONSENT_REDIRECT_URI);
-    redirectUrl.searchParams.set('tenant', tenant_id);
-    window.open(buildAdminConsentUrl(tenant_id, redirectUrl.toString()), '_blank', 'popup=yes,width=1040,height=780');
+    const state = buildAdminConsentState(tenant_id);
+    window.open(
+      buildAdminConsentUrl(tenant_id, POWER_BI_ADMIN_CONSENT_REDIRECT_URI, state),
+      '_blank',
+      'popup=yes,width=1040,height=780',
+    );
   };
 
   const handleTestConnection = async () => {
