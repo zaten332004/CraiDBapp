@@ -29,6 +29,7 @@ import { isPowerBiTableNotInDatasetError } from '@/lib/powerbi/schema-table-erro
 type PowerBIWorkspace = { id: string; name: string; raw: unknown };
 type PowerBIDataset = { id: string; name: string; raw: unknown };
 const UUID_V4_LIKE_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const POWER_BI_APP_CLIENT_ID = '53a7db35-5f93-4e5d-beba-34d0437ef94c';
 
 function toWorkspace(item: any): PowerBIWorkspace | null {
   if (!item || typeof item !== 'object') return null;
@@ -48,6 +49,10 @@ function toDataset(item: any): PowerBIDataset | null {
 
 function isLikelyGuid(value: string): boolean {
   return UUID_V4_LIKE_REGEX.test(String(value || '').trim());
+}
+
+function buildAdminConsentUrl(tenantId: string, redirectUri: string): string {
+  return `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/adminconsent?client_id=${encodeURIComponent(POWER_BI_APP_CLIENT_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 }
 
 type PowerBiStatus = {
@@ -364,6 +369,26 @@ export default function PowerBIConfigPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGrantAccess = () => {
+    const tenant_id = config.tenantId.trim();
+    if (!tenant_id) {
+      notifyError(t('powerbi.toast.connect_fail_title'), {
+        description: t('powerbi.tenant_id_required'),
+        duration: 5000,
+      });
+      return;
+    }
+    if (!isLikelyGuid(tenant_id)) {
+      notifyError(t('powerbi.toast.connect_fail_title'), {
+        description: t('powerbi.tenant_id_invalid_format'),
+        duration: 6500,
+      });
+      return;
+    }
+    const redirectUri = `${window.location.origin}/dashboard/powerbi/config`;
+    window.open(buildAdminConsentUrl(tenant_id, redirectUri), '_blank', 'noopener,noreferrer');
   };
 
   const handleTestConnection = async () => {
@@ -824,9 +849,14 @@ export default function PowerBIConfigPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="workspaceId" required>
-                    {t('powerbi.workspace_id')}
-                  </Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="workspaceId" required>
+                      {t('powerbi.workspace_id')}
+                    </Label>
+                    <Button type="button" variant="outline" size="sm" onClick={handleGrantAccess} disabled={isLoading}>
+                      {t('powerbi.grant_access_button')}
+                    </Button>
+                  </div>
                   <Input
                     id="workspaceId"
                     placeholder={t('powerbi.workspace_id_ph')}
@@ -1062,21 +1092,6 @@ export default function PowerBIConfigPage() {
               <CardDescription>{t('powerbi.hints_card_desc')}</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 space-y-4 text-sm leading-relaxed text-muted-foreground">
-              <section className="rounded-lg border border-amber-200/90 bg-amber-50/70 p-3 dark:border-amber-900/60 dark:bg-amber-950/25">
-                <p className="font-medium text-foreground">{t('powerbi.hints_prereq_label')}</p>
-                <p className="mt-2 whitespace-pre-line text-[13px] leading-relaxed">{t('powerbi.hints_prereq_body')}</p>
-                <p className="mt-2 text-[13px]">
-                  <a
-                    href="https://app.powerbi.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-medium text-primary underline underline-offset-2 hover:opacity-90"
-                  >
-                    {t('powerbi.hints_prereq_powerbi_service_link')}
-                    <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
-                  </a>
-                </p>
-              </section>
               <section className="rounded-lg border border-border bg-muted/40 p-3">
                 <p className="font-medium text-foreground">{t('powerbi.hints_sp_label')}</p>
                 <p className="mt-1 text-[13px] font-medium text-amber-900 dark:text-amber-100/90">
@@ -1084,11 +1099,7 @@ export default function PowerBIConfigPage() {
                 </p>
                 <ul className="mt-2 list-inside list-disc space-y-1 text-[13px]">
                   <li>
-                    <span className="font-medium text-foreground">{t('powerbi.hints_sp_app_name')}</span> CreditRisk_Backend
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground">{t('powerbi.hints_sp_client_id')}</span>{' '}
-                    <code className="rounded bg-background px-1 py-0.5 font-mono text-xs">53a7db35-5f93-4e5d-beba-34d0437ef94c</code>
+                    <span className="font-medium text-foreground">{t('powerbi.hints_sp_app_name')}</span> CreditRisk_Analysis
                   </li>
                 </ul>
                 <p className="mt-2 text-[13px]">{t('powerbi.hints_sp_workspace_note')}</p>
