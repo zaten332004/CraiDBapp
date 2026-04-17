@@ -185,8 +185,13 @@ export default function PowerBIConfigPage() {
           duration: 5200,
         });
       }
-      void runConnectionTest();
-      void loadAccountPowerBiStatus();
+      void (async () => {
+        await runConnectionTest();
+        await loadAccountPowerBiStatus();
+        if (tenantId) {
+          setConfig((prev) => ({ ...prev, tenantId }));
+        }
+      })();
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
@@ -451,11 +456,9 @@ export default function PowerBIConfigPage() {
       });
       return;
     }
-    window.open(
-      buildAdminConsentUrl(tenant_id, POWER_BI_ADMIN_CONSENT_REDIRECT_URI),
-      '_blank',
-      'popup=yes,width=1040,height=780',
-    );
+    const redirectUrl = new URL(POWER_BI_ADMIN_CONSENT_REDIRECT_URI);
+    redirectUrl.searchParams.set('tenant', tenant_id);
+    window.open(buildAdminConsentUrl(tenant_id, redirectUrl.toString()), '_blank', 'popup=yes,width=1040,height=780');
   };
 
   const handleTestConnection = async () => {
