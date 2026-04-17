@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowRight, Copy, Loader2, ListChecks, RefreshCw, Trash2, Unplug, PlugZap } from 'lucide-react';
+import { ArrowRight, Loader2, ListChecks, RefreshCw, Trash2, Unplug, PlugZap } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { useI18n } from '@/components/i18n-provider';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
@@ -32,8 +32,6 @@ type PowerBIDataset = { id: string; name: string; raw: unknown };
 const UUID_V4_LIKE_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const POWER_BI_APP_CLIENT_ID = '53a7db35-5f93-4e5d-beba-34d0437ef94c';
 const POWER_BI_ADMIN_CONSENT_REDIRECT_URI = 'https://craidbapp-production.up.railway.app/dashboard/powerbi/config';
-const WORKSPACE_URL_TEMPLATE = 'https://app.powerbi.com/groups/<workspace-guid>/...';
-const DATASET_URL_TEMPLATE = 'https://app.powerbi.com/.../dataset/<dataset-guid>/...';
 
 function toWorkspace(item: any): PowerBIWorkspace | null {
   if (!item || typeof item !== 'object') return null;
@@ -561,20 +559,6 @@ export default function PowerBIConfigPage() {
       '_blank',
       'popup=yes,width=1040,height=780',
     );
-  };
-
-  const handleCopyIdTemplate = async (kind: 'workspace' | 'dataset') => {
-    const text = kind === 'workspace' ? WORKSPACE_URL_TEMPLATE : DATASET_URL_TEMPLATE;
-    const okText =
-      kind === 'workspace' ? t('powerbi.hints_copy_workspace_ok') : t('powerbi.hints_copy_dataset_ok');
-    const failText =
-      kind === 'workspace' ? t('powerbi.hints_copy_workspace_fail') : t('powerbi.hints_copy_dataset_fail');
-    try {
-      await navigator.clipboard.writeText(text);
-      notifySuccess(t('powerbi.hints_copy_ok_title'), { description: okText, duration: 3600 });
-    } catch {
-      notifyError(t('powerbi.hints_copy_fail_title'), { description: failText, duration: 4600 });
-    }
   };
 
   const handleTestConnection = async () => {
@@ -1298,11 +1282,6 @@ export default function PowerBIConfigPage() {
                 <p className="font-medium text-foreground">
                   {locale === 'vi' ? 'Dán link Power BI để tự nhận diện ID' : 'Paste a Power BI link to auto-detect IDs'}
                 </p>
-                <p className="mt-1 text-[12px] text-muted-foreground">
-                  {locale === 'vi'
-                    ? 'Ô sẽ tự giãn theo độ dài nội dung. Hệ thống sẽ tự tách Workspace ID và Dataset ID từ URL.'
-                    : 'The field auto-resizes with content. Workspace ID and Dataset ID are extracted automatically from the URL.'}
-                </p>
                 <Textarea
                   ref={powerBiUrlInputRef}
                   value={powerBiUrlInput}
@@ -1315,21 +1294,21 @@ export default function PowerBIConfigPage() {
                   className="mt-2 min-h-[44px] resize-none overflow-hidden text-[12px] leading-relaxed font-mono"
                   maxLength={1200}
                 />
-                <div className="mt-2 text-[12px] text-muted-foreground">
-                  <span>
+                <div className="mt-2 space-y-1 text-[12px] text-muted-foreground">
+                  <p>
                     {locale === 'vi' ? 'Workspace ID nhận diện:' : 'Detected Workspace ID:'}{' '}
                     <span className="font-mono text-foreground">{parsedPowerBiLinkIds.workspaceId || '—'}</span>
-                  </span>
-                  <span className="mx-2">|</span>
-                  <span>
+                  </p>
+                  <p>
                     {locale === 'vi' ? 'Dataset ID nhận diện:' : 'Detected Dataset ID:'}{' '}
                     <span className="font-mono text-foreground">{parsedPowerBiLinkIds.datasetId || '—'}</span>
-                  </span>
+                  </p>
                 </div>
               </section>
 
               <section className="mt-auto rounded-lg border border-border bg-muted/25 p-3">
                 <p className="text-sm font-semibold text-foreground">{t('powerbi.hints_steps_title')}</p>
+                <p className="mt-1 text-[12px] text-muted-foreground">{t('powerbi.hints_steps_desc')}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px]">
                   <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-2 py-1">
                     1. {t('powerbi.hints_step_1')}
@@ -1343,47 +1322,21 @@ export default function PowerBIConfigPage() {
                     3. {t('powerbi.hints_step_3')}
                   </span>
                 </div>
-
-                <p className="mt-3 text-sm font-semibold text-foreground">{t('powerbi.hints_copy_title')}</p>
-                <p className="mt-1 text-[12px] text-muted-foreground">{t('powerbi.hints_copy_desc')}</p>
-                <div className="mt-2 space-y-2 text-[12px]">
+                <div className="mt-3 space-y-2 text-[12px]">
                   <div className="rounded-md border border-border/70 bg-background/80 p-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-medium text-foreground">{t('powerbi.hints_workspace_label')}</p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-2 text-[11px]"
-                        onClick={() => void handleCopyIdTemplate('workspace')}
-                      >
-                        <Copy className="mr-1 h-3.5 w-3.5" />
-                        {t('powerbi.hints_copy_workspace_button')}
-                      </Button>
-                    </div>
-                    <code className="mt-1 block break-all font-mono text-[11px] text-muted-foreground">
-                      {WORKSPACE_URL_TEMPLATE}
-                    </code>
+                    <p className="font-medium text-foreground">1) {t('powerbi.hints_step_1')}</p>
+                    <p className="mt-1 text-muted-foreground">{t('powerbi.hints_step_1_detail')}</p>
                   </div>
                   <div className="rounded-md border border-border/70 bg-background/80 p-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-medium text-foreground">{t('powerbi.hints_dataset_label')}</p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-2 text-[11px]"
-                        onClick={() => void handleCopyIdTemplate('dataset')}
-                      >
-                        <Copy className="mr-1 h-3.5 w-3.5" />
-                        {t('powerbi.hints_copy_dataset_button')}
-                      </Button>
-                    </div>
-                    <code className="mt-1 block break-all font-mono text-[11px] text-muted-foreground">
-                      {DATASET_URL_TEMPLATE}
-                    </code>
+                    <p className="font-medium text-foreground">2) {t('powerbi.hints_step_2')}</p>
+                    <p className="mt-1 text-muted-foreground">{t('powerbi.hints_step_2_detail')}</p>
+                  </div>
+                  <div className="rounded-md border border-border/70 bg-background/80 p-2">
+                    <p className="font-medium text-foreground">3) {t('powerbi.hints_step_3')}</p>
+                    <p className="mt-1 text-muted-foreground">{t('powerbi.hints_step_3_detail')}</p>
                   </div>
                 </div>
+
               </section>
             </CardContent>
           </Card>
