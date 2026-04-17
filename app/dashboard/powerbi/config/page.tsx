@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollableTableRegion, scrollableTableHeaderRowClass } from '@/components/scrollable-table-region';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowRight, Loader2, ListChecks, RefreshCw, Trash2, Unplug, PlugZap } from 'lucide-react';
+import { ArrowRight, ExternalLink, Loader2, ListChecks, RefreshCw, Trash2, Unplug, PlugZap } from 'lucide-react';
 import { browserApiFetchAuth } from '@/lib/api/browser';
 import { useI18n } from '@/components/i18n-provider';
 import { formatUserFacingApiError, type UserFacingLocale } from '@/lib/api/format-api-error';
@@ -1279,9 +1279,20 @@ export default function PowerBIConfigPage() {
                 <p className="mt-2 text-[13px]">{t('powerbi.hints_sp_workspace_note')}</p>
               </section>
               <section className="rounded-lg border border-border bg-muted/20 p-3">
-                <p className="font-medium text-foreground">
-                  {locale === 'vi' ? 'Dán link Power BI để tự nhận diện ID' : 'Paste a Power BI link to auto-detect IDs'}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium text-foreground">
+                    {locale === 'vi' ? 'Dán link Power BI để tự nhận diện ID' : 'Paste a Power BI link to auto-detect IDs'}
+                  </p>
+                  <a
+                    href="https://app.powerbi.com/"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1 text-[12px] font-medium text-primary underline-offset-2 hover:underline"
+                  >
+                    {locale === 'vi' ? 'Mở PowerBI Service' : 'Open PowerBI Service'}
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                  </a>
+                </div>
                 <Textarea
                   ref={powerBiUrlInputRef}
                   value={powerBiUrlInput}
@@ -1324,7 +1335,18 @@ export default function PowerBIConfigPage() {
                 </div>
                 <div className="mt-3 space-y-2 text-[12px]">
                   <div className="rounded-md border border-border/70 bg-background/80 p-2">
-                    <p className="font-medium text-foreground">1) {t('powerbi.hints_step_1')}</p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-foreground">1) {t('powerbi.hints_step_1')}</p>
+                      <a
+                        href="https://entra.microsoft.com/#view/Microsoft_AAD_IAM/EntraLanding.ReactView"
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="inline-flex items-center gap-1 text-[12px] font-medium text-primary underline-offset-2 hover:underline"
+                      >
+                        {locale === 'vi' ? 'Mở Microsoft Entra' : 'Open Microsoft Entra'}
+                        <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                      </a>
+                    </div>
                     <p className="mt-1 text-muted-foreground">{t('powerbi.hints_step_1_detail')}</p>
                   </div>
                   <div className="rounded-md border border-border/70 bg-background/80 p-2">
